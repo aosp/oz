@@ -119,5 +119,9 @@ source "drivers/staging/Kconfig"
 source "drivers/platform/Kconfig"
 
 source "drivers/clk/Kconfig"
+
 source "drivers/dsp/syslink/Kconfig"
+
+source "drivers/media/video/dmm/Kconfig"
+
 endmenu

@@ -127,4 +127,3 @@ obj-$(CONFIG_SYSLINK_PROC4430)  += dsp/syslink/procmgr/proc4430/
 obj-$(CONFIG_OMAP_DEVICE_HANDLER)	+= dsp/syslink/devh/
 obj-$(CONFIG_OMAP_DEVICE_HANDLER)	+= dsp/syslink/devh/44xx/
 obj-$(CONFIG_DMM_OMAP)		+= media/
-obj-$(CONFIG_TILER_OMAP)		+= media/
