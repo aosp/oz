@@ -1,17 +1,17 @@
 menuconfig FB_OMAP2
-        tristate "OMAP2/3 frame buffer support (EXPERIMENTAL)"
-        depends on FB && OMAP2_DSS
+	tristate "OMAP2+ frame buffer support (EXPERIMENTAL)"
+	depends on FB && OMAP2_DSS
+	default y
 
 	select OMAP2_VRAM
-	select OMAP2_VRFB if ARCH_OMAP2 || ARCH_OMAP3
-        select FB_CFB_FILLRECT
-        select FB_CFB_COPYAREA
-        select FB_CFB_IMAGEBLIT
-        help
-          Frame buffer driver for OMAP2/3 based boards.
+	select FB_CFB_FILLRECT
+	select FB_CFB_COPYAREA
+	select FB_CFB_IMAGEBLIT
+	help
+	  Frame buffer driver for OMAP2+ based boards.
 
 config FB_OMAP2_DEBUG_SUPPORT
-	bool "Debug support for OMAP2/3 FB"
+	bool "Debug support for OMAP2+ FB"
 	default y
 	depends on FB_OMAP2
 	help
@@ -21,8 +21,10 @@ config FB_OMAP2_DEBUG_SUPPORT
 config FB_OMAP2_NUM_FBS
 	int "Number of framebuffers"
 	range 1 10
-	default 3
+	default 2  if ARCH_OMAP4
+	default 1  if ARCH_OMAP2 || ARCH_OMAP3
 	depends on FB_OMAP2
 	help
 	  Select the number of framebuffers created. OMAP2/3 has 3 overlays
-	  so normally this would be 3.
+	  so normally this would be max 3.  OMAP4 has 4 overlays.
+	  By default we leave 2 overlays for video.
