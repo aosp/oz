@@ -26,7 +26,7 @@
 #include <mach/omap4-common.h>
 
 /* SCU base address */
-static void __iomem *scu_base;
+void __iomem *scu_base;
 
 static DEFINE_SPINLOCK(boot_lock);
 
