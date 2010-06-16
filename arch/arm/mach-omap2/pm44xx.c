@@ -115,6 +115,12 @@ static int __init omap4_pm_init(void)
 
 	/* Enable autoidle for all clks which support it*/
 	omap_clk_enable_autoidle();
+
+	ret = omap4_mpuss_init();
+	if (ret) {
+		pr_err("Failed to initialise OMAP4 MPUSS\n");
+		goto err2;
+	}
 #endif
 
 #ifdef CONFIG_SUSPEND
