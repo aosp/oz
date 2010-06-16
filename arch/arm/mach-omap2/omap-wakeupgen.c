@@ -24,6 +24,9 @@
 #include <asm/hardware/gic.h>
 
 #include <mach/omap-wakeupgen.h>
+#include <mach/omap4-common.h>
+
+#include "omap4-sar-layout.h"
 
 #define NR_BANKS		4
 #define MAX_IRQS		128
@@ -52,6 +55,11 @@ static inline void cpu_writel(u32 val, u8 idx, u32 cpu)
 {
 	__raw_writel(val, wakeupgen_base + OMAP_WKG_ENB_A_0 +
 				(cpu * CPU_ENA_OFFSET) + (idx * 4));
+}
+
+static inline void sar_writel(u32 val, u32 offset, u8 idx)
+{
+	__raw_writel(val, sar_ram_base + offset + (idx * 4));
 }
 
 static void _wakeupgen_set_all(unsigned int cpu, unsigned int reg)
@@ -210,4 +218,70 @@ int __init omap_wakeupgen_init(void)
 	gic_arch_extn.irq_set_wake = wakeupgen_set_wake;
 
 	return 0;
+}
+
+/**
+ * omap_wakeupgen_save() - WakeupGen context save function
+ *
+ * Save WakewupGen context in SAR BANK3. Restore is done by ROM code.
+ * WakeupGen is lost only when DEVICE hits OFF. Though the register
+ * context is retained in MPU OFF/OSWR state, hw recommondation is to
+ * save/restore WakeupGen along with GIC to have consistent interrupt
+ * state at both the blocks.
+ *
+ * During normal operation, WakeupGen delivers external interrupts
+ * directly to the GIC. When the CPU asserts StandbyWFI, indicating
+ * it wants to enter lowpower state, the Standby Controller checks
+ * with the WakeupGen unit using the idlereq/idleack handshake to make
+ * sure there is no incoming interrupts.
+ */
+
+void omap_wakeupgen_save(void)
+{
+	u8 i;
+	u32 val;
+
+	if (omap_rev() == OMAP4430_REV_ES1_0)
+		return;
+
+	for (i = 0; i < NR_BANKS; i++) {
+		/* Save the CPUx interrupt mask for IRQ 0 to 127 */
+		val = cpu_readl(i, 0);
+		sar_writel(val, WAKEUPGENENB_OFFSET_CPU0, i);
+		val = cpu_readl(i, 1);
+		sar_writel(val, WAKEUPGENENB_OFFSET_CPU1, i);
+
+		/*
+		 * Disable the secure interrupts for CPUx. The restore
+		 * code blindly restores secure and non-secure interrupt
+		 * masks from SAR RAM. Secure interrupts are not suppose
+		 * to be enabled from HLOS. So overwrite the SAR location
+		 * so that the secure interrupt remains disabled.
+		 */
+		sar_writel(0x0, WAKEUPGENENB_SECURE_OFFSET_CPU0, i);
+		sar_writel(0x0, WAKEUPGENENB_SECURE_OFFSET_CPU1, i);
+	}
+
+	/* Save AuxBoot* registers */
+	val = __raw_readl(wakeupgen_base + OMAP_AUX_CORE_BOOT_0);
+	__raw_writel(val, sar_ram_base + AUXCOREBOOT0_OFFSET);
+	val = __raw_readl(wakeupgen_base + OMAP_AUX_CORE_BOOT_0);
+	__raw_writel(val, sar_ram_base + AUXCOREBOOT1_OFFSET);
+
+	/* Save SyncReq generation logic */
+	val = __raw_readl(wakeupgen_base + OMAP_AUX_CORE_BOOT_0);
+	__raw_writel(val, sar_ram_base + AUXCOREBOOT0_OFFSET);
+	val = __raw_readl(wakeupgen_base + OMAP_AUX_CORE_BOOT_0);
+	__raw_writel(val, sar_ram_base + AUXCOREBOOT1_OFFSET);
+
+	/* Save SyncReq generation logic */
+	val = __raw_readl(wakeupgen_base + OMAP_PTMSYNCREQ_MASK);
+	__raw_writel(val, sar_ram_base + PTMSYNCREQ_MASK_OFFSET);
+	val = __raw_readl(wakeupgen_base + OMAP_PTMSYNCREQ_EN);
+	__raw_writel(val, sar_ram_base + PTMSYNCREQ_EN_OFFSET);
+
+	/* Set the Backup Bit Mask status */
+	val = __raw_readl(sar_ram_base + SAR_BACKUP_STATUS_OFFSET);
+	val |= SAR_BACKUP_STATUS_WAKEUPGEN;
+	__raw_writel(val, sar_ram_base + SAR_BACKUP_STATUS_OFFSET);
 }
