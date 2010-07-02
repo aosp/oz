@@ -150,7 +150,18 @@
 #define MMC_PU				(0x1 << 3)
 #define MMC_PD				(0x1 << 2)
 
+/* TWL6030 vibrator registers */
+#define TWL6030_VIBCTRL			0x9B
+#define TWL6030_VIBMODE			0x9C
+#define TWL6030_PWM1ON			0xBA
+#define	TWL6030_PWM1OFF			0xBB
+#define TWL6030_PWM2ON			0xBD
+#define TWL6030_PWM2OFF			0xBE
 
+/* TWL6030 control interface  registers */
+#define TWL6030_TOGGLE1			0x90
+#define TWL6030_TOGGLE2			0x91
+#define TWL6030_TOGGLE3			0x92
 
 #define TWL4030_CLASS_ID 		0x4030
 #define TWL6030_CLASS_ID 		0x6030
