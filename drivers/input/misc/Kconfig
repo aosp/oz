@@ -481,4 +481,12 @@ config INPUT_CMA3000_I2C
 	  To compile this driver as a module, choose M here: the
 	  module will be called cma3000_d0x_i2c.
 
+config INPUT_SFH7741
+	tristate "SFH7741 Proximity sensor"
+	help
+	  Say Y here if you want to use proximity sensor sfh7741.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called sfh7741.
+
 endif
