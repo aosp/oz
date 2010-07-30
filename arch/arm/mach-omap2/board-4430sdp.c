@@ -24,6 +24,7 @@
 #include <linux/regulator/machine.h>
 #include <linux/leds.h>
 #include <linux/leds_pwm.h>
+#include <linux/delay.h>
 
 #include <mach/hardware.h>
 #include <mach/omap4-common.h>
@@ -33,8 +34,10 @@
 
 #include <plat/board.h>
 #include <plat/common.h>
+#include <plat/display.h>
 #include <plat/usb.h>
 #include <plat/mmc.h>
+#include <plat/nokia-dsi-panel.h>
 
 #include "mux.h"
 #include "hsmmc.h"
@@ -219,13 +222,59 @@ error1:
 	return status;
 }
 
-static struct platform_device sdp4430_lcd_device = {
-	.name		= "sdp4430_lcd",
-	.id		= -1,
+static struct nokia_dsi_panel_data dsi_panel = {
+		.name	= "taal",
+		.reset_gpio	= 102,
+		.use_ext_te	= false,
+		.ext_te_gpio	= 101,
+		.use_esd_check	= false,
+};
+
+static struct omap_dss_device sdp4430_lcd_device = {
+	.name			= "lcd",
+	.driver_name		= "taal",
+	.type			= OMAP_DISPLAY_TYPE_DSI,
+	.data			= &dsi_panel,
+	.phy.dsi		= {
+		.clk_lane	= 1,
+		.clk_pol	= 0,
+		.data1_lane	= 2,
+		.data1_pol	= 0,
+		.data2_lane	= 3,
+		.data2_pol	= 0,
+		.div		= {
+			.lck_div	= 1,
+			.pck_div	= 5,
+			.regm		= 150,
+			.regn		= 17,
+			.regm3		= 4,
+			.regm4		= 4,
+			.lp_clk_div	= 8,
+		},
+	},
+	.channel		= OMAP_DSS_CHANNEL_LCD,
+};
+
+static struct omap_dss_device *sdp4430_dss_devices[] = {
+	&sdp4430_lcd_device,
+};
+
+static struct omap_dss_board_info sdp4430_dss_data = {
+	.num_devices	=	ARRAY_SIZE(sdp4430_dss_devices),
+	.devices	=	sdp4430_dss_devices,
+	.default_device	=	&sdp4430_lcd_device,
+};
+
+static struct platform_device sdp4430_dss_device = {
+	.name	=	"omapdss",
+	.id	=	-1,
+	.dev	= {
+		.platform_data = &sdp4430_dss_data,
+	},
 };
 
 static struct platform_device *sdp4430_devices[] __initdata = {
-	&sdp4430_lcd_device,
+	&sdp4430_dss_device,
 	&sdp4430_gpio_keys_device,
 	&sdp4430_leds_gpio,
 	&sdp4430_leds_pwm,
@@ -589,6 +638,20 @@ static struct omap_board_mux board_mux[] __initdata = {
 #define board_mux	NULL
 #endif
 
+static void __init omap4_display_init(void)
+{
+	void __iomem *phymux_base = NULL;
+	unsigned int dsimux = 0xFFFFFFFF;
+	phymux_base = ioremap(0x4A100000, 0x1000);
+	/* Turning on DSI PHY Mux*/
+	__raw_writel(dsimux, phymux_base+0x618);
+	dsimux = __raw_readl(phymux_base+0x618);
+
+	/* Panel Taal reset */
+	gpio_request(dsi_panel.reset_gpio, "dsi1_en_gpio");
+	gpio_direction_output(dsi_panel.reset_gpio, 0);
+}
+
 static void __init omap_4430sdp_init(void)
 {
 	int status;
@@ -599,6 +662,7 @@ static void __init omap_4430sdp_init(void)
 	omap4_mux_init(board_mux, package);
 
 	omap4_i2c_init();
+	omap4_display_init();
 	omap_sfh7741prox_init();
 	platform_add_devices(sdp4430_devices, ARRAY_SIZE(sdp4430_devices));
 	omap_serial_init();
