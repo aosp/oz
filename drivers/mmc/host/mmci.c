@@ -464,29 +464,30 @@ static void mmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 	struct mmci_host *host = mmc_priv(mmc);
 	u32 pwr = 0;
 	unsigned long flags;
+	int ret;
 
 	switch (ios->power_mode) {
 	case MMC_POWER_OFF:
-		if(host->vcc &&
-		   regulator_is_enabled(host->vcc))
-			regulator_disable(host->vcc);
+		if (host->vcc)
+			ret = mmc_regulator_set_ocr(mmc, host->vcc, 0);
 		break;
 	case MMC_POWER_UP:
-#ifdef CONFIG_REGULATOR
-		if (host->vcc)
-			/* This implicitly enables the regulator */
-			mmc_regulator_set_ocr(host->vcc, ios->vdd);
-#endif
-		/*
-		 * The translate_vdd function is not used if you have
-		 * an external regulator, or your design is really weird.
-		 * Using it would mean sending in power control BOTH using
-		 * a regulator AND the 4 MMCIPWR bits. If we don't have
-		 * a regulator, we might have some other platform specific
-		 * power control behind this translate function.
-		 */
-		if (!host->vcc && host->plat->translate_vdd)
-			pwr |= host->plat->translate_vdd(mmc_dev(mmc), ios->vdd);
+		if (host->vcc) {
+			ret = mmc_regulator_set_ocr(mmc, host->vcc, ios->vdd);
+			if (ret) {
+				dev_err(mmc_dev(mmc), "unable to set OCR\n");
+				/*
+				 * The .set_ios() function in the mmc_host_ops
+				 * struct return void, and failing to set the
+				 * power should be rare so we print an error
+				 * and return here.
+				 */
+				return;
+			}
+		}
+		if (host->plat->vdd_handler)
+			pwr |= host->plat->vdd_handler(mmc_dev(mmc), ios->vdd,
+						       ios->power_mode);
 		/* The ST version does not have this, fall through to POWER_ON */
 		if (host->hw_designer != AMBA_VENDOR_ST) {
 			pwr |= MCI_PWR_UP;
@@ -807,8 +808,8 @@ static int __devexit mmci_remove(struct amba_device *dev)
 		clk_disable(host->clk);
 		clk_put(host->clk);
 
-		if (regulator_is_enabled(host->vcc))
-			regulator_disable(host->vcc);
+		if (host->vcc)
+			mmc_regulator_set_ocr(mmc, host->vcc, 0);
 		regulator_put(host->vcc);
 
 		mmc_free_host(mmc);
