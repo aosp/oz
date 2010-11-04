@@ -1139,7 +1139,7 @@ static struct omap_hwmod omap44xx_dss_dsi2_hwmod = {
 static struct omap_hwmod_class_sysconfig omap44xx_dss_sysc = {
 	.rev_offs	= 0x0000,
 	.syss_offs	= 0x0014,
-	.sysc_flags	= SYSS_HAS_RESET_STATUS,
+	.sysc_flags	= SYSS_HAS_RESET_STATUS | SYSC_READONLY,
 };
 
 static struct omap_hwmod_class omap44xx_dss_hwmod_class = {
