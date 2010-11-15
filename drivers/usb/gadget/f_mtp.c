@@ -317,7 +317,9 @@ static inline void _unlock(atomic_t *excl)
 /* add a request to the tail of a list */
 static void req_put(struct mtp_dev *dev, struct list_head *head,
 		struct usb_request *req)
-{	unsigned long flags;
+{
+	unsigned long flags;
+
 	spin_lock_irqsave(&dev->lock, flags);
 	list_add_tail(&req->list, head);
 	spin_unlock_irqrestore(&dev->lock, flags);
@@ -608,14 +610,16 @@ static ssize_t mtp_write(struct file *fp, const char __user *buf,
 }
 
 static void mtp_send_file(struct work_struct *data)
-	{struct mtp_dev	*dev = container_of(data,
+	{
+	struct mtp_dev	*dev = container_of(data,
 		struct mtp_dev, mtp_send_file);
 	struct usb_composite_dev *cdev = dev->cdev;
 	struct usb_request *req = NULL;
 	struct file *filp;
 	loff_t offset;
 	int64_t count;
-	int r, xfer, ret;
+	int xfer, ret;
+	int r = 0;
 
 	int need_zlp = 0;
 
@@ -623,7 +627,7 @@ static void mtp_send_file(struct work_struct *data)
 	smp_rmb();
 	filp = dev->xfer_file;
 	offset = dev->xfer_file_offset;
-	r = count = dev->xfer_file_length;
+	count = dev->xfer_file_length;
 
 	DBG(cdev, "mtp_send_file(%lld %lld)\n", offset, count);
 
@@ -683,20 +687,22 @@ static void mtp_send_file(struct work_struct *data)
 }
 
 static void mtp_receive_file(struct work_struct *data)
-{       struct mtp_dev	*dev = container_of(data,
+{
+	struct mtp_dev	*dev = container_of(data,
 		struct mtp_dev, mtp_receive_file);
 	struct usb_composite_dev *cdev = dev->cdev;
 	struct usb_request *read_req = NULL, *write_req = NULL;
 	struct file *filp;
 	loff_t offset;
 	int64_t count;
-	int r, ret, cur_buf = 0;
+	int ret, cur_buf = 0;
+	int r = 0;;
 
 	/* read our parameters */
 	smp_rmb();
 	filp = dev->xfer_file;
 	offset = dev->xfer_file_offset;
-	r = count = dev->xfer_file_length;
+	count = dev->xfer_file_length;
 
 	DBG(cdev, "mtp_receive_file(%lld)\n", count);
 
