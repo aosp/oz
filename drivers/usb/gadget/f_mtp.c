@@ -745,7 +745,15 @@ static void mtp_receive_file(struct work_struct *data)
 				r = ret;
 				break;
 			}
-			count -= read_req->actual;
+			/* if xfer_file_length is 0xFFFFFFFF, then we read until
+			* we get a zero length packet
+			*/
+			if (count != 0xFFFFFFFF)
+				count -= read_req->actual;
+			if (read_req->actual < read_req->length) {
+				DBG(cdev, "got short packet\n");
+				count = 0;
+			}
 			write_req = read_req;
 			read_req = NULL;
 		}
@@ -1178,9 +1186,9 @@ static int mtp_bind_config(struct usb_configuration *c)
 	spin_lock_init(&dev->lock);
 	init_waitqueue_head(&dev->read_wq);
 	init_waitqueue_head(&dev->write_wq);
-	init_waitqueue_head(&dev->intr_wq);
 	atomic_set(&dev->open_excl, 0);
 	atomic_set(&dev->ioctl_excl, 0);
+	init_waitqueue_head(&dev->intr_wq);
 	INIT_LIST_HEAD(&dev->tx_idle);
 
 	dev->wq = create_singlethread_workqueue("f_mtp");
