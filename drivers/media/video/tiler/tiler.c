@@ -1769,6 +1769,7 @@ static s32 __init tiler_init(void)
 	struct tcm_pt div_pt;
 	struct tcm *sita = NULL;
 	struct tmm *tmm_pat = NULL;
+	struct pat_area area = {0};
 
 	if (!cpu_is_omap44xx())
 		return 0;
@@ -1793,11 +1794,14 @@ static s32 __init tiler_init(void)
 	TCM_SET(TILFMT_PAGE, sita);
 
 	/* Allocate tiler memory manager (must have 1 unique TMM per TCM ) */
-	tmm_pat = tmm_pat_init(0);
+	tmm_pat = tmm_pat_init(0, dmac_va, dmac_pa);
 	TMM_SET(TILFMT_8BIT, tmm_pat);
 	TMM_SET(TILFMT_16BIT, tmm_pat);
 	TMM_SET(TILFMT_32BIT, tmm_pat);
 	TMM_SET(TILFMT_PAGE, tmm_pat);
+	area.x1 = TILER_WIDTH - 1;
+	area.y1 = TILER_HEIGHT - 1;
+	tmm_clear(tmm_pat, area);
 
 	tiler_device = kmalloc(sizeof(*tiler_device), GFP_KERNEL);
 	if (!tiler_device || !sita || !tmm_pat) {
