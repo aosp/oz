@@ -970,10 +970,14 @@ int omapfb_apply_changes(struct fb_info *fbi, int init)
 	int r = 0, rotation = 0;
 	struct omapfb_info *ofbi = FB2OFB(fbi);
 	struct fb_var_screeninfo *var = &fbi->var;
+	struct omap_dss_device *display;
 	struct omap_overlay *ovl;
-	u16 posx, posy;
 	u16 outw, outh;
+	u16 posx, posy;
 	int i;
+	/* Assigning default values */
+	outw = var->xres;
+	outh = var->yres;
 
 #ifdef DEBUG
 	if (omapfb_test_pattern)
@@ -998,6 +1002,15 @@ int omapfb_apply_changes(struct fb_info *fbi, int init)
 		/* Even if scaling is enabled, we will not scale FB */
 		outw = var->xres;
 		outh = var->yres;
+
+		if (ofbi->fit_to_screen &&
+		    (ovl->caps & OMAP_DSS_OVL_CAP_SCALE)) {
+			/* get the device resolution */
+			display = ovl->manager->device;
+			if (display && display->driver)
+				display->driver->get_resolution(display,
+								&outw, &outh);
+		}
 
 		rotation = (var->rotate + ofbi->rotation[i]) % 4;
 		if (ofbi->rotation_type != OMAP_DSS_ROT_TILER &&
