@@ -204,6 +204,11 @@ s32 tiler_map(struct tiler_block_t *blk, enum tiler_fmt fmt, u32 usr_addr);
  * @param gid		group ID
  * @param pid		process ID
  * @param usr_addr	user space address of existing buffer.
+ *			This is understood in the context of the
+ *			current process, not the process
+ *			referred to by 'pid'.  However, the
+ *			mapped block will be tracked as part of
+ *			the process 'pid'.
  *
  * @return error status
  */
