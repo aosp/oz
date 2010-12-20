@@ -1000,7 +1000,8 @@ static s32 map_block(enum tiler_fmt fmt, u32 width, u32 height,
 		return -ENOMEM;
 
 	/* reserve area in tiler container */
-	mi = __get_area(fmt, width, height, 0, 0, gi);
+	mi = __get_area(fmt, width, height, PAGE_SIZE,
+						usr_addr & (PAGE_SIZE - 1), gi);
 	if (!mi) {
 		mutex_lock(&mtx);
 		gi->refs--;
