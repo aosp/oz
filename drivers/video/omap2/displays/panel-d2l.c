@@ -17,7 +17,6 @@
  * this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#define DEBUG 1
 #include <linux/module.h>
 #include <linux/delay.h>
 #include <linux/err.h>
@@ -909,7 +908,9 @@ static int d2l_power_on(struct omap_dss_device *dssdev)
 		/* Need to wait a certain time - Toshiba Bridge Constraint */
 		msleep(1000);
 
+#ifdef DEB
 		d2l_dump_regs();
+#endif
 
 		//configure D2L chip DSI-RX configuration registers
 		d2l_write_register(PPI_TX_RX_TA, 0x00000004); //this register setting is required only if host wishes to perform DSI read transactions.
@@ -939,7 +940,9 @@ static int d2l_power_on(struct omap_dss_device *dssdev)
 		d2l_write_register(SYSRST, 0x00000004);
 		d2l_write_register(VFUEN, 0x00000001);
 
+#ifdef DEB
 		d2l_dump_regs();
+#endif
 
 		dsi_videomode_panel_postinit();
 
