@@ -388,6 +388,12 @@ int dsi_vc_set_max_rx_packet_size(enum omap_dsi_index ix,
 		int channel, u16 len);
 int dsi_vc_send_null(enum omap_dsi_index ix, int channel);
 int dsi_vc_send_bta_sync(enum omap_dsi_index ix, int channel);
+int dsi_vc_send_long(enum omap_dsi_index ix, int channel,
+	u8 data_type, u8 *data, u16 len, u8 ecc);
+void dsi_set_stop_mode(bool stop);
+void dsi_videomode_panel_preinit(void);
+void dsi_videomode_panel_postinit(void);
+
 
 /* Board specific data */
 #define PWM2ON			0x03
@@ -656,6 +662,10 @@ struct omap_dss_device {
 			u8 data1_pol;
 			u8 data2_lane;
 			u8 data2_pol;
+			u8 data3_lane;
+			u8 data3_pol;
+			u8 data4_lane;
+			u8 data4_pol;
 
 			struct {
 				u16 regn;
@@ -820,6 +830,10 @@ struct omap_dss_driver {
 };
 
 struct pico_platform_data {
+	u8 gpio_intr;
+};
+
+struct d2l_platform_data {
 	u8 gpio_intr;
 };
 

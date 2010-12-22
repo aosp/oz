@@ -29,6 +29,12 @@ config PANEL_PICO_DLP
         help
           LCD Panel used in TI's SDP4430 and EVM boards
 
+config PANEL_D2L
+        tristate "Toshiba D2L DSI Panel"
+        depends on OMAP2_DSS_DSI
+        help
+          Toshiba D2L DSI video mode panel.
+
 config PANEL_TAAL
         tristate "Taal DSI Panel"
         depends on OMAP2_DSS_DSI

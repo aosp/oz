@@ -3373,6 +3373,9 @@ static void dispc_enable_lcd_out(enum omap_channel channel, bool enable)
 		irq = DISPC_IRQ_FRAMEDONE;
 	}
 
+	/* another change */
+	irq = DISPC_IRQ_VSYNC;
+
 	if (!enable && is_on) {
 		init_completion(&frame_done_completion);
 
@@ -3761,7 +3764,8 @@ void dispc_set_parallel_interface_mode(enum omap_channel channel,
 		break;
 
 	case OMAP_DSS_PARALLELMODE_DSI:
-		stallmode = 1;
+		//seems like nobody thought about DSI videomode where stallmode needs to be off, so turning it off here.
+			stallmode = 0;
 		gpout1 = 1;
 		break;
 
