@@ -13,6 +13,7 @@
 #include <asm/system.h>
 #include <asm/smp_scu.h>
 #include <asm/memory.h>
+#include <asm/hardware/cache-l2x0.h>
 
 #include <plat/omap44xx.h>
 #include <mach/omap4-common.h>
@@ -56,6 +57,7 @@ ENTRY(omap4_cpu_suspend)
 	beq	do_WFI				@ Nothing to save, jump to WFI
 	ldr	r8, =sar_ram_base
 	ldr	r8, [r8]
+	str	r1, [r8, #L2X0_OFFSET]		@ Store save state
 	ands	r0, r0, #0x0f
 	orreq	r8, r8, #CPU0_SAVE_OFFSET
 	orrne	r8, r8, #CPU1_SAVE_OFFSET
@@ -131,6 +133,42 @@ ENTRY(omap4_cpu_suspend)
 	ldr	r0, =scu_base
 	ldr	r0, [r0]
 	bl     scu_power_mode
+	isb
+	dsb
+
+#ifdef CONFIG_CACHE_L2X0
+	/*
+	 * Clean and invalidate the L2 cache.
+	 * Common cache-l2x0.c functions can't be used here since it
+	 * uses spinlocks. We are out of coherency here with data cache
+	 * disabled. The spinlock implementation uses exclusive load/store
+	 * instruction which can fail without data cache being enabled.
+	 * OMAP4 hardware doesn't support exclusive monitor which can
+	 * overcome exclusive access issue. Because of this, CPU can
+	 * lead to deadlock.
+	 */
+l2x_clean_inv:
+	ldr	r8, =sar_ram_base
+	ldr	r8, [r8]
+	ldr	r0, [r8, #L2X0_OFFSET]
+	cmp	r0, #3
+	bne	do_WFI
+	ldr	r2, =l2cache_base
+	ldr	r2, [r2]
+	mov	r0, #0xff
+	str	r0, [r2, #L2X0_CLEAN_WAY]
+wait:
+	ldr	r0, [r2, #L2X0_CLEAN_WAY]
+	ands	r0, r0, #0xff
+	bne	wait
+l2x_sync:
+	mov	r0, #0x0
+	str	r0, [r2, #L2X0_CACHE_SYNC]
+sync:
+	ldr	r0, [r2, #L2X0_CACHE_SYNC]
+	ands	r0, r0, #0x1
+	bne	sync
+#endif
 
 do_WFI:
 	/*
@@ -193,6 +231,32 @@ ENDPROC(omap4_cpu_suspend)
  */
 
 ENTRY(omap4_cpu_resume)
+#ifdef CONFIG_CACHE_L2X0
+	/*
+	 * Restore the L2 AUXCTRL and enable the L2 cache.
+	 * 0x109 =  Program the L2X0 AUXCTRL
+	 * 0x102 =  Enable the L2 using L2X0 CTRL
+	 * register r0 contains value to be programmed.
+	 * L2 cache is already invalidate by ROM code as part
+	 * of MPUSS OFF wakeup path.
+	 */
+	ldr	r2, =OMAP44XX_L2CACHE_BASE
+	ldr	r0, [r2, #L2X0_CTRL]
+	and	r0, #0x0f
+	cmp	r0, #1
+	beq	skip_l2en			@ Skip if already enabled
+	ldr	r3, =OMAP44XX_SAR_RAM_BASE
+	ldr	r0, [r3, #L2X0_AUXCTRL_OFFSET]
+	ldr	r12, =0x109			@ Setup L2 AUXCTRL value
+	dsb
+	smc	#0
+	mov	r0, #0x1
+	ldr	r12, =0x102			@ Enable L2 Cache controller
+	dsb
+	smc	#0
+skip_l2en:
+#endif
+
 	/*
 	 * Check the wakeup cpuid and use appropriate
 	 * SAR BANK location for context restore.

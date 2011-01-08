@@ -49,6 +49,7 @@
 #include <asm/system.h>
 #include <asm/irq.h>
 #include <asm/hardware/gic.h>
+#include <asm/hardware/cache-l2x0.h>
 
 #include <plat/omap44xx.h>
 #include <mach/omap4-common.h>
@@ -341,6 +342,7 @@ int __init omap4_mpuss_init(void)
 {
 	struct omap4_cpu_pm_info *pm_info;
 	u8 i;
+	u32 val;
 
 	if (omap_rev() == OMAP4430_REV_ES1_0) {
 		WARN(1, "Power Management not supported on OMAP4430 ES1.0\n");
@@ -409,6 +411,15 @@ int __init omap4_mpuss_init(void)
 	sar_writel(GIC_ISR_NON_SECURE, ICDISR_CPU1_OFFSET, 0);
 	for (i = 0; i < max_spi_reg; i++)
 		sar_writel(GIC_ISR_NON_SECURE, ICDISR_SPI_OFFSET, i);
+
+#ifdef CONFIG_CACHE_L2X0
+	/*
+	 * Save the L2X0 AUXCTRL value to SAR memory. Its used to
+	 * in every restore patch MPUSS OFF path.
+	 */
+	val = __raw_readl(l2cache_base + L2X0_AUX_CTRL);
+	__raw_writel(val, sar_ram_base + L2X0_AUXCTRL_OFFSET);
+#endif
 
 	return 0;
 }
