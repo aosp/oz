@@ -287,6 +287,10 @@ int omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
 	if (cpu)
 		goto cpu_prepare;
 
+#ifdef CONFIG_PM_DEBUG
+	pwrdm_pre_transition();
+#endif
+
 	/*
 	 * Check MPUSS next state and save GIC if needed
 	 * GIC lost during MPU OFF and OSWR
@@ -331,6 +335,10 @@ cpu_prepare:
 		gic_secondary_set(CPU0_ID, 1);
 		gic_dist_set(CPU0_ID, 1);
 	}
+
+#ifdef CONFIG_PM_DEBUG
+	pwrdm_post_transition();
+#endif
 
 ret:
 	return 0;
