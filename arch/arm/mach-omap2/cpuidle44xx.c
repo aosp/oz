@@ -170,6 +170,31 @@ static int omap4_enter_idle_bm(struct cpuidle_device *dev,
 }
 
 /**
+ * omap4_cpuidle_update_states() - Update the cpuidle states
+ * @mpu_deepest_state: Enable states upto and including this for mpu domain
+ * @core_deepest_state: Enable states upto and including this for core domain
+ *
+ * This goes through the list of states available and enables and disables the
+ * validity of C states based on deepest state that can be achieved for the
+ * variable domain
+ */
+void omap4_cpuidle_update_states(u32 mpu_deepest_state, u32 core_deepest_state)
+{
+	int i;
+
+	for (i = OMAP4_STATE_C1; i < OMAP4_MAX_STATES; i++) {
+		struct omap4_processor_cx *cx = &omap4_power_states[i];
+
+		if ((cx->mpu_state >= mpu_deepest_state) &&
+		    (cx->core_state >= core_deepest_state)) {
+			cx->valid = 1;
+		} else {
+			cx->valid = 0;
+		}
+	}
+}
+
+/**
  * omap4_init_power_states - Initialises the OMAP4 specific C states.
  *
  */
@@ -324,6 +349,11 @@ int __init omap4_idle_init(void)
 			return -EIO;
 		}
 	}
+
+	if (enable_off_mode)
+		omap4_cpuidle_update_states(PWRDM_POWER_OFF, PWRDM_POWER_OFF);
+	else
+		omap4_cpuidle_update_states(PWRDM_POWER_RET, PWRDM_POWER_RET);
 
 	return 0;
 }

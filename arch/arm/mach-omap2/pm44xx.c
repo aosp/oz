@@ -183,6 +183,10 @@ void omap4_pm_off_mode_enable(int enable)
 	else
 		state = PWRDM_POWER_RET;
 
+#ifdef CONFIG_CPU_IDLE
+	omap4_cpuidle_update_states(state, PWRDM_POWER_ON);
+#endif
+
 	list_for_each_entry(pwrst, &pwrst_list, node) {
 		/* FIXME: Remove this check when core retention is supported */
 		if (!strcmp(pwrst->pwrdm->name, "mpu_pwrdm")) {
