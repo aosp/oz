@@ -178,7 +178,7 @@ static void _autodep_lookup(struct clkdm_autodep *autodep)
  * XXX autodeps are deprecated and should be removed at the earliest
  * opportunity
  */
-static void _clkdm_add_autodeps(struct clockdomain *clkdm)
+void _clkdm_add_autodeps(struct clockdomain *clkdm)
 {
 	struct clkdm_autodep *autodep;
 
@@ -212,7 +212,7 @@ static void _clkdm_add_autodeps(struct clockdomain *clkdm)
  * XXX autodeps are deprecated and should be removed at the earliest
  * opportunity
  */
-static void _clkdm_del_autodeps(struct clockdomain *clkdm)
+void _clkdm_del_autodeps(struct clockdomain *clkdm)
 {
 	struct clkdm_autodep *autodep;
 
@@ -332,7 +332,7 @@ void clkdm_init(struct clockdomain **clkdms,
 		if (clkdm->flags & CLKDM_CAN_FORCE_WAKEUP)
 			clkdm_wakeup(clkdm);
 		else if (clkdm->flags & CLKDM_CAN_DISABLE_AUTO)
-			omap2_clkdm_deny_idle(clkdm);
+			clkdm_deny_idle(clkdm);
 
 		for (cd = clkdm->wkdep_srcs; cd && cd->clkdm_name; cd++) {
 			if (!omap_chip_is(cd->omap_chip))
@@ -780,7 +780,7 @@ int clkdm_wakeup(struct clockdomain *clkdm)
 }
 
 /**
- * omap2_clkdm_allow_idle - enable hwsup idle transitions for clkdm
+ * clkdm_allow_idle - enable hwsup idle transitions for clkdm
  * @clkdm: struct clockdomain *
  *
  * Allow the hardware to automatically switch the clockdomain @clkdm into
@@ -789,7 +789,7 @@ int clkdm_wakeup(struct clockdomain *clkdm)
  * framework, wkdep/sleepdep autodependencies are added; this is so
  * device drivers can read and write to the device.  No return value.
  */
-void omap2_clkdm_allow_idle(struct clockdomain *clkdm)
+void clkdm_allow_idle(struct clockdomain *clkdm)
 {
 	if (!clkdm)
 		return;
@@ -800,28 +800,18 @@ void omap2_clkdm_allow_idle(struct clockdomain *clkdm)
 		return;
 	}
 
+	if (!arch_clkdm || !arch_clkdm->clkdm_allow_idle)
+		return;
+
 	pr_debug("clockdomain: enabling automatic idle transitions for %s\n",
 		 clkdm->name);
 
-	/*
-	 * XXX This should be removed once TI adds wakeup/sleep
-	 * dependency code and data for OMAP4.
-	 */
-	if (cpu_is_omap44xx()) {
-		WARN_ONCE(1, "clockdomain: OMAP4 wakeup/sleep dependency "
-			  "support is not yet implemented\n");
-	} else {
-		if (atomic_read(&clkdm->usecount) > 0)
-			_clkdm_add_autodeps(clkdm);
-	}
-
-	_enable_hwsup(clkdm);
-
+	arch_clkdm->clkdm_allow_idle(clkdm);
 	pwrdm_clkdm_state_switch(clkdm);
 }
 
 /**
- * omap2_clkdm_deny_idle - disable hwsup idle transitions for clkdm
+ * clkdm_deny_idle - disable hwsup idle transitions for clkdm
  * @clkdm: struct clockdomain *
  *
  * Prevent the hardware from automatically switching the clockdomain
@@ -829,7 +819,7 @@ void omap2_clkdm_allow_idle(struct clockdomain *clkdm)
  * downstream clocks enabled in the clock framework, wkdep/sleepdep
  * autodependencies are removed.  No return value.
  */
-void omap2_clkdm_deny_idle(struct clockdomain *clkdm)
+void clkdm_deny_idle(struct clockdomain *clkdm)
 {
 	if (!clkdm)
 		return;
@@ -840,22 +830,13 @@ void omap2_clkdm_deny_idle(struct clockdomain *clkdm)
 		return;
 	}
 
+	if (!arch_clkdm || !arch_clkdm->clkdm_deny_idle)
+		return;
+
 	pr_debug("clockdomain: disabling automatic idle transitions for %s\n",
 		 clkdm->name);
 
-	_disable_hwsup(clkdm);
-
-	/*
-	 * XXX This should be removed once TI adds wakeup/sleep
-	 * dependency code and data for OMAP4.
-	 */
-	if (cpu_is_omap44xx()) {
-		WARN_ONCE(1, "clockdomain: OMAP4 wakeup/sleep dependency "
-			  "support is not yet implemented\n");
-	} else {
-		if (atomic_read(&clkdm->usecount) > 0)
-			_clkdm_del_autodeps(clkdm);
-	}
+	arch_clkdm->clkdm_deny_idle(clkdm);
 }
 
 
