@@ -308,6 +308,7 @@ void clkdm_init(struct clockdomain **clkdms,
 	struct clockdomain **c = NULL;
 	struct clockdomain *clkdm;
 	struct clkdm_autodep *autodep = NULL;
+	struct clkdm_dep *cd;
 
 	if (!custom_funcs)
 		WARN(1, "No custom clkdm functions registered\n");
@@ -333,7 +334,18 @@ void clkdm_init(struct clockdomain **clkdms,
 		else if (clkdm->flags & CLKDM_CAN_DISABLE_AUTO)
 			omap2_clkdm_deny_idle(clkdm);
 
+		for (cd = clkdm->wkdep_srcs; cd && cd->clkdm_name; cd++) {
+			if (!omap_chip_is(cd->omap_chip))
+				continue;
+			cd->clkdm = _clkdm_lookup(cd->clkdm_name);
+		}
 		clkdm_clear_all_wkdeps(clkdm);
+
+		for (cd = clkdm->sleepdep_srcs; cd && cd->clkdm_name; cd++) {
+			if (!omap_chip_is(cd->omap_chip))
+				continue;
+			cd->clkdm = _clkdm_lookup(cd->clkdm_name);
+		}
 		clkdm_clear_all_sleepdeps(clkdm);
 	}
 }
@@ -430,26 +442,32 @@ struct powerdomain *clkdm_get_pwrdm(struct clockdomain *clkdm)
 int clkdm_add_wkdep(struct clockdomain *clkdm1, struct clockdomain *clkdm2)
 {
 	struct clkdm_dep *cd;
+	int ret = 0;
 
 	if (!clkdm1 || !clkdm2)
 		return -EINVAL;
 
 	cd = _clkdm_deps_lookup(clkdm2, clkdm1->wkdep_srcs);
-	if (IS_ERR(cd)) {
+	if (IS_ERR(cd))
+		ret = PTR_ERR(cd);
+
+	if (!arch_clkdm || !arch_clkdm->clkdm_add_wkdep)
+		ret = -EINVAL;
+
+	if (ret) {
 		pr_debug("clockdomain: hardware cannot set/clear wake up of "
 			 "%s when %s wakes up\n", clkdm1->name, clkdm2->name);
-		return PTR_ERR(cd);
+		return ret;
 	}
 
 	if (atomic_inc_return(&cd->wkdep_usecount) == 1) {
 		pr_debug("clockdomain: hardware will wake up %s when %s wakes "
 			 "up\n", clkdm1->name, clkdm2->name);
 
-		omap2_prm_set_mod_reg_bits((1 << clkdm2->dep_bit),
-				     clkdm1->pwrdm.ptr->prcm_offs, PM_WKDEP);
+		ret = arch_clkdm->clkdm_add_wkdep(clkdm1, clkdm2);
 	}
 
-	return 0;
+	return ret;
 }
 
 /**
@@ -465,26 +483,32 @@ int clkdm_add_wkdep(struct clockdomain *clkdm1, struct clockdomain *clkdm2)
 int clkdm_del_wkdep(struct clockdomain *clkdm1, struct clockdomain *clkdm2)
 {
 	struct clkdm_dep *cd;
+	int ret = 0;
 
 	if (!clkdm1 || !clkdm2)
 		return -EINVAL;
 
 	cd = _clkdm_deps_lookup(clkdm2, clkdm1->wkdep_srcs);
-	if (IS_ERR(cd)) {
+	if (IS_ERR(cd))
+		ret = PTR_ERR(cd);
+
+	if (!arch_clkdm || !arch_clkdm->clkdm_del_wkdep)
+		ret = -EINVAL;
+
+	if (ret) {
 		pr_debug("clockdomain: hardware cannot set/clear wake up of "
 			 "%s when %s wakes up\n", clkdm1->name, clkdm2->name);
-		return PTR_ERR(cd);
+		return ret;
 	}
 
 	if (atomic_dec_return(&cd->wkdep_usecount) == 0) {
 		pr_debug("clockdomain: hardware will no longer wake up %s "
 			 "after %s wakes up\n", clkdm1->name, clkdm2->name);
 
-		omap2_prm_clear_mod_reg_bits((1 << clkdm2->dep_bit),
-				       clkdm1->pwrdm.ptr->prcm_offs, PM_WKDEP);
+		ret = arch_clkdm->clkdm_del_wkdep(clkdm1, clkdm2);
 	}
 
-	return 0;
+	return ret;
 }
 
 /**
@@ -504,20 +528,26 @@ int clkdm_del_wkdep(struct clockdomain *clkdm1, struct clockdomain *clkdm2)
 int clkdm_read_wkdep(struct clockdomain *clkdm1, struct clockdomain *clkdm2)
 {
 	struct clkdm_dep *cd;
+	int ret = 0;
 
 	if (!clkdm1 || !clkdm2)
 		return -EINVAL;
 
 	cd = _clkdm_deps_lookup(clkdm2, clkdm1->wkdep_srcs);
-	if (IS_ERR(cd)) {
+	if (IS_ERR(cd))
+		ret = PTR_ERR(cd);
+
+	if (!arch_clkdm || !arch_clkdm->clkdm_read_wkdep)
+		ret = -EINVAL;
+
+	if (ret) {
 		pr_debug("clockdomain: hardware cannot set/clear wake up of "
 			 "%s when %s wakes up\n", clkdm1->name, clkdm2->name);
-		return PTR_ERR(cd);
+		return ret;
 	}
 
 	/* XXX It's faster to return the atomic wkdep_usecount */
-	return omap2_prm_read_mod_bits_shift(clkdm1->pwrdm.ptr->prcm_offs, PM_WKDEP,
-				       (1 << clkdm2->dep_bit));
+	return arch_clkdm->clkdm_read_wkdep(clkdm1, clkdm2);
 }
 
 /**
@@ -532,27 +562,13 @@ int clkdm_read_wkdep(struct clockdomain *clkdm1, struct clockdomain *clkdm2)
  */
 int clkdm_clear_all_wkdeps(struct clockdomain *clkdm)
 {
-	struct clkdm_dep *cd;
-	u32 mask = 0;
-
 	if (!clkdm)
 		return -EINVAL;
 
-	for (cd = clkdm->wkdep_srcs; cd && cd->clkdm_name; cd++) {
-		if (!omap_chip_is(cd->omap_chip))
-			continue;
+	if (!arch_clkdm || !arch_clkdm->clkdm_clear_all_wkdeps)
+		return -EINVAL;
 
-		if (!cd->clkdm && cd->clkdm_name)
-			cd->clkdm = _clkdm_lookup(cd->clkdm_name);
-
-		/* PRM accesses are slow, so minimize them */
-		mask |= 1 << cd->clkdm->dep_bit;
-		atomic_set(&cd->wkdep_usecount, 0);
-	}
-
-	omap2_prm_clear_mod_reg_bits(mask, clkdm->pwrdm.ptr->prcm_offs, PM_WKDEP);
-
-	return 0;
+	return arch_clkdm->clkdm_clear_all_wkdeps(clkdm);
 }
 
 /**
@@ -570,31 +586,33 @@ int clkdm_clear_all_wkdeps(struct clockdomain *clkdm)
 int clkdm_add_sleepdep(struct clockdomain *clkdm1, struct clockdomain *clkdm2)
 {
 	struct clkdm_dep *cd;
-
-	if (!cpu_is_omap34xx())
-		return -EINVAL;
+	int ret = 0;
 
 	if (!clkdm1 || !clkdm2)
 		return -EINVAL;
 
 	cd = _clkdm_deps_lookup(clkdm2, clkdm1->sleepdep_srcs);
-	if (IS_ERR(cd)) {
+	if (IS_ERR(cd))
+		ret = PTR_ERR(cd);
+
+	if (!arch_clkdm || !arch_clkdm->clkdm_add_sleepdep)
+		ret = -EINVAL;
+
+	if (ret) {
 		pr_debug("clockdomain: hardware cannot set/clear sleep "
 			 "dependency affecting %s from %s\n", clkdm1->name,
 			 clkdm2->name);
-		return PTR_ERR(cd);
+		return ret;
 	}
 
 	if (atomic_inc_return(&cd->sleepdep_usecount) == 1) {
 		pr_debug("clockdomain: will prevent %s from sleeping if %s "
 			 "is active\n", clkdm1->name, clkdm2->name);
 
-		omap2_cm_set_mod_reg_bits((1 << clkdm2->dep_bit),
-				    clkdm1->pwrdm.ptr->prcm_offs,
-				    OMAP3430_CM_SLEEPDEP);
+		ret = arch_clkdm->clkdm_add_sleepdep(clkdm1, clkdm2);
 	}
 
-	return 0;
+	return ret;
 }
 
 /**
@@ -612,19 +630,23 @@ int clkdm_add_sleepdep(struct clockdomain *clkdm1, struct clockdomain *clkdm2)
 int clkdm_del_sleepdep(struct clockdomain *clkdm1, struct clockdomain *clkdm2)
 {
 	struct clkdm_dep *cd;
-
-	if (!cpu_is_omap34xx())
-		return -EINVAL;
+	int ret = 0;
 
 	if (!clkdm1 || !clkdm2)
 		return -EINVAL;
 
 	cd = _clkdm_deps_lookup(clkdm2, clkdm1->sleepdep_srcs);
-	if (IS_ERR(cd)) {
+	if (IS_ERR(cd))
+		ret = PTR_ERR(cd);
+
+	if (!arch_clkdm || !arch_clkdm->clkdm_del_sleepdep)
+		ret = -EINVAL;
+
+	if (ret) {
 		pr_debug("clockdomain: hardware cannot set/clear sleep "
 			 "dependency affecting %s from %s\n", clkdm1->name,
 			 clkdm2->name);
-		return PTR_ERR(cd);
+		return ret;
 	}
 
 	if (atomic_dec_return(&cd->sleepdep_usecount) == 0) {
@@ -632,12 +654,10 @@ int clkdm_del_sleepdep(struct clockdomain *clkdm1, struct clockdomain *clkdm2)
 			 "sleeping if %s is active\n", clkdm1->name,
 			 clkdm2->name);
 
-		omap2_cm_clear_mod_reg_bits((1 << clkdm2->dep_bit),
-				      clkdm1->pwrdm.ptr->prcm_offs,
-				      OMAP3430_CM_SLEEPDEP);
+		ret = arch_clkdm->clkdm_del_sleepdep(clkdm1, clkdm2);
 	}
 
-	return 0;
+	return ret;
 }
 
 /**
@@ -659,25 +679,27 @@ int clkdm_del_sleepdep(struct clockdomain *clkdm1, struct clockdomain *clkdm2)
 int clkdm_read_sleepdep(struct clockdomain *clkdm1, struct clockdomain *clkdm2)
 {
 	struct clkdm_dep *cd;
-
-	if (!cpu_is_omap34xx())
-		return -EINVAL;
+	int ret = 0;
 
 	if (!clkdm1 || !clkdm2)
 		return -EINVAL;
 
 	cd = _clkdm_deps_lookup(clkdm2, clkdm1->sleepdep_srcs);
-	if (IS_ERR(cd)) {
+	if (IS_ERR(cd))
+		ret = PTR_ERR(cd);
+
+	if (!arch_clkdm || !arch_clkdm->clkdm_read_sleepdep)
+		ret = -EINVAL;
+
+	if (ret) {
 		pr_debug("clockdomain: hardware cannot set/clear sleep "
 			 "dependency affecting %s from %s\n", clkdm1->name,
 			 clkdm2->name);
-		return PTR_ERR(cd);
+		return ret;
 	}
 
 	/* XXX It's faster to return the atomic sleepdep_usecount */
-	return omap2_prm_read_mod_bits_shift(clkdm1->pwrdm.ptr->prcm_offs,
-				       OMAP3430_CM_SLEEPDEP,
-				       (1 << clkdm2->dep_bit));
+	return arch_clkdm->clkdm_read_sleepdep(clkdm1, clkdm2);
 }
 
 /**
@@ -692,31 +714,13 @@ int clkdm_read_sleepdep(struct clockdomain *clkdm1, struct clockdomain *clkdm2)
  */
 int clkdm_clear_all_sleepdeps(struct clockdomain *clkdm)
 {
-	struct clkdm_dep *cd;
-	u32 mask = 0;
-
-	if (!cpu_is_omap34xx())
-		return -EINVAL;
-
 	if (!clkdm)
 		return -EINVAL;
 
-	for (cd = clkdm->sleepdep_srcs; cd && cd->clkdm_name; cd++) {
-		if (!omap_chip_is(cd->omap_chip))
-			continue;
+	if (!arch_clkdm || !arch_clkdm->clkdm_clear_all_sleepdeps)
+		return -EINVAL;
 
-		if (!cd->clkdm && cd->clkdm_name)
-			cd->clkdm = _clkdm_lookup(cd->clkdm_name);
-
-		/* PRM accesses are slow, so minimize them */
-		mask |= 1 << cd->clkdm->dep_bit;
-		atomic_set(&cd->sleepdep_usecount, 0);
-	}
-
-	omap2_prm_clear_mod_reg_bits(mask, clkdm->pwrdm.ptr->prcm_offs,
-			       OMAP3430_CM_SLEEPDEP);
-
-	return 0;
+	return arch_clkdm->clkdm_clear_all_sleepdeps(clkdm);
 }
 
 /**
