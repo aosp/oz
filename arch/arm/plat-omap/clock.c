@@ -335,6 +335,32 @@ struct clk *omap_clk_get_by_name(const char *name)
 	return ret;
 }
 
+void omap_clk_enable_autoidle(void)
+{
+	struct clk *c;
+
+	mutex_lock(&clocks_mutex);
+
+	list_for_each_entry(c, &clocks, node)
+		if (c->ops->allow_idle)
+			c->ops->allow_idle(c);
+
+	mutex_unlock(&clocks_mutex);
+}
+
+void omap_clk_disable_autoidle(void)
+{
+	struct clk *c;
+
+	mutex_lock(&clocks_mutex);
+
+	list_for_each_entry(c, &clocks, node)
+		if (c->ops->deny_idle)
+			c->ops->deny_idle(c);
+
+	mutex_unlock(&clocks_mutex);
+}
+
 /*
  * Low level helpers
  */
