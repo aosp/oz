@@ -388,6 +388,11 @@ const struct clkops clkops_omap3_core_dpll_ops = {
 
 #endif
 
+const struct clkops clkops_omap4_dpllmx_ops = {
+	.allow_idle	= omap4_dpllmx_allow_gatectrl,
+	.deny_idle	= omap4_dpllmx_deny_gatectrl,
+};
+
 /*
  * OMAP2+ clock reset and init functions
  */
