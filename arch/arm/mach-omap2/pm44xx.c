@@ -15,6 +15,7 @@
 #include <linux/list.h>
 #include <linux/err.h>
 #include <linux/slab.h>
+#include <plat/clock.h>
 
 #include "powerdomain.h"
 #include <mach/omap4-common.h>
@@ -111,6 +112,9 @@ static int __init omap4_pm_init(void)
 		pr_err("Failed to setup powerdomains\n");
 		goto err2;
 	}
+
+	/* Enable autoidle for all clks which support it*/
+	omap_clk_enable_autoidle();
 #endif
 
 #ifdef CONFIG_SUSPEND
