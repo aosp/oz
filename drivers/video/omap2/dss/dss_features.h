@@ -37,6 +37,7 @@ enum dss_feat_id {
 	FEAT_ROWREPEATENABLE		= 1 << 13,
 	FEAT_RESIZECONF			= 1 << 14,
 	FEAT_OVL_VID3			= 1 << 15,
+	FEAT_OVL_ZORDER			= 1 << 16,
 };
 
 /* DSS register field id */
