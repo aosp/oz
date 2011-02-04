@@ -530,6 +530,8 @@ static struct omap_board_mux board_mux[] __initdata = {
 #define board_mux	NULL
 #endif
 
+extern void __init omap4_panda_android_init(void);
+
 static void __init omap4_panda_init(void)
 {
 	int package = OMAP_PACKAGE_CBS;
@@ -550,6 +552,8 @@ static void __init omap4_panda_init(void)
 	err = panda_dvi_init();
 	if (!err)
 		omap_display_init(&panda_dss_data);
+
+	omap4_panda_android_init();
 }
 
 static void __init omap4_panda_map_io(void)
