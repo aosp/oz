@@ -70,6 +70,7 @@
 #include "board-4430sdp-wifi.h"
 #include "omap_tps6236x.h"
 #include "board-44xxtablet.h"
+#include "cm.h"
 
 #include <linux/skbuff.h>
 #include <linux/ti_wilink_st.h>
@@ -100,6 +101,17 @@
 #define BLUETOOTH_UART UART2
 #define BLUETOOTH_UART_DEV_NAME "/dev/ttyO1"
 #define CONSOLE_UART UART3
+
+#define OMAP4_GPIO_BASE			(L4_PER_44XX_BASE + 0x55000)
+#define OMAP4_GPIO3_BASE		(OMAP4_GPIO_BASE + 0x2000)
+#define OMAP4_GPIO6_BASE		(OMAP4_GPIO_BASE + 0x8000)
+
+#define OMAP4_GPIO_CTRL			0x0130
+#define OMAP4_GPIO_OE			0x0134
+#define OMAP4_GPIO_DATAOUT		0x013c
+
+#define GPIO_REG_ADDR(bank, reg)\
+	(unsigned int)OMAP2_L4_IO_ADDRESS(OMAP4_GPIO##bank##_BASE + reg)
 
 static struct wake_lock uart_lock;
 static struct platform_device sdp4430_hdmi_audio_device = {
@@ -2029,6 +2041,29 @@ static void __init omap_4430sdp_init(void)
 		usbhs_pdata.port_mode[0] = OMAP_USBHS_PORT_MODE_UNUSED;
 		/* Setup HSI pad conf for OMAP4430 platform */
 		omap_4430hsi_pad_conf();
+
+		/* Enable GPIO3 Clock and Enable module*/
+		outl(0x101, (unsigned int)OMAP4430_CM_L4PER_GPIO3_CLKCTRL);
+		outl(inl(GPIO_REG_ADDR(3, OMAP4_GPIO_CTRL)) & 0xFFFFFFFE,
+			 GPIO_REG_ADDR(3, OMAP4_GPIO_CTRL));
+
+		/*set SERVICEn (GPIO 92) to output and set it to 0*/
+		outl(inl(GPIO_REG_ADDR(3, OMAP4_GPIO_OE)) & 0xEFFFFFFF,
+			 GPIO_REG_ADDR(3, OMAP4_GPIO_OE));
+		outl(inl(GPIO_REG_ADDR(3, OMAP4_GPIO_DATAOUT)) & 0xEFFFFFFF,
+			 GPIO_REG_ADDR(3, OMAP4_GPIO_DATAOUT));
+
+		/* Enable GPIO6 Clock and Enable module*/
+		outl(0x101, (unsigned int)OMAP4430_CM_L4PER_GPIO6_CLKCTRL);
+		outl(inl(GPIO_REG_ADDR(6, OMAP4_GPIO_CTRL)) & 0xFFFFFFFE,
+			 GPIO_REG_ADDR(6, OMAP4_GPIO_CTRL));
+
+		/* Set ONSWA (GPIO 187) set output enable and set it to 0 */
+		outl(inl(GPIO_REG_ADDR(6, OMAP4_GPIO_OE)) & 0xF7FFFFFF,
+			 GPIO_REG_ADDR(6, OMAP4_GPIO_OE));
+		outl(inl(GPIO_REG_ADDR(6, OMAP4_GPIO_DATAOUT)) & 0xF7FFFFFF,
+			 GPIO_REG_ADDR(6, OMAP4_GPIO_DATAOUT));
+
 	} else
 		pr_info("Modem HSI not detected");
 
