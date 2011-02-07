@@ -646,6 +646,10 @@ static void mtp_send_file(struct work_struct *data)
 		ret = wait_event_interruptible(dev->write_wq,
 			(req = req_get(dev, &dev->tx_idle))
 			|| dev->state != STATE_BUSY);
+		if (dev->state == STATE_CANCELED) {
+			r = -ECANCELED;
+			break;
+		}
 		if (!req) {
 			r = ret;
 			break;
@@ -743,9 +747,9 @@ static void mtp_receive_file(struct work_struct *data)
 				dev->rx_done || dev->state != STATE_BUSY);
 			if (dev->state == STATE_CANCELED) {
 				r = -ECANCELED;
-				if (!dev->rx_done)
-					usb_ep_dequeue(dev->ep_out, read_req);
-				break;
+			if (!dev->rx_done)
+				usb_ep_dequeue(dev->ep_out, read_req);
+			  break;
 			}
 			/* if xfer_file_length is 0xFFFFFFFF, then we read until
 			 * we get a zero length packet
@@ -1090,7 +1094,7 @@ static int mtp_function_setup(struct usb_function *f,
 			else
 				status->wCode =
 					__cpu_to_le16(MTP_RESPONSE_OK);
-				spin_unlock_irqrestore(&dev->lock, flags);
+			spin_unlock_irqrestore(&dev->lock, flags);
 			value = sizeof(*status);
 		}
 	}
