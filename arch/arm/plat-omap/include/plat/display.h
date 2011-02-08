@@ -405,6 +405,7 @@ void dsi_videomode_panel_postinit(void);
 #define DLP_4430_GPIO_44	44
 #define DLP_4430_GPIO_45	45
 #define DLP_4430_GPIO_59	59
+#define DP_4430_GPIO_59         59
 
 #define PROGRESSIVE		0
 #define INTERLACED		1
