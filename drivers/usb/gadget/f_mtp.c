@@ -93,7 +93,6 @@ struct mtp_dev {
 	wait_queue_head_t read_wq;
 	wait_queue_head_t write_wq;
 	struct usb_request *rx_req[RX_REQ_MAX];
-	struct usb_request *intr_req;
 	int rx_done;
 
 	int intr_busy;
@@ -757,8 +756,8 @@ static void mtp_receive_file(struct work_struct *data)
 			if (count != 0xFFFFFFFF)
 				count -= read_req->actual;
 			if (read_req->actual < read_req->length) {
-				/* short packet is used to signal
-				EOF for sizes > 4 gig */
+				/*short packet is used to signal
+				EOF for sizes> 4 gig*/
 				DBG(cdev, "got short packet\n");
 				count = 0;
 			}
@@ -783,13 +782,15 @@ static int mtp_send_event(struct mtp_dev *dev, struct mtp_event *event)
 	if (length < 0 || length > INTR_BUFFER_SIZE)
 		return -EINVAL;
 
-	/* wait for a request to complete */
-	ret = wait_event_interruptible(dev->intr_wq, !dev->intr_busy || dev->state == STATE_OFFLINE);
-	if (ret < 0)
-		return ret;
-	if (dev->state == STATE_OFFLINE) {
-		ret = -ENODEV;
-	}
+	if (dev->state == STATE_OFFLINE)
+		return -ENODEV;
+	/* unfortunately an interrupt request might hang indefinitely if
+	* the host is not listening on the interrupt endpoint,
+	* so instead of waiting,we just fail if the endpoint is busy.
+	*/
+	if (dev->intr_busy)
+		return -EBUSY;
+
 	req = dev->intr_req;
 	if (copy_from_user(req->buf, (void __user *)event->data, length))
 		return -EFAULT;
@@ -1161,12 +1162,10 @@ static void mtp_function_disable(struct usb_function *f)
 	DBG(cdev, "mtp_function_disable\n");
 	dev->state = STATE_OFFLINE;
 	usb_ep_disable(dev->ep_in);
-	usb_ep_disable(dev->ep_out);
-	usb_ep_disable(dev->ep_intr);
+	usb_ep_disable(dev->ep_out);;
 
 	/* readers may be blocked waiting for us to go online */
 	wake_up(&dev->read_wq);
-	wake_up(&dev->intr_wq);
 
 	VDBG(cdev, "%s disabled\n", dev->function.name);
 }
@@ -1194,7 +1193,6 @@ static int mtp_bind_config(struct usb_configuration *c)
 	spin_lock_init(&dev->lock);
 	init_waitqueue_head(&dev->read_wq);
 	init_waitqueue_head(&dev->write_wq);
-	init_waitqueue_head(&dev->intr_wq);
 	atomic_set(&dev->open_excl, 0);
 	atomic_set(&dev->ioctl_excl, 0);
 	INIT_LIST_HEAD(&dev->tx_idle);
