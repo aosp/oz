@@ -311,7 +311,6 @@ int d2l_write_register(u16 reg, u32 value) {
 	return ret;
 }
 
-
 /****************************
 ********* DEBUG *************
 ****************************/
@@ -432,14 +431,6 @@ EXPORT_SYMBOL(d2l_dump_regs);
 /***********************
 *** DUMMY FUNCTIONS ****
 ***********************/
-static int d2l_bl_get_intensity(struct backlight_device *dev)
-{
-        return 0;
-}
-
-static struct backlight_ops d2d_bl_ops = {
-        .get_brightness = d2l_bl_get_intensity,
-};
 
 static int d2l_rotate(struct omap_dss_device *dssdev, u8 rotate)
 {
@@ -462,22 +453,6 @@ static bool d2l_get_mirror(struct omap_dss_device *dssdev)
 
 }
 
-static void hw_guard_start(struct d2l_data *d2d, int guard_msec)
-{
-        d2d->hw_guard_wait = msecs_to_jiffies(guard_msec);
-        d2d->hw_guard_end = jiffies + d2d->hw_guard_wait;
-}
-
-static void hw_guard_wait(struct d2l_data *d2d)
-{
-        unsigned long wait = d2d->hw_guard_end - jiffies;
-
-        if ((long)wait > 0 && wait <= d2d->hw_guard_wait) {
-                set_current_state(TASK_UNINTERRUPTIBLE);
-                schedule_timeout(wait);
-        }
-}
-
 static int d2l_dcs_read1(enum omap_dsi_index lcd_ix, u8 dcs_cmd, u8 *data)
 {
         int ret;
@@ -488,11 +463,6 @@ static int d2l_dcs_read1(enum omap_dsi_index lcd_ix, u8 dcs_cmd, u8 *data)
                 return ret;
         *data = buf[0];
         return 0;
-}
-
-static int d2l_dcs_write0(enum omap_dsi_index lcd_ix, u8 dcs_cmd)
-{
-        return dsi_vc_dcs_write(lcd_ix, TCH, &dcs_cmd, 1);
 }
 
 static int d2l_dcs_write1(enum omap_dsi_index lcd_ix, u8 dcs_cmd, u8 param)
@@ -515,41 +485,6 @@ static int d2l_get_id(enum omap_dsi_index lcd_ix,
         ret = d2l_dcs_read1(lcd_ix, DCS_GET_ID3, id3);
         if (ret) return ret;
         return 0;
-}
-
-static int d2l_set_addr_mode(enum omap_dsi_index lcd_ix,
-        u8 rotate, bool mirror)
-{
-        int ret;
-        u8 mode;
-        int b5, b6, b7;
-
-	PRINT_DEBUG("%s:%s\n",__FILE__,__FUNCTION__);
-        ret = d2l_dcs_read1(lcd_ix, DCS_READ_MADCTL, &mode);
-        if (ret)return ret;
-
-        switch (rotate) {
-        default:
-        case 0:
-                b7 = 0; b6 = 0; b5 = 0;
-                break;
-        case 1:
-                b7 = 0; b6 = 1; b5 = 1;
-                break;
-        case 2:
-                b7 = 1; b6 = 1; b5 = 0;
-                break;
-        case 3:
-                b7 = 1; b6 = 0; b5 = 1;
-                break;
-        }
-
-        if (mirror)
-                b6 = !b6;
-
-        mode &= ~((1<<7) | (1<<6) | (1<<5));
-        mode |= (b7 << 7) | (b6 << 6) | (b5 << 5);
-        return d2l_dcs_write1(lcd_ix, DCS_MEM_ACC_CTRL, mode);
 }
 
 static void d2l_get_timings(struct omap_dss_device *dssdev,
@@ -755,18 +690,8 @@ static struct attribute_group d2l_attr_group = {
         .attrs = d2l_attrs,
 };
 
-static void d2l_setup_update(struct omap_dss_device *dssdev,
-	u16 x, u16 y, u16 w, u16 h)
-{
-	return 0;
-}
 
 static int d2l_enable_te(struct omap_dss_device *dssdev, bool enable)
-{
-        return 0;
-}
-
-static int d2l_wait_te(struct omap_dss_device *dssdev)
 {
         return 0;
 }
@@ -801,7 +726,6 @@ static int d2l_hw_reset(struct omap_dss_device *dssdev)
 static int d2l_probe(struct omap_dss_device *dssdev)
 {
 	struct d2l_data *d2d;
-	struct backlight_device *bldev;
 	int ret = 0;
 	int i;
 
@@ -830,8 +754,6 @@ static int d2l_probe(struct omap_dss_device *dssdev)
 	dssdev->panel.config = OMAP_DSS_LCD_TFT;
 	dssdev->panel.timings = panel_config->timings;
         dssdev->ctrl.pixel_size = 24;
-
-	//JORGE
 	dssdev->panel.acbi = 0;
         dssdev->panel.acb = 40;
 
@@ -881,8 +803,7 @@ static void d2l_remove(struct omap_dss_device *dssdev)
 static int d2l_power_on(struct omap_dss_device *dssdev)
 {
         struct d2l_data *d2d = dev_get_drvdata(&dssdev->dev);
-        int ret;
-
+        int ret=0;
 
 	if(d2d->enabled != 1) {
 
@@ -954,8 +875,6 @@ static int d2l_power_on(struct omap_dss_device *dssdev)
 
 static void d2l_power_off(struct omap_dss_device *dssdev)
 {
-	struct d2l_data *d2d = dev_get_drvdata(&dssdev->dev);
-
 	msleep(10);
 
 	omapdss_dsi_display_disable(dssdev);
@@ -964,7 +883,6 @@ static void d2l_power_off(struct omap_dss_device *dssdev)
 static int d2l_start(struct omap_dss_device *dssdev)
 {
 	struct d2l_data *d2d = dev_get_drvdata(&dssdev->dev);
-	struct toshiba_dsi_panel_data *panel_data = get_panel_data(dssdev);
 	int r = 0;
 	enum omap_dsi_index lcd_ix;
 
@@ -1067,7 +985,6 @@ static int d2l_update(struct omap_dss_device *dssdev,
 				    u16 x, u16 y, u16 w, u16 h)
 {
 	struct d2l_data *d2d = dev_get_drvdata(&dssdev->dev);
-	struct toshiba_dsi_panel_data *panel_data = get_panel_data(dssdev);
 	int r;
 	enum omap_dsi_index lcd_ix;
 
@@ -1173,13 +1090,62 @@ static enum omap_dss_update_mode d2l_get_update_mode(
 		return OMAP_DSS_UPDATE_MANUAL;
 }
 
+#ifdef CONFIG_PM
+static int d2l_resume(struct omap_dss_device *dssdev)
+{
+	struct d2l_data *td = dev_get_drvdata(&dssdev->dev);
+	int r = 0;
+/*
+	dev_dbg(&dssdev->dev, "resume\n");
+
+	mutex_lock(&td->lock);
+
+	if (dssdev->state != OMAP_DSS_DISPLAY_SUSPENDED) {
+		r = -EINVAL;
+		goto err;
+	}
+
+	r = d2l_start(dssdev);
+err:
+	mutex_unlock(&td->lock);
+*/
+	return r;
+}
+
+static int d2l_suspend(struct omap_dss_device *dssdev)
+{
+	struct d2l_data *td = dev_get_drvdata(&dssdev->dev);
+	int r = 0;
+/*
+	dev_dbg(&dssdev->dev, "suspend\n");
+
+	mutex_lock(&td->lock);
+
+	if (dssdev->state != OMAP_DSS_DISPLAY_ACTIVE) {
+		r = -EINVAL;
+		goto err;
+	}
+
+	d2l_stop(dssdev);
+
+	dssdev->state = OMAP_DSS_DISPLAY_SUSPENDED;
+err:
+	mutex_unlock(&td->lock);
+*/
+	return r;
+}
+#endif
+
 static struct omap_dss_driver d2l_driver = {
 	.probe		= d2l_probe,
 	.remove		= d2l_remove,
 
 	.enable		= d2l_enable,
 	.disable	= d2l_disable,
-
+#ifdef CONFIG_PM
+	.suspend		= d2l_suspend,
+	.resume			= d2l_resume,
+#endif
 //        .setup_update   = d2l_setup_update, //dummy
 
 	.set_update_mode = d2l_set_update_mode,
@@ -1190,7 +1156,6 @@ static struct omap_dss_driver d2l_driver = {
 
 	.get_resolution	= d2l_get_resolution,
 	.get_recommended_bpp = omapdss_default_get_recommended_bpp,
-
 
         .enable_te      = d2l_enable_te,   //dummy
 //        .wait_for_te    = d2l_wait_te,     //dummy
