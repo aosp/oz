@@ -345,16 +345,18 @@ static void omap_mbox_fini(struct omap_mbox *mbox)
 
 struct omap_mbox *omap_mbox_get(const char *name, struct notifier_block *nb)
 {
-	struct omap_mbox *mbox;
-	int ret;
+	struct omap_mbox *_mbox, *mbox = NULL;
+	int i, ret;
 
 	if (!mboxes)
 		return ERR_PTR(-EINVAL);
 
 	mutex_lock(&mboxes_lock);
-	for (mbox = *mboxes; mbox; mbox++)
+	for (mbox = *mboxes; mbox; mbox++) {
 		if (!strcmp(mbox->name, name))
 			break;
+		}
+	}
 
 	if (!mbox) {
 		mutex_unlock(&mboxes_lock);
