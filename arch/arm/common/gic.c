@@ -388,6 +388,31 @@ void __cpuinit gic_enable_ppi(unsigned int irq)
 	local_irq_restore(flags);
 }
 
+/* Used in power management paths */
+void gic_secondary_set(unsigned int gic_nr, unsigned int on)
+{
+	BUG_ON(gic_nr >= MAX_GIC_NR);
+
+	if (on) {
+		__raw_writel(0xf0, gic_data[gic_nr].cpu_base + GIC_CPU_PRIMASK);
+		__raw_writel(1, gic_data[gic_nr].cpu_base + GIC_CPU_CTRL);
+
+	} else {
+		__raw_writel(0, gic_data[gic_nr].cpu_base + GIC_CPU_CTRL);
+	}
+}
+
+/* Used in power management paths */
+void gic_dist_set(unsigned int gic_nr, unsigned int on)
+{
+	BUG_ON(gic_nr >= MAX_GIC_NR);
+
+	if (on)
+		__raw_writel(0x1, gic_data[gic_nr].dist_base + GIC_DIST_CTRL);
+	else
+		__raw_writel(0, gic_data[gic_nr].cpu_base + GIC_CPU_CTRL);
+}
+
 #ifdef CONFIG_SMP
 void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
 {

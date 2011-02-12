@@ -41,6 +41,8 @@ void gic_secondary_init(unsigned int);
 void gic_cascade_irq(unsigned int gic_nr, unsigned int irq);
 void gic_raise_softirq(const struct cpumask *mask, unsigned int irq);
 void gic_enable_ppi(unsigned int);
+void gic_secondary_set(unsigned int gic_nr, unsigned int on);
+void gic_dist_set(unsigned int gic_nr, unsigned int on);
 #endif
 
 #endif
