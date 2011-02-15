@@ -168,4 +168,13 @@ struct d2l_i2c_data {
 #define DCS_GET_ID2             0xdb
 #define DCS_GET_ID3             0xdc
 
-
+//D2L TIMINGS
+#define D2L_WIDTH 		1024
+#define D2L_HEIGHT		768
+#define D2L_PCLK		65183
+#define D2L_HFP			282
+#define D2L_HSW			6
+#define D2L_HBP			32
+#define D2L_VFP			15
+#define D2L_VSW			8
+#define D2L_VBP			15

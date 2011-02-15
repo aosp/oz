@@ -36,11 +36,11 @@
 
 #include "panel-d2l.h"
 
-/* DSI Virtual channel. Hardcoded for now. */
-#define TCH 1
+/* DSI Command Virtual channel */
+#define CMD_VC_CHANNEL 1
 
-#define DRIVER_NAME "d2l_i2c_driver"
-#define DEVICE_NAME "d2l_i2c_driver"
+#define DRIVER_NAME "d2l_i2c_drv"
+#define DEVICE_NAME "d2l_i2c"
 
 //define this if you want debug print messages
 //#define DEB
@@ -185,19 +185,18 @@ static struct panel_config panel_configs[] = {
 		.name		= "d2l",
 		.type		= PANEL_D2L,
 		.timings	= {
-			.x_res		= 1024,
-			.y_res		= 768,
-		        .pixel_clock    = 65183,
-		        .hfp            = 282,
-		        .hsw            = 6,
-		        .hbp            = 32,
-		        .vfp            = 15,
-		        .vsw            = 8,
-		        .vbp            = 15,
+			.x_res		= D2L_WIDTH,
+			.y_res		= D2L_HEIGHT,
+				.pixel_clock    = D2L_PCLK,
+				.hfp            = D2L_HFP,
+				.hsw            = D2L_HSW,
+				.hbp            = D2L_HBP,
+				.vfp            = D2L_VFP,
+				.vsw            = D2L_VSW,
+				.vbp            = D2L_VBP,
 		},
 	},
 };
-
 
 /* device private data structure */
 struct d2l_data {
@@ -274,10 +273,10 @@ static int d2l_i2c_read(int reg)
 {
 	int r;
 	u8 data[4];
-	data[1] = data[2] = data[3] = data[0] = 0;
+	data[0] = data[1] = data[2] = data[3] = 0;
 
 	r = d2l_read_block(reg, data, 4);
-	return (int)data[3] <<24 | ((int)(data[2]) << 16) | ((int)(data[1]) << 8) | ((int)(data[0]) );
+	return ((int)data[3] << 24) | ((int)(data[2]) << 16) | ((int)(data[1]) << 8) | ((int)(data[0]));
 }
 
 int d2l_write_register(u16 reg, u32 value) {
@@ -299,14 +298,9 @@ int d2l_write_register(u16 reg, u32 value) {
         dsi_buf.Data_buf[5] = (value >> 24) & 0xFF;
 
 	// Send long packet to DSI
-        ret = dsi_vc_send_long(lcd_ix, TCH, dsi_buf.data_type, (u8 *)dsi_buf.Data_buf, 6, 0);
+        ret = dsi_vc_send_long(lcd_ix, CMD_VC_CHANNEL, dsi_buf.data_type, (u8 *)dsi_buf.Data_buf, 6, 0);
 
         mdelay(100);
-
-#define PRINT_ERR(r) printk("%s: D2L write register failure (reg=%s)\n",__FUNCTION__, #r)
-	if(ret !=  0)
-		PRINT_ERR(reg);
-#undef PRINT_ERR
 
 	return ret;
 }
@@ -372,7 +366,6 @@ void d2l_dump_regs(void)
 	DUMPREG( PPI_HSTimeoutEnable);
 
 	printk(KERN_ALERT "DSI Protocol Layer Registers\n");
-	//DUMPREG( DSI_STARTDSI);//write only
 	DUMPREG( DSI_BUSYDSI);
 	DUMPREG( DSI_LANEENABLE);
 	DUMPREG( DSI_LANESTATUS0);
@@ -450,47 +443,11 @@ static int d2l_mirror(struct omap_dss_device *dssdev, bool enable)
 static bool d2l_get_mirror(struct omap_dss_device *dssdev)
 {
 	return 0;
-
-}
-
-static int d2l_dcs_read1(enum omap_dsi_index lcd_ix, u8 dcs_cmd, u8 *data)
-{
-        int ret;
-        u8 buf[1];
-
-        ret = dsi_vc_dcs_read(lcd_ix, TCH, dcs_cmd, buf, 1);
-        if (ret < 0)
-                return ret;
-        *data = buf[0];
-        return 0;
-}
-
-static int d2l_dcs_write1(enum omap_dsi_index lcd_ix, u8 dcs_cmd, u8 param)
-{
-        u8 buf[2];
-        buf[0] = dcs_cmd;
-        buf[1] = param;
-        return dsi_vc_dcs_write(lcd_ix, TCH, buf, 2);
-}
-
-static int d2l_get_id(enum omap_dsi_index lcd_ix,
-        u8 *id1, u8 *id2, u8 *id3)
-{
-        int ret;
-	PRINT_DEBUG("%s:%s\n",__FILE__,__FUNCTION__);
-        ret = d2l_dcs_read1(lcd_ix, DCS_GET_ID1, id1);
-        if (ret) return ret;
-        ret = d2l_dcs_read1(lcd_ix, DCS_GET_ID2, id2);
-        if (ret) return ret;
-        ret = d2l_dcs_read1(lcd_ix, DCS_GET_ID3, id3);
-        if (ret) return ret;
-        return 0;
 }
 
 static void d2l_get_timings(struct omap_dss_device *dssdev,
                         struct omap_video_timings *timings)
 {
-	PRINT_DEBUG("%s:%s\n",__FILE__,__FUNCTION__);
         *timings = dssdev->panel.timings;
 }
 
@@ -511,7 +468,7 @@ static void d2l_set_timings(struct omap_dss_device *dssdev,
 static int d2l_check_timings(struct omap_dss_device *dssdev,
 			struct omap_video_timings *timings)
 {
-	if (timings->x_res != 1024 || timings->y_res != 768)
+	if (timings->x_res != D2L_WIDTH || timings->y_res != D2L_HEIGHT)
 		return -EINVAL;
 
 	return 0;
@@ -529,7 +486,7 @@ static void d2l_get_resolution(struct omap_dss_device *dssdev,
                 *yres = dssdev->panel.timings.x_res;
                 *xres = dssdev->panel.timings.y_res;
         }
-	PRINT_DEBUG("%s:%s xres %d yres %d\n",__FILE__,__FUNCTION__,*xres,*yres);
+	dev_dbg(&dssdev->dev, "xres: %d, yres: %d\n", *xres, *yres);
 }
 
 static ssize_t d2l_num_errors_show(struct device *dev,
@@ -539,23 +496,18 @@ static ssize_t d2l_num_errors_show(struct device *dev,
         struct d2l_data *d2d = dev_get_drvdata(&dssdev->dev);
         u8 errors;
         int ret;
-        enum omap_dsi_index lcd_ix;
-
-        lcd_ix = DSI1;
-
-	PRINT_DEBUG("%s:%s\n",__FILE__,__FUNCTION__);
 
 	mutex_lock(&d2d->lock);
 
         if (d2d->enabled) {
-                dsi_bus_lock(lcd_ix);
-                ret = d2l_dcs_read1(lcd_ix, DCS_READ_NUM_ERRORS, &errors);
-                dsi_bus_unlock(lcd_ix);
-        } else {
-                ret = -ENODEV;
-        }
+			errors = (u8) d2l_i2c_read(DSIERRCNT) & 0x0000007F;
+			if (errors < 0)
+				ret = -ENODEV;
+		} else {
+			ret = -ENODEV;
+		}
 
-	mutex_lock(&d2d->lock);
+	mutex_unlock(&d2d->lock);
 
         if (ret)
                 return ret;
@@ -568,128 +520,39 @@ static ssize_t d2l_hw_revision_show(struct device *dev,
 {
         struct omap_dss_device *dssdev = to_dss_device(dev);
         struct d2l_data *d2d = dev_get_drvdata(&dssdev->dev);
-        u8 id1, id2, id3;
-        int r;
-        enum omap_dsi_index lcd_ix;
-
-        lcd_ix =  DSI1;
-	PRINT_DEBUG("%s:%s\n",__FILE__,__FUNCTION__);
+        u8 id;
+        int ret;
 
 	mutex_lock(&d2d->lock);
 
         if (d2d->enabled) {
-                dsi_bus_lock(lcd_ix);
-                r = d2l_get_id(lcd_ix, &id1, &id2, &id3);
-                dsi_bus_unlock(lcd_ix);
+                id = (u8) d2l_i2c_read(IDREG) & 0x000000FF;
+		if (id < 0)
+			ret = -ENODEV;
         } else {
-                r = -ENODEV;
+                ret = -ENODEV;
         }
-
-	mutex_lock(&d2d->lock);
-
-        if (r) return r;
-
-        return snprintf(buf, PAGE_SIZE, "%02x.%02x.%02x\n", id1, id2, id3);
-}
-
-static const char *cabc_modes[] = {
-        "off",          /* used also always when CABC is not supported */
-        "ui",
-        "still-image",
-        "moving-image",
-};
-
-static ssize_t show_cabc_mode(struct device *dev,
-                struct device_attribute *attr,
-                char *buf)
-{
-        struct omap_dss_device *dssdev = to_dss_device(dev);
-        struct d2l_data *d2d = dev_get_drvdata(&dssdev->dev);
-        const char *mode_str;
-        int mode;
-        int len;
-
-        mode = d2d->cabc_mode;
-
-	PRINT_DEBUG("%s:%s\n",__FILE__,__FUNCTION__);
-        mode_str = "unknown";
-        if (mode >= 0 && mode < ARRAY_SIZE(cabc_modes))
-                mode_str = cabc_modes[mode];
-        len = snprintf(buf, PAGE_SIZE, "%s\n", mode_str);
-
-        return len < PAGE_SIZE - 1 ? len : PAGE_SIZE - 1;
-}
-
-static ssize_t store_cabc_mode(struct device *dev,
-                struct device_attribute *attr,
-                const char *buf, size_t count)
-{
-        struct omap_dss_device *dssdev = to_dss_device(dev);
-        struct d2l_data *d2d = dev_get_drvdata(&dssdev->dev);
-        int i;
-        enum omap_dsi_index lcd_ix;
-
-        lcd_ix = DSI1;
-	PRINT_DEBUG("%s:%s\n",__FILE__,__FUNCTION__);
-        for (i = 0; i < ARRAY_SIZE(cabc_modes); i++) {
-                if (sysfs_streq(cabc_modes[i], buf))
-                        break;
-        }
-        if (i == ARRAY_SIZE(cabc_modes))
-                return -EINVAL;
-
-	mutex_lock(&d2d->lock);
-
-        if (d2d->enabled) {
-                dsi_bus_lock(lcd_ix);
-                if (!d2d->cabc_broken)
-                        d2l_dcs_write1(lcd_ix, DCS_WRITE_CABC, i);
-                dsi_bus_unlock(lcd_ix);
-        }
-
-        d2d->cabc_mode = i;
 
 	mutex_unlock(&d2d->lock);
 
-        return count;
-}
+        if (ret)
+		return ret;
 
-static ssize_t show_cabc_available_modes(struct device *dev,
-                struct device_attribute *attr,
-                char *buf)
-{
-        int len;
-        int i;
-
-	PRINT_DEBUG("%s:%s\n",__FILE__,__FUNCTION__);
-        for (i = 0, len = 0;
-             len < PAGE_SIZE && i < ARRAY_SIZE(cabc_modes); i++)
-                len += snprintf(&buf[len], PAGE_SIZE - len, "%s%s%s",
-                        i ? " " : "", cabc_modes[i],
-                        i == ARRAY_SIZE(cabc_modes) - 1 ? "\n" : "");
-
-        return len < PAGE_SIZE ? len : PAGE_SIZE - 1;
+        return snprintf(buf, PAGE_SIZE, "%02x\n", id);
 }
 
 static DEVICE_ATTR(num_dsi_errors, S_IRUGO, d2l_num_errors_show, NULL);
 static DEVICE_ATTR(hw_revision, S_IRUGO, d2l_hw_revision_show, NULL);
-static DEVICE_ATTR(cabc_mode, S_IRUGO | S_IWUSR,
-                show_cabc_mode, store_cabc_mode);
-static DEVICE_ATTR(cabc_available_modes, S_IRUGO,
-                show_cabc_available_modes, NULL);
 
 static struct attribute *d2l_attrs[] = {
 	&dev_attr_num_dsi_errors.attr,
         &dev_attr_hw_revision.attr,
-        &dev_attr_cabc_mode.attr,
-        &dev_attr_cabc_available_modes.attr,
         NULL,
 };
 
 static struct attribute_group d2l_attr_group = {
         .attrs = d2l_attrs,
 };
-
 
 static int d2l_enable_te(struct omap_dss_device *dssdev, bool enable)
 {
@@ -725,18 +588,17 @@ static int d2l_hw_reset(struct omap_dss_device *dssdev)
 
 static int d2l_probe(struct omap_dss_device *dssdev)
 {
-	struct d2l_data *d2d;
 	int ret = 0;
 	int i;
-
 	struct toshiba_dsi_panel_data *panel_data = get_panel_data(dssdev);
+	struct d2l_data *d2d = NULL;
 	struct panel_config *panel_config = NULL;
-
 
 	dev_dbg(&dssdev->dev, "d2l_probe\n");
 
 	if (!panel_data || !panel_data->name) {
 		ret = -EINVAL;
+		goto err;
 	}
 
 	for (i = 0; i < ARRAY_SIZE(panel_configs); i++) {
@@ -748,7 +610,7 @@ static int d2l_probe(struct omap_dss_device *dssdev)
 
 	if (!panel_config) {
 		ret = -EINVAL;
-		//goto err;
+		goto err;
 	}
 
 	dssdev->panel.config = OMAP_DSS_LCD_TFT;
@@ -760,7 +622,7 @@ static int d2l_probe(struct omap_dss_device *dssdev)
 	d2d = kzalloc(sizeof(*d2d), GFP_KERNEL);
         if (!d2d) {
                 ret = -ENOMEM;
-                return ret;
+                goto err;
         }
 
         d2d->dssdev = dssdev;
@@ -774,7 +636,7 @@ static int d2l_probe(struct omap_dss_device *dssdev)
 	ret = init_regulators(dssdev, panel_config->regulators,
 			panel_config->num_regulators);
 	if (ret)
-		goto err_reg;
+		goto err;
 
 	dev_set_drvdata(&dssdev->dev, d2d);
 
@@ -785,13 +647,13 @@ static int d2l_probe(struct omap_dss_device *dssdev)
 	if (ret)
 		dev_err(&dssdev->dev, "failed to create sysfs files\n");
 
-	// do I need an err and kfree(d2d)
 	return ret;
 
-err_reg:
-	kfree(d2d);
+err:
+	if (d2d)
+		kfree(d2d);
 
-	return 0;
+	return ret;
 }
 
 static void d2l_remove(struct omap_dss_device *dssdev)
@@ -803,7 +665,7 @@ static void d2l_remove(struct omap_dss_device *dssdev)
 static int d2l_power_on(struct omap_dss_device *dssdev)
 {
         struct d2l_data *d2d = dev_get_drvdata(&dssdev->dev);
-        int ret=0;
+        int ret = 0;
 
 	if(d2d->enabled != 1) {
 
@@ -815,7 +677,7 @@ static int d2l_power_on(struct omap_dss_device *dssdev)
 		ret = omapdss_dsi_display_enable(dssdev);
 		if (ret) {
 			dev_err(&dssdev->dev, "failed to enable DSI\n");
-			//goto err0;
+			goto err;
 		}
 
 		/* reset d2l bridge */
@@ -827,14 +689,13 @@ static int d2l_power_on(struct omap_dss_device *dssdev)
 		dsi_videomode_panel_preinit();
 
 		/* Need to wait a certain time - Toshiba Bridge Constraint */
-		msleep(1000);
+		msleep(100);
 
 #ifdef DEB
 		d2l_dump_regs();
 #endif
 
 		//configure D2L chip DSI-RX configuration registers
-		d2l_write_register(PPI_TX_RX_TA, 0x00000004); //this register setting is required only if host wishes to perform DSI read transactions.
 		d2l_write_register(PPI_LPTXTIMECNT, 0x00000004); //SYSLPTX Timing Generation Counter
 		d2l_write_register(PPI_D0S_CLRSIPOCOUNT, 0x00000003); //D*S_CLRSIPOCOUNT = [(THS-SETTLE + THS-ZERO) / HS_byte_clock_period ]
 		d2l_write_register(PPI_D1S_CLRSIPOCOUNT, 0x00000003);
@@ -850,7 +711,7 @@ static int d2l_power_on(struct omap_dss_device *dssdev)
 		d2l_write_register(LVPHY0, 0x00044006); //set frequency range allowed and clock/data lanes.
 
 		//configure D2L chip LCD Controller configuration registers
-		d2l_write_register(VPCTRL, 0x00F00110);
+		d2l_write_register(VPCTRL, 0x00F00110); //vtgen on
 		d2l_write_register(HTIM1, 0x00200006);
 		d2l_write_register(HTIM2, 0x011A0400);
 		d2l_write_register(VTIM1, 0x000F0008);
@@ -870,6 +731,7 @@ static int d2l_power_on(struct omap_dss_device *dssdev)
 		d2d->enabled = 1;
 	}
 
+err:
         return ret;
 }
 
@@ -890,11 +752,6 @@ static int d2l_start(struct omap_dss_device *dssdev)
 
 	mutex_lock(&d2d->lock);
 
-	if (d2d->force_update) {
-		//d2d->te_enabled = 1;
-		//d2l_prepare_workqueue(dssdev);
-	}
-
 	dsi_bus_lock(lcd_ix);
 
 	r = d2l_power_on(dssdev);
@@ -906,9 +763,6 @@ static int d2l_start(struct omap_dss_device *dssdev)
 		dssdev->state = OMAP_DSS_DISPLAY_DISABLED;
 	} else {
 		dssdev->state = OMAP_DSS_DISPLAY_ACTIVE;
-		//if (panel_data->use_esd_check)
-		//	queue_delayed_work(d2d->esd_wq, &d2d->esd_work,
-		//			D2L_ESD_CHECK_PERIOD);
 	}
 
 	mutex_unlock(&d2d->lock);
@@ -922,19 +776,7 @@ static void d2l_stop(struct omap_dss_device *dssdev)
 
 	lcd_ix = DSI1;
 
-	if (d2d->force_update) {
-		dsi_bus_lock(lcd_ix);
-		//_d2l_enable_te(dssdev, 0);
-		dsi_bus_unlock(lcd_ix);
-		//destroy_workqueue(td->te_wq);
-	}
-
 	mutex_lock(&d2d->lock);
-
-	//if (d2d->force_update)
-		//d2d->te_enabled = 0;
-
-	//cancel_delayed_work(&d2d->esd_work);
 
 	dsi_bus_lock(lcd_ix);
 
@@ -973,12 +815,8 @@ static void d2l_framedone_cb(int err, void *data)
 
         lcd_ix = DSI1;
 
-	printk(KERN_ALERT "d2l_framedone_cb\n");
-
 	dev_dbg(&dssdev->dev, "framedone, err %d\n", err);
 	dsi_bus_unlock(lcd_ix);
-
-	d2l_update(dssdev, 0, 0, 1024, 768);
 }
 
 static int d2l_update(struct omap_dss_device *dssdev,
@@ -990,15 +828,11 @@ static int d2l_update(struct omap_dss_device *dssdev,
 
 	lcd_ix = DSI1;
 
-	printk(KERN_ALERT "d2l_update\n");
-
 	dev_dbg(&dssdev->dev, "update %d, %d, %d x %d\n", x, y, w, h);
 
-	printk(KERN_ALERT "d2l_update... before mutex_lock\n");
 	mutex_lock(&d2d->lock);
-	printk(KERN_ALERT "d2l_update... before dsi_bus_lock\n");
+
 	dsi_bus_lock(lcd_ix);
-	printk(KERN_ALERT "d2l_update... after locks\n");
 
 	if (!d2d->enabled) {
 		r = 0;
@@ -1009,30 +843,11 @@ static int d2l_update(struct omap_dss_device *dssdev,
 	if (r)
 		goto err;
 
-	//r = d2l_set_update_window(lcd_ix, x, y, w, h);
-	//if (r)
-	//	goto err;
-
-	//if (d2d->te_enabled && panel_data->use_ext_te) {
-	//	d2d->update_region.x = x;
-	//	d2d->update_region.y = y;
-	//	d2d->update_region.w = w;
-	//	d2d->update_region.h = h;
-	//	barrier();
-	//	schedule_delayed_work(&td->te_timeout_work,
-	//			msecs_to_jiffies(250));
-	//	atomic_set(&td->do_update, 1);
-	//} else {
-		/* We use VC(0) for VideoPort Data and VC(1) for commands */
-		if (cpu_is_omap44xx())
-			r = omap_dsi_update(dssdev, 0, x, y, w, h,
-				d2l_framedone_cb, dssdev);
-		else
-			r = omap_dsi_update(dssdev, TCH, x, y, w, h,
-				d2l_framedone_cb, dssdev);
-		if (r)
-			goto err;
-	//}
+	/* We use VC(0) for VideoPort Data and VC(1) for commands */
+	r = omap_dsi_update(dssdev, 0, x, y, w, h,
+		d2l_framedone_cb, dssdev);
+	if (r)
+		goto err;
 
 	dsi_bus_unlock(lcd_ix);
 	/* note: no bus_unlock here. unlock is in framedone_cb */
@@ -1046,27 +861,13 @@ err:
 
 static int d2l_sync(struct omap_dss_device *dssdev)
 {
-	struct d2l_data *d2d = dev_get_drvdata(&dssdev->dev);
-	enum omap_dsi_index lcd_ix;
-
-	lcd_ix = DSI1;
-
-	dev_dbg(&dssdev->dev, "sync\n");
-
-	mutex_lock(&d2d->lock);
-	dsi_bus_lock(lcd_ix);
-	dsi_bus_unlock(lcd_ix);
-	mutex_unlock(&d2d->lock);
-
-	dev_dbg(&dssdev->dev, "sync done\n");
-
+	/* TODO? */
 	return 0;
 }
 
 static int d2l_set_update_mode(struct omap_dss_device *dssdev,
 		enum omap_dss_update_mode mode)
 {
-
 	struct d2l_data *d2d = dev_get_drvdata(&dssdev->dev);
 
 	if (d2d->force_update) {
@@ -1076,6 +877,7 @@ static int d2l_set_update_mode(struct omap_dss_device *dssdev,
 		if (mode != OMAP_DSS_UPDATE_MANUAL)
 			return -EINVAL;
 	}
+
 	return 0;
 }
 
