@@ -21,7 +21,7 @@
 #define __OMAP2_DSS_FEATURES_H
 
 #define MAX_DSS_MANAGERS	3
-#define MAX_DSS_OVERLAYS	3
+#define MAX_DSS_OVERLAYS	4
 
 /* DSS has feature id */
 enum dss_feat_id {
@@ -36,6 +36,7 @@ enum dss_feat_id {
 	FEAT_LINEBUFFERSPLIT		= 1 << 12,
 	FEAT_ROWREPEATENABLE		= 1 << 13,
 	FEAT_RESIZECONF			= 1 << 14,
+	FEAT_OVL_VID3			= 1 << 15,
 };
 
 /* DSS register field id */

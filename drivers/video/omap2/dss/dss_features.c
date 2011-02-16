@@ -148,6 +148,35 @@ static const enum omap_color_mode omap3_dss_supported_color_modes[] = {
 	OMAP_DSS_COLOR_RGBA32 | OMAP_DSS_COLOR_RGBX32,
 };
 
+static const enum omap_color_mode omap4_dss_supported_color_modes[] = {
+	/* OMAP_DSS_GFX */
+	OMAP_DSS_COLOR_CLUT1 | OMAP_DSS_COLOR_CLUT2 |
+	OMAP_DSS_COLOR_CLUT4 | OMAP_DSS_COLOR_CLUT8 |
+	OMAP_DSS_COLOR_RGB12U | OMAP_DSS_COLOR_ARGB16 |
+	OMAP_DSS_COLOR_RGB16 | OMAP_DSS_COLOR_RGB24U |
+	OMAP_DSS_COLOR_RGB24P | OMAP_DSS_COLOR_ARGB32 |
+	OMAP_DSS_COLOR_RGBA32 | OMAP_DSS_COLOR_RGBX32,
+
+	/* OMAP_DSS_VIDEO1 */
+	OMAP_DSS_COLOR_RGB24U | OMAP_DSS_COLOR_RGB24P |
+	OMAP_DSS_COLOR_RGB12U | OMAP_DSS_COLOR_RGB16 |
+	OMAP_DSS_COLOR_YUV2 | OMAP_DSS_COLOR_UYVY,
+
+	/* OMAP_DSS_VIDEO2 */
+	OMAP_DSS_COLOR_RGB12U | OMAP_DSS_COLOR_ARGB16 |
+	OMAP_DSS_COLOR_RGB16 | OMAP_DSS_COLOR_RGB24U |
+	OMAP_DSS_COLOR_RGB24P | OMAP_DSS_COLOR_YUV2 |
+	OMAP_DSS_COLOR_UYVY | OMAP_DSS_COLOR_ARGB32 |
+	OMAP_DSS_COLOR_RGBA32 | OMAP_DSS_COLOR_RGBX32,
+
+	/* OMAP_DSS_VIDEO3 */
+	OMAP_DSS_COLOR_RGB12U | OMAP_DSS_COLOR_ARGB16 |
+	OMAP_DSS_COLOR_RGB16 | OMAP_DSS_COLOR_RGB24U |
+	OMAP_DSS_COLOR_RGB24P | OMAP_DSS_COLOR_YUV2 |
+	OMAP_DSS_COLOR_UYVY | OMAP_DSS_COLOR_ARGB32 |
+	OMAP_DSS_COLOR_RGBA32 | OMAP_DSS_COLOR_RGBX32,
+};
+
 /* OMAP2 DSS Features */
 static struct omap_dss_features omap2_dss_features = {
 	.reg_fields = omap2_dss_reg_fields,
@@ -206,12 +235,12 @@ static struct omap_dss_features omap4_dss_features = {
 	.has_feature	=
 		FEAT_GLOBAL_ALPHA | FEAT_PRE_MULT_ALPHA |
 		FEAT_MGR_LCD2 |
-		FEAT_GLOBAL_ALPHA_VID1,
+		FEAT_GLOBAL_ALPHA_VID1 | FEAT_OVL_VID3,
 
 	.num_mgrs = 3,
-	.num_ovls = 3,
+	.num_ovls = 4,
 	.supported_displays = omap4_dss_supported_displays,
-	.supported_color_modes = omap3_dss_supported_color_modes,
+	.supported_color_modes = omap4_dss_supported_color_modes,
 };
 
 /* Functions returning values related to a DSS feature */
