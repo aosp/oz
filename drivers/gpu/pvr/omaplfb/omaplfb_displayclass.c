@@ -290,14 +290,14 @@ static OMAP_ERROR UnBlankDisplay(OMAPLFB_DEVINFO *psDevInfo)
 	DEBUG_PRINTK("Executing for display %u",
 		psDevInfo->uDeviceID);
 
-	acquire_console_sem();
+	console_lock();
 	if (fb_blank(psDevInfo->psLINFBInfo, FB_BLANK_UNBLANK))
 	{
-		release_console_sem();
+		console_unlock();
 		WARNING_PRINTK("fb_blank failed");
 		return OMAP_ERROR_GENERIC;
 	}
-	release_console_sem();
+	console_unlock();
 
 	return OMAP_OK;
 }
@@ -770,12 +770,18 @@ static PVRSRV_ERROR CreateDCSwapChain(IMG_HANDLE hDevice,
 	psSwapChain->pvDevInfo = (void*)psDevInfo;
 
 	/*
+	 * XXX TL: port to .38. We need to revisit this, we are not
+	 * able to create a real time workqueue so stick with a
+	 * freezable one for now
+	 */
+
+	/*
 	 * Init the workqueue (single thread, freezable and real time)
 	 * and its own work for this display
 	 */
 	INIT_WORK(&psDevInfo->sync_display_work, OMAPLFBSyncIHandler);
 	psDevInfo->sync_display_wq =
-		__create_workqueue("pvr_display_sync_wq", 1, 1, 1);
+		create_freezable_workqueue("pvr_display_sync_wq");
 
 	DEBUG_PRINTK("Swap chain will have %u buffers for display %u",
 		(unsigned int)ui32BufferCount, psDevInfo->uDeviceID);
@@ -1251,7 +1257,7 @@ static void DeInitDev(OMAPLFB_DEVINFO *psDevInfo)
 	struct fb_info *psLINFBInfo = psDevInfo->psLINFBInfo;
 	struct module *psLINFBOwner;
 
-	acquire_console_sem();
+	console_lock();
 	psLINFBOwner = psLINFBInfo->fbops->owner;
 
 	if (psLINFBInfo->fbops->fb_release != NULL)
@@ -1259,7 +1265,7 @@ static void DeInitDev(OMAPLFB_DEVINFO *psDevInfo)
 
 	module_put(psLINFBOwner);
 
-	release_console_sem();
+	console_unlock();
 }
 
 /*
@@ -1378,7 +1384,7 @@ static OMAP_ERROR InitDev(OMAPLFB_DEVINFO *psDevInfo, int fb_idx)
 			WARNING_PRINTK("Unknown bits per pixel format %i",
 				DESIRED_BPP);
 	}
-	acquire_console_sem();
+	console_lock();
 	psLINFBInfo->var.activate = FB_ACTIVATE_FORCE;
 	fb_set_var(psLINFBInfo, &psLINFBInfo->var);
 	buffers_available =
@@ -1401,7 +1407,7 @@ static OMAP_ERROR InitDev(OMAPLFB_DEVINFO *psDevInfo, int fb_idx)
 	if (!try_module_get(psLINFBOwner))
 	{
 		ERROR_PRINTK("Couldn't get framebuffer module");
-		release_console_sem();
+		console_unlock();
 		return OMAP_ERROR_GENERIC;
 	}
 
@@ -1412,7 +1418,7 @@ static OMAP_ERROR InitDev(OMAPLFB_DEVINFO *psDevInfo, int fb_idx)
 			ERROR_PRINTK("Couldn't open framebuffer with"
 				" index %d", fb_idx);
 			module_put(psLINFBOwner);
-			release_console_sem();
+			console_unlock();
 			return OMAP_ERROR_GENERIC;
 		}
 	}
@@ -1503,7 +1509,7 @@ static OMAP_ERROR InitDev(OMAPLFB_DEVINFO *psDevInfo, int fb_idx)
 	else
 		WARNING_PRINTK("*Format: Unknown framebuffer format");
 
-	release_console_sem();
+	console_unlock();
 	return OMAP_OK;
 }
 
