@@ -34,6 +34,7 @@
 
 static struct workqueue_struct *mboxd;
 static struct omap_mbox **mboxes;
+static DEFINE_MUTEX(mboxes_lock);
 
 static int mbox_configured;
 static DEFINE_MUTEX(mbox_configured_lock);
@@ -152,7 +153,7 @@ static void mbox_rx_work(struct work_struct *work)
 		WARN_ON(len != sizeof(msg));
 
 		blocking_notifier_call_chain(&mq->mbox->notifier, len,
-								(void *)msg);
+							(void *)msg);
 		spin_lock_irq(&mq->lock);
 		if (mq->full) {
 			mq->full = false;
@@ -167,37 +168,59 @@ static void mbox_rx_work(struct work_struct *work)
  */
 static void __mbox_tx_interrupt(struct omap_mbox *mbox)
 {
-	omap_mbox_disable_irq(mbox, IRQ_TX);
-	ack_mbox_irq(mbox, IRQ_TX);
-	tasklet_schedule(&mbox->txq->tasklet);
+	struct omap_mbox *mbox_curr;
+	int i =0;
+
+	while (mboxes[i]) {
+		mbox_curr = mboxes[i];
+		if (!mbox_fifo_full(mbox_curr)) {
+			omap_mbox_disable_irq(mbox_curr, IRQ_TX);
+			ack_mbox_irq(mbox_curr, IRQ_TX);
+			tasklet_schedule(&mbox_curr->txq->tasklet);
+		}
+		i++;
+	}
 }
 
 static void __mbox_rx_interrupt(struct omap_mbox *mbox)
 {
-	struct omap_mbox_queue *mq = mbox->rxq;
+	struct omap_mbox_queue *mq;
 	mbox_msg_t msg;
 	int len;
+	int i = 0;
+	struct omap_mbox *mbox_curr;
+	bool msg_rx;
 
-	while (!mbox_fifo_empty(mbox)) {
-		if (unlikely(kfifo_avail(&mq->fifo) < sizeof(msg))) {
-			omap_mbox_disable_irq(mbox, IRQ_RX);
-			mq->full = true;
-			goto nomem;
+	while (mboxes[i]) {
+		mbox_curr = mboxes[i];
+		mq = mbox_curr->rxq;
+		msg_rx = false;
+		while (!mbox_fifo_empty(mbox_curr)) {
+			msg_rx = true;
+			if (unlikely(kfifo_avail(&mq->fifo) < sizeof(msg))) {
+				omap_mbox_disable_irq(mbox_curr, IRQ_RX);
+				mq->full = true;
+				goto nomem;
+			}
+
+			msg = mbox_fifo_read(mbox_curr);
+
+			len = kfifo_in(&mq->fifo, (unsigned char *)&msg,
+								sizeof(msg));
+			if (unlikely(len != sizeof(msg)))
+				pr_err("%s: kfifo_in anomaly detected\n",
+								__func__);
+			if (mbox->ops->type == OMAP_MBOX_TYPE1)
+				break;
 		}
-
-		msg = mbox_fifo_read(mbox);
-
-		len = kfifo_in(&mq->fifo, (unsigned char *)&msg, sizeof(msg));
-		WARN_ON(len != sizeof(msg));
-
-		if (mbox->ops->type == OMAP_MBOX_TYPE1)
-			break;
-	}
-
-	/* no more messages in the fifo. clear IRQ source. */
-	ack_mbox_irq(mbox, IRQ_RX);
+		/* no more messages in the fifo. clear IRQ source. */
+		if (msg_rx)
+			ack_mbox_irq(mbox_curr, IRQ_RX);
 nomem:
-	queue_work(mboxd, &mbox->rxq->work);
+		queue_work(mboxd, &mbox->rxq->work);
+
+		i++;
+	}
 }
 
 static irqreturn_t mbox_interrupt(int irq, void *p)
@@ -291,7 +314,7 @@ fail_alloc_rxq:
 fail_alloc_txq:
 	free_irq(mbox->irq, mbox);
 fail_request_irq:
-	if (mbox->ops->shutdown)
+	if (likely(mbox->ops->shutdown))
 		mbox->ops->shutdown(mbox);
 	mbox->use_count--;
 fail_startup:
@@ -328,12 +351,16 @@ struct omap_mbox *omap_mbox_get(const char *name, struct notifier_block *nb)
 	if (!mboxes)
 		return ERR_PTR(-EINVAL);
 
+	mutex_lock(&mboxes_lock);
 	for (mbox = *mboxes; mbox; mbox++)
 		if (!strcmp(mbox->name, name))
 			break;
 
-	if (!mbox)
+	if (!mbox) {
+		mutex_unlock(&mboxes_lock);
 		return ERR_PTR(-ENOENT);
+	}
+	mutex_unlock(&mboxes_lock);
 
 	ret = omap_mbox_startup(mbox);
 	if (ret)
@@ -348,7 +375,8 @@ EXPORT_SYMBOL(omap_mbox_get);
 
 void omap_mbox_put(struct omap_mbox *mbox, struct notifier_block *nb)
 {
-	blocking_notifier_chain_unregister(&mbox->notifier, nb);
+	if (nb)
+		blocking_notifier_chain_unregister(&mbox->notifier, nb);
 	omap_mbox_fini(mbox);
 }
 EXPORT_SYMBOL(omap_mbox_put);
@@ -363,6 +391,7 @@ int omap_mbox_register(struct device *parent, struct omap_mbox **list)
 	mboxes = list;
 	if (!mboxes)
 		return -EINVAL;
+	mutex_lock(&mboxes_lock);
 
 	for (i = 0; mboxes[i]; i++) {
 		struct omap_mbox *mbox = mboxes[i];
@@ -375,11 +404,13 @@ int omap_mbox_register(struct device *parent, struct omap_mbox **list)
 
 		BLOCKING_INIT_NOTIFIER_HEAD(&mbox->notifier);
 	}
+	mutex_unlock(&mboxes_lock);
 	return 0;
 
 err_out:
 	while (i--)
 		device_unregister(mboxes[i]->dev);
+	mutex_unlock(&mboxes_lock);
 	return ret;
 }
 EXPORT_SYMBOL(omap_mbox_register);
@@ -391,9 +422,11 @@ int omap_mbox_unregister(void)
 	if (!mboxes)
 		return -EINVAL;
 
+	mutex_lock(&mboxes_lock);
 	for (i = 0; mboxes[i]; i++)
 		device_unregister(mboxes[i]->dev);
 	mboxes = NULL;
+	mutex_unlock(&mboxes_lock);
 	return 0;
 }
 EXPORT_SYMBOL(omap_mbox_unregister);
