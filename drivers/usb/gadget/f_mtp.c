@@ -25,6 +25,8 @@
 #include <linux/wait.h>
 #include <linux/err.h>
 #include <linux/interrupt.h>
+#include <linux/kthread.h>
+#include <linux/freezer.h>
 
 #include <linux/types.h>
 #include <linux/file.h>
@@ -93,10 +95,16 @@ struct mtp_dev {
 	wait_queue_head_t read_wq;
 	wait_queue_head_t write_wq;
 	struct usb_request *rx_req[RX_REQ_MAX];
+	struct usb_request *intr_req;
 	int rx_done;
 
+	/* synchronize access to interrupt endpoint */
+	/* true if interrupt endpoint is busy */
 	int intr_busy;
 
+	/* for processing MTP_SEND_FILE and MTP_RECEIVE_FILE
+	* ioctls on a work queue
+	*/
 	struct workqueue_struct *wq;
 	struct work_struct mtp_send_file;
 	struct work_struct mtp_receive_file;
@@ -368,12 +376,11 @@ static void mtp_complete_intr(struct usb_ep *ep, struct usb_request *req)
 {
 	struct mtp_dev *dev = _mtp_dev;
 
-	DBG(dev->cdev, "mtp_complete_intr status: %d actual: %d\n", req->status, req->actual);
+	DBG(dev->cdev, "mtp_complete_intr status: %d actual: %d\n",
+		req->status, req->actual);
 	dev->intr_busy = 0;
 	if (req->status != 0)
 		dev->state = STATE_ERROR;
-
-	wake_up(&dev->intr_wq);
 }
 
 static int __init create_bulk_endpoints(struct mtp_dev *dev,
@@ -501,6 +508,7 @@ requeue_req:
 	ret = wait_event_interruptible(dev->read_wq, dev->rx_done);
 	if (ret < 0) {
 		r = ret;
+		usb_ep_dequeue(dev->ep_out, req);
 		goto done;
 	}
 	if (dev->state == STATE_BUSY) {
@@ -608,8 +616,10 @@ static ssize_t mtp_write(struct file *fp, const char __user *buf,
 	return r;
 }
 
+
+/* read from a local file and write to USB */
 static void mtp_send_file(struct work_struct *data)
-	{
+{
 	struct mtp_dev	*dev = container_of(data,
 		struct mtp_dev, mtp_send_file);
 	struct usb_composite_dev *cdev = dev->cdev;
@@ -630,9 +640,9 @@ static void mtp_send_file(struct work_struct *data)
 
 	DBG(cdev, "mtp_send_file(%lld %lld)\n", offset, count);
 
-	/* Send 'Zero Length Packet' at end of the transfer if it's size
-	 * is a multiple of the bulk max packet size
-	 */
+	/* Send 'Zero Length Packet' at end of the transfer if it's
+	* size is a multiple of the bulk max packet size
+	*/
 	if ((count & (dev->ep_in->maxpacket - 1)) == 0)
 		need_zlp = 1;
 
@@ -668,7 +678,7 @@ static void mtp_send_file(struct work_struct *data)
 		req->length = xfer;
 		ret = usb_ep_queue(dev->ep_in, req, GFP_KERNEL);
 		if (ret < 0) {
-			DBG(cdev, "mtp_sned_file: xfer error %d\n", ret);
+			DBG(cdev, "mtp_write: xfer error %d\n", ret);
 			dev->state = STATE_ERROR;
 			r = -EIO;
 			break;
@@ -744,8 +754,8 @@ static void mtp_receive_file(struct work_struct *data)
 			/* wait for our last read to complete */
 			ret = wait_event_interruptible(dev->read_wq,
 				dev->rx_done || dev->state != STATE_BUSY);
-			if (dev->state == STATE_CANCELED) {
-				r = -ECANCELED;
+		if (dev->state == STATE_CANCELED) {
+			r = -ECANCELED;
 			if (!dev->rx_done)
 				usb_ep_dequeue(dev->ep_out, read_req);
 			  break;
@@ -757,7 +767,7 @@ static void mtp_receive_file(struct work_struct *data)
 				count -= read_req->actual;
 			if (read_req->actual < read_req->length) {
 				/*short packet is used to signal
-				EOF for sizes> 4 gig*/
+				EOF for sizes>, 4 gig*/
 				DBG(cdev, "got short packet\n");
 				count = 0;
 			}
@@ -770,6 +780,7 @@ static void mtp_receive_file(struct work_struct *data)
 	dev->xfer_result = r;
 	smp_wmb();
 }
+
 
 static int mtp_send_event(struct mtp_dev *dev, struct mtp_event *event)
 {
@@ -784,8 +795,8 @@ static int mtp_send_event(struct mtp_dev *dev, struct mtp_event *event)
 
 	if (dev->state == STATE_OFFLINE)
 		return -ENODEV;
-	/* unfortunately an interrupt request might hang indefinitely if
-	* the host is not listening on the interrupt endpoint,
+	/* unfortunately an interrupt request might hang indefinitely
+	* if the host is not listening on the interrupt endpoint,
 	* so instead of waiting,we just fail if the endpoint is busy.
 	*/
 	if (dev->intr_busy)
@@ -830,7 +841,7 @@ static long mtp_ioctl(struct file *fp, unsigned code, unsigned long value)
 		if (dev->state == STATE_OFFLINE) {
 			spin_unlock_irq(&dev->lock);
 			ret = -ENODEV;
-			goto out
+			goto out;
 		}
 		dev->state = STATE_BUSY;
 		spin_unlock_irq(&dev->lock);
@@ -839,6 +850,7 @@ static long mtp_ioctl(struct file *fp, unsigned code, unsigned long value)
 			ret = -EFAULT;
 			goto fail;
 		}
+	/* hold a reference to the file while we are working with it */
 		filp = fget(mfr.fd);
 		if (!filp) {
 			ret = -EBADF;
@@ -894,11 +906,13 @@ static long mtp_ioctl(struct file *fp, unsigned code, unsigned long value)
 			ret =  -EFAULT;
 		else
 			ret = mtp_send_event(dev, &event);
-		goto out;
+				goto out;
 	}
 	}
 
 fail:
+	if (filp)
+		fput(filp);
 	spin_lock_irq(&dev->lock);
 	if (dev->state == STATE_CANCELED)
 		ret = -ECANCELED;
@@ -909,7 +923,6 @@ out:
 	_unlock(&dev->ioctl_excl);
 	DBG(dev->cdev, "ioctl returning %d\n", ret);
 	return ret;
-
 }
 
 static int mtp_open(struct inode *ip, struct file *fp)
@@ -925,7 +938,6 @@ static int mtp_open(struct inode *ip, struct file *fp)
 	fp->private_data = _mtp_dev;
 	return 0;
 }
-
 static int mtp_release(struct inode *ip, struct file *fp)
 {
 	printk(KERN_INFO "mtp_release\n");
@@ -1002,7 +1014,6 @@ mtp_function_unbind(struct usb_configuration *c, struct usb_function *f)
 	mtp_request_free(dev->intr_req, dev->ep_intr);
 	dev->state = STATE_OFFLINE;
 	spin_unlock_irq(&dev->lock);
-	wake_up(&dev->intr_wq);
 
 	misc_deregister(&mtp_device);
 	kfree(_mtp_dev);
@@ -1095,7 +1106,7 @@ static int mtp_function_setup(struct usb_function *f,
 			else
 				status->wCode =
 					__cpu_to_le16(MTP_RESPONSE_OK);
-			spin_unlock_irqrestore(&dev->lock, flags);
+				spin_unlock_irqrestore(&dev->lock, flags);
 			value = sizeof(*status);
 		}
 	}
@@ -1162,7 +1173,8 @@ static void mtp_function_disable(struct usb_function *f)
 	DBG(cdev, "mtp_function_disable\n");
 	dev->state = STATE_OFFLINE;
 	usb_ep_disable(dev->ep_in);
-	usb_ep_disable(dev->ep_out);;
+	usb_ep_disable(dev->ep_out);
+	usb_ep_disable(dev->ep_intr);
 
 	/* readers may be blocked waiting for us to go online */
 	wake_up(&dev->read_wq);
@@ -1202,7 +1214,6 @@ static int mtp_bind_config(struct usb_configuration *c)
 		goto err1;
 	INIT_WORK(&dev->mtp_send_file, mtp_send_file);
 	INIT_WORK(&dev->mtp_receive_file, mtp_receive_file);
-
 
 	dev->cdev = c->cdev;
 	dev->function.name = "mtp";
