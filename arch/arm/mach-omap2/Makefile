@@ -62,7 +62,7 @@ ifeq ($(CONFIG_PM),y)
 obj-$(CONFIG_ARCH_OMAP2)		+= pm24xx.o
 obj-$(CONFIG_ARCH_OMAP2)		+= sleep24xx.o pm_bus.o voltage.o
 obj-$(CONFIG_ARCH_OMAP3)		+= pm34xx.o sleep34xx.o voltage.o \
-					   cpuidle34xx.o pm_bus.o
+					   cpuidle34xx.o pm_bus.o dvfs.o
 obj-$(CONFIG_ARCH_OMAP4)		+= pm44xx.o voltage.o pm_bus.o \
 					   omap4-mpuss-lowpower.o sleep44xx.o \
 					   cpuidle44xx.o
