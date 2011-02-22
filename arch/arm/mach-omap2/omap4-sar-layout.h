@@ -27,10 +27,12 @@
 #define SCU_OFFSET1				0xd24
 #define L2X0_OFFSET				0xd28
 #define L2X0_AUXCTRL_OFFSET			0xd2c
+#define OMAP_TYPE_OFFSET		0xd48
 
 /* CPUx Wakeup Non-Secure Physical Address offsets in SAR_BANK3 */
 #define CPU0_WAKEUP_NS_PA_ADDR_OFFSET		0xa04
 #define CPU1_WAKEUP_NS_PA_ADDR_OFFSET		0xa08
+
 
  /* GIC save restore offset from SAR_BANK3 */
 #define SAR_BACKUP_STATUS_OFFSET		(SAR_BANK3_OFFSET + 0x500)

@@ -44,6 +44,8 @@
 #include <linux/smp.h>
 
 #include <asm/cacheflush.h>
+#include <linux/dma-mapping.h>
+
 #include <asm/tlbflush.h>
 #include <asm/smp_scu.h>
 #include <asm/system.h>
@@ -73,6 +75,15 @@
 
 /* GIC save SAR bank base */
 static struct powerdomain *mpuss_pd;
+/*
+ * Maximum Secure memory storage size.
+ */
+#define OMAP4_SECURE_RAM_STORAGE		(88 * SZ_1K)
+/*
+ * Physical address of secure memory storage
+ */
+dma_addr_t omap4_secure_ram_phys;
+static void *secure_ram;
 
 /* Variables to store maximum spi(Shared Peripheral Interrupts) registers. */
 static u32 max_spi_irq, max_spi_reg;
@@ -132,14 +143,16 @@ static inline void clear_cpu_prev_pwrst(unsigned int cpu_id)
 static void scu_pwrst_prepare(unsigned int cpu_id, unsigned int cpu_state)
 {
 	struct omap4_cpu_pm_info *pm_info = &per_cpu(omap4_pm_info, cpu_id);
-	u32 scu_pwr_st;
+	u32 scu_pwr_st, l1_state;
 
 	switch (cpu_state) {
 	case PWRDM_POWER_RET:
 		scu_pwr_st = SCU_PM_DORMANT;
+		l1_state = 0x00;
 		break;
 	case PWRDM_POWER_OFF:
 		scu_pwr_st = SCU_PM_POWEROFF;
+		l1_state = 0xff;
 		break;
 	case PWRDM_POWER_ON:
 	case PWRDM_POWER_INACTIVE:
@@ -149,6 +162,8 @@ static void scu_pwrst_prepare(unsigned int cpu_id, unsigned int cpu_state)
 	}
 
 	__raw_writel(scu_pwr_st, pm_info->scu_sar_addr);
+	if (omap_type() != OMAP2_DEVICE_TYPE_GP)
+		writel(l1_state, pm_info->scu_sar_addr + 0x04); //SEC1?????
 }
 
 /*
@@ -231,6 +246,34 @@ static void gic_save_context(void)
 }
 
 /*
+ * API to save GIC and Wakeupgen using secure API
+ * for HS/EMU device
+ */
+static void save_gic_wakeupgen_secure(void)
+{
+	u32 ret;
+	ret = omap4_secure_dispatcher(HAL_SAVEGIC_INDEX,
+					FLAG_IRQFIQ_MASK | FLAG_START_CRITICAL,
+					0, 0, 0, 0, 0);
+	if (!ret)
+		pr_debug("GIC and Wakeupgen context save failed\n");
+}
+
+/*
+ * API to save Secure RAM using secure API
+ * for HS/EMU device
+ */
+static void save_secure_ram(void)
+{
+	u32 ret;
+	ret = omap4_secure_dispatcher(HAL_SAVESECURERAM_INDEX,
+					FLAG_IRQFIQ_MASK | FLAG_START_CRITICAL,
+					1, omap4_secure_ram_phys, 0, 0, 0);
+	if (!ret)
+		pr_debug("Secure ram context save failed\n");
+}
+
+/*
  * OMAP4 MPUSS Low Power Entry Function
  *
  * The purpose of this function is to manage low power programming
@@ -296,9 +339,24 @@ int omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
 	 * GIC lost during MPU OFF and OSWR
 	 */
 	pwrdm_clear_all_prev_pwrst(mpuss_pd);
+	if (pwrdm_read_next_pwrst(mpuss_pd) == PWRDM_POWER_RET) {
+		if (pwrdm_read_logic_retst(mpuss_pd) == PWRDM_POWER_OFF) {
+			if (omap_type() != OMAP2_DEVICE_TYPE_GP) {
+				save_gic_wakeupgen_secure();
+			} else {
+				omap_wakeupgen_save();
+				gic_save_context();
+			}
+		}
+	}
 	if (pwrdm_read_next_pwrst(mpuss_pd) == PWRDM_POWER_OFF) {
+	if (omap_type() != OMAP2_DEVICE_TYPE_GP) {
+			save_secure_ram();
+			save_gic_wakeupgen_secure();
+	} else {
 		omap_wakeupgen_save();
 		gic_save_context();
+	}
 		save_state = 3;
 	}
 
@@ -381,6 +439,20 @@ int __init omap4_mpuss_init(void)
 	if (!pm_info->pwrdm) {
 		pr_err("Lookup failed for CPU1 pwrdm\n");
 		return -ENODEV;
+	}
+
+	/*
+	 * Check the OMAP type and store it to scratchpad
+	 */
+	if (omap_type() != OMAP2_DEVICE_TYPE_GP) {
+		/* Memory not released */
+		secure_ram = dma_alloc_coherent(NULL, OMAP4_SECURE_RAM_STORAGE,
+			(dma_addr_t *)&omap4_secure_ram_phys, GFP_KERNEL);
+		if (!secure_ram)
+			pr_err("Unable to allocate secure ram storage\n");
+		writel(0x1, sar_ram_base + OMAP_TYPE_OFFSET);
+	} else {
+		writel(0x0, sar_ram_base + OMAP_TYPE_OFFSET);
 	}
 
 	/* Clear CPU previous power domain state */
