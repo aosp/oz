@@ -34,6 +34,7 @@
 #include "clock.h"
 #include "cm2xxx_3xxx.h"
 #include "cm-regbits-34xx.h"
+#include "cm-regbits-44xx.h"
 
 /* CM_AUTOIDLE_PLL*.AUTO_* bit values */
 #define DPLL_AUTOIDLE_DISABLE			0x0
@@ -611,4 +612,45 @@ unsigned long omap3_clkoutx2_recalc(struct clk *clk)
 	else
 		rate = clk->parent->rate * 2;
 	return rate;
+}
+
+/* Supported only on OMAP4 */
+int omap4_dpllmx_gatectrl_read(struct clk *clk)
+{
+	u32 v;
+
+	if (!clk || !clk->clksel_reg || !cpu_is_omap44xx())
+		return -EINVAL;
+
+	v = __raw_readl(clk->clksel_reg);
+	v &= OMAP4430_DPLL_CLKOUT_GATE_CTRL_MASK;
+	v >>= __ffs(OMAP4430_DPLL_CLKOUT_GATE_CTRL_MASK);
+
+	return v;
+}
+
+void omap4_dpllmx_allow_gatectrl(struct clk *clk)
+{
+	u32 v;
+
+	if (!clk || !clk->clksel_reg || !cpu_is_omap44xx())
+		return;
+
+	v = __raw_readl(clk->clksel_reg);
+	/* Clear the bit to allow gatectrl */
+	v &= ~OMAP4430_DPLL_CLKOUT_GATE_CTRL_MASK;
+	__raw_writel(v, clk->clksel_reg);
+}
+
+void omap4_dpllmx_deny_gatectrl(struct clk *clk)
+{
+	u32 v;
+
+	if (!clk || !clk->clksel_reg || !cpu_is_omap44xx())
+		return;
+
+	v = __raw_readl(clk->clksel_reg);
+	/* Set the bit to deny gatectrl */
+	v |= OMAP4430_DPLL_CLKOUT_GATE_CTRL_MASK;
+	__raw_writel(v, clk->clksel_reg);
 }

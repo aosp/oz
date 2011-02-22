@@ -116,7 +116,7 @@ inline int ipu_pm_module_set_rate(unsigned rsrc,
 			dp = pd[target].dev;
 	}
 #ifdef CONFIG_OMAP_PM
-	ret = omap_device_set_rate(pd[rsrc].dev, dp, rate);
+	ret = omap_device_set_rate(dp, rate);
 #endif
 	if (ret)
 		pr_err("device set rate failed %s", pd[target_rsrc].oh_name);

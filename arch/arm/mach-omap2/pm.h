@@ -17,10 +17,12 @@
 
 extern void *omap3_secure_ram_storage;
 extern void omap3_pm_off_mode_enable(int);
+extern void omap4_pm_off_mode_enable(int);
 extern void omap_sram_idle(void);
 extern int omap3_can_sleep(void);
 extern int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 state);
 extern int omap3_idle_init(void);
+extern int omap4_idle_init(void);
 
 #if defined(CONFIG_PM_OPP)
 extern int omap3_opp_init(void);
@@ -75,6 +77,7 @@ extern u32 sleep_while_idle;
 
 #if defined(CONFIG_CPU_IDLE)
 extern void omap3_cpuidle_update_states(u32, u32);
+extern void omap4_cpuidle_update_states(u32, u32);
 #endif
 
 #if defined(CONFIG_PM_DEBUG) && defined(CONFIG_DEBUG_FS)

@@ -65,6 +65,9 @@ u32 omap3_dpll_autoidle_read(struct clk *clk);
 int omap3_noncore_dpll_set_rate(struct clk *clk, unsigned long rate);
 int omap3_noncore_dpll_enable(struct clk *clk);
 void omap3_noncore_dpll_disable(struct clk *clk);
+int omap4_dpllmx_gatectrl_read(struct clk *clk);
+void omap4_dpllmx_allow_gatectrl(struct clk *clk);
+void omap4_dpllmx_deny_gatectrl(struct clk *clk);
 
 #ifdef CONFIG_OMAP_RESET_CLOCKS
 void omap2_clk_disable_unused(struct clk *clk);
@@ -137,7 +140,9 @@ extern const struct clksel_rate gpt_32k_rates[];
 extern const struct clksel_rate gpt_sys_rates[];
 extern const struct clksel_rate gfx_l3_rates[];
 
-#if defined(CONFIG_ARCH_OMAP2) && defined(CONFIG_CPU_FREQ)
+#ifdef CONFIG_CPU_FREQ
+
+#ifdef CONFIG_ARCH_OMAP2
 extern void omap2_clk_init_cpufreq_table(struct cpufreq_frequency_table **table);
 extern void omap2_clk_exit_cpufreq_table(struct cpufreq_frequency_table **table);
 #else
@@ -145,6 +150,18 @@ extern void omap2_clk_exit_cpufreq_table(struct cpufreq_frequency_table **table)
 #define omap2_clk_exit_cpufreq_table	0
 #endif
 
+#ifdef CONFIG_ARCH_OMAP3
+extern void omap3_clk_init_cpufreq_table(struct cpufreq_frequency_table **table);
+extern void omap3_clk_exit_cpufreq_table(struct cpufreq_frequency_table **table);
+#else
+#define omap3_clk_init_cpufreq_table	0
+#define omap3_clk_exit_cpufreq_table	0
+#endif
+
+#endif /* CONFIG_CPU_FREQ */
+
 extern const struct clkops clkops_omap3_noncore_dpll_ops;
+extern const struct clkops clkops_omap3_core_dpll_ops;
+extern const struct clkops clkops_omap4_dpllmx_ops;
 
 #endif
