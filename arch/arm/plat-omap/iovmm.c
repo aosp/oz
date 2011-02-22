@@ -57,9 +57,7 @@
  *
  *	'*':	not yet, but feasible.
  */
-
 static struct kmem_cache *iovm_area_cachep;
-
 /* return total bytes of sg buffers */
 static size_t sgtable_len(const struct sg_table *sgt)
 {
@@ -275,10 +273,8 @@ static struct iovm_struct *alloc_iovm_area(struct iommu *obj, u32 da,
 
 	if (!obj || !bytes)
 		return ERR_PTR(-EINVAL);
-
 	start = da;
 	alignement = PAGE_SIZE;
-
 	if (flags & IOVMF_DA_ANON) {
 		start = obj->da_start;
 
@@ -289,11 +285,9 @@ static struct iovm_struct *alloc_iovm_area(struct iommu *obj, u32 da,
 					obj->da_end - start < bytes) {
 		return ERR_PTR(-EINVAL);
 	}
-
 	tmp = NULL;
 	if (list_empty(&obj->mmap))
 		goto found;
-
 	prev_end = 0;
 	list_for_each_entry(tmp, &obj->mmap, list) {
 
@@ -458,7 +452,7 @@ static inline void sgtable_drain_kmalloc(struct sg_table *sgt)
 static int map_iovm_area(struct iommu *obj, struct iovm_struct *new,
 			 const struct sg_table *sgt, u32 flags)
 {
-	int err;
+	int err = 0;
 	unsigned int i, j;
 	struct scatterlist *sg;
 	u32 da = new->da_start;
@@ -887,7 +881,6 @@ void iommu_kfree(struct iommu *obj, u32 da)
 }
 EXPORT_SYMBOL_GPL(iommu_kfree);
 
-
 static int __init iovmm_init(void)
 {
 	const unsigned long flags = SLAB_HWCACHE_ALIGN;
@@ -897,6 +890,7 @@ static int __init iovmm_init(void)
 			      flags, NULL);
 	if (!p)
 		return -ENOMEM;
+
 	iovm_area_cachep = p;
 
 	return 0;
