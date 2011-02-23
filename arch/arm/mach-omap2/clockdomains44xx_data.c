@@ -62,7 +62,7 @@ static struct clockdomain tesla_44xx_clkdm = {
 	.prcm_partition	  = OMAP4430_CM1_PARTITION,
 	.cm_inst	  = OMAP4430_CM1_TESLA_INST,
 	.clkdm_offs	  = OMAP4430_CM1_TESLA_TESLA_CDOFFS,
-	.flags		  = CLKDM_CAN_HWSUP_SWSUP,
+	.flags		  = CLKDM_CAN_SWSUP,
 	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
 };
 
@@ -82,7 +82,7 @@ static struct clockdomain ivahd_44xx_clkdm = {
 	.prcm_partition	  = OMAP4430_CM2_PARTITION,
 	.cm_inst	  = OMAP4430_CM2_IVAHD_INST,
 	.clkdm_offs	  = OMAP4430_CM2_IVAHD_IVAHD_CDOFFS,
-	.flags		  = CLKDM_CAN_HWSUP_SWSUP,
+	.flags		  = CLKDM_CAN_SWSUP,
 	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
 };
 
@@ -191,7 +191,7 @@ static struct clockdomain ducati_44xx_clkdm = {
 	.prcm_partition	  = OMAP4430_CM2_PARTITION,
 	.cm_inst	  = OMAP4430_CM2_CORE_INST,
 	.clkdm_offs	  = OMAP4430_CM2_CORE_DUCATI_CDOFFS,
-	.flags		  = CLKDM_CAN_HWSUP_SWSUP,
+	.flags		  = CLKDM_CAN_SWSUP,
 	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
 };
 
@@ -231,7 +231,7 @@ static struct clockdomain iss_44xx_clkdm = {
 	.prcm_partition	  = OMAP4430_CM2_PARTITION,
 	.cm_inst	  = OMAP4430_CM2_CAM_INST,
 	.clkdm_offs	  = OMAP4430_CM2_CAM_CAM_CDOFFS,
-	.flags		  = CLKDM_CAN_HWSUP_SWSUP,
+	.flags		  = CLKDM_CAN_SWSUP,
 	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
 };
 
