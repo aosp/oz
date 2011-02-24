@@ -26,6 +26,11 @@
 #include <linux/input/sfh7741.h>
 #include <linux/slab.h>
 
+#define SFH7741_PROX_ON	1
+#define SFH7741_PROX_OFF	0
+
+#define SFH7741_SUSPEND_RESUME
+
 struct sfh7741_drvdata {
 	struct input_dev *input;
 	int irq;
@@ -68,8 +73,19 @@ static ssize_t set_prox_state(struct device *dev,
 	if (state != ddata->prox_enable) {
 		if (state)
 			enable_irq(ddata->irq);
-		else
-			disable_irq(ddata->irq);
+			if (ddata->pdata->flags & SFH7741_WAKEABLE_INT)
+				enable_irq_wake(ddata->irq);
+
+			proximity = ddata->read_prox();
+			input_report_abs(ddata->input, ABS_DISTANCE, proximity);
+			input_sync(ddata->input);
+		} else {
+			disable_irq_nosync(ddata->irq);
+			if (ddata->pdata->flags & SFH7741_WAKEABLE_INT)
+				disable_irq_wake(ddata->irq);
+		}
+
+		ddata->activate_func(state);
 		ddata->prox_enable = state;
 	}
 	mutex_unlock(&ddata->lock);
@@ -194,7 +210,9 @@ static int sfh7741_suspend(struct device *dev)
 {
 	struct platform_device *pdev = to_platform_device(dev);
 	struct sfh7741_drvdata *ddata = platform_get_drvdata(pdev);
-	ddata->activate_func(0);
+	/* Save the prox state for the resume */
+	ddata->on_before_suspend = ddata->prox_enable;
+
 	return 0;
 }
 
@@ -202,7 +220,13 @@ static int sfh7741_resume(struct device *dev)
 {
 	struct platform_device *pdev = to_platform_device(dev);
 	struct sfh7741_drvdata *ddata = platform_get_drvdata(pdev);
-	ddata->activate_func(1);
+	int proximity = 0;
+
+	if (ddata->on_before_suspend) {
+		proximity = ddata->read_prox();
+		input_report_abs(ddata->input, ABS_DISTANCE, proximity);
+		input_sync(ddata->input);
+	}
 	return 0;
 }
 
