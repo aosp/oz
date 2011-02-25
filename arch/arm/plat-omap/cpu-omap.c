@@ -32,9 +32,10 @@
 #include <asm/system.h>
 #include <asm/cpu.h>
 
+#include <plat/common.h>
+
 #if defined(CONFIG_ARCH_OMAP3) && !defined(CONFIG_OMAP_PM_NONE)
 #include <plat/omap-pm.h>
-#include <plat/common.h>
 #include <plat/dvfs.h>
 #endif
 
