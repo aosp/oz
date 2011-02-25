@@ -1255,7 +1255,6 @@ static void usbhs_omap_tll_init(struct uhhtll_hcd_omap *omap,
 
 static void usbhs_p1_enable(struct uhhtll_hcd_omap *omap)
 {
-
 	if (!omap->utmi_p1_fck)
 		return;
 
@@ -1264,15 +1263,19 @@ static void usbhs_p1_enable(struct uhhtll_hcd_omap *omap)
 
 	clk_enable(omap->utmi_p1_fck);
 
+	if (omap->usbtll_p1_fck)
+		clk_enable(omap->usbtll_p1_fck);
+
+	if (omap->usbhost_p1_fck)
+		clk_enable(omap->usbhost_p1_fck);
+
 end_count:
 	omap->p1_fck_count++;
-
 }
 
 
-static void usbhs_p1_disble(struct uhhtll_hcd_omap *omap)
+static void usbhs_p1_disable(struct uhhtll_hcd_omap *omap)
 {
-
 	if (!omap->utmi_p1_fck)
 		return;
 
@@ -1280,9 +1283,16 @@ static void usbhs_p1_disble(struct uhhtll_hcd_omap *omap)
 		return;
 
 	omap->p1_fck_count--;
-	if (omap->p1_fck_count == 0)
+
+	if (omap->p1_fck_count == 0) {
 		clk_disable(omap->utmi_p1_fck);
 
+		if (omap->usbtll_p1_fck)
+			clk_disable(omap->usbtll_p1_fck);
+
+		if (omap->usbhost_p1_fck)
+			clk_disable(omap->usbhost_p1_fck);
+	}
 }
 
 static void usbhs_p2_enable(struct uhhtll_hcd_omap *omap)
@@ -1296,13 +1306,18 @@ static void usbhs_p2_enable(struct uhhtll_hcd_omap *omap)
 
 	clk_enable(omap->utmi_p2_fck);
 
+	if (omap->usbtll_p2_fck)
+		clk_enable(omap->usbtll_p2_fck);
+
+	if (omap->usbhost_p2_fck)
+		clk_enable(omap->usbhost_p2_fck);
+
 end_count:
 	omap->p2_fck_count++;
-
 }
 
 
-static void usbhs_p2_disble(struct uhhtll_hcd_omap *omap)
+static void usbhs_p2_disable(struct uhhtll_hcd_omap *omap)
 {
 
 	if (!omap->utmi_p2_fck)
@@ -1312,9 +1327,16 @@ static void usbhs_p2_disble(struct uhhtll_hcd_omap *omap)
 		return;
 
 	omap->p2_fck_count--;
-	if (omap->p2_fck_count == 0)
+
+	if (omap->p2_fck_count == 0) {
 		clk_disable(omap->utmi_p2_fck);
 
+		if (omap->usbtll_p2_fck)
+			clk_disable(omap->usbtll_p2_fck);
+
+		if (omap->usbhost_p2_fck)
+			clk_disable(omap->usbhost_p2_fck);
+	}
 }
 
 
@@ -1327,7 +1349,7 @@ static void usbhs_ehci_clk(struct uhhtll_hcd_omap *omap, int on)
 			if (on)
 				usbhs_p1_enable(omap);
 			else
-				usbhs_p1_disble(omap);
+				usbhs_p1_disable(omap);
 	}
 
 	if ((pdata->port_mode[1] == OMAP_EHCI_PORT_MODE_PHY) ||
@@ -1335,7 +1357,7 @@ static void usbhs_ehci_clk(struct uhhtll_hcd_omap *omap, int on)
 			if (on)
 				usbhs_p2_enable(omap);
 			else
-				usbhs_p2_disble(omap);
+				usbhs_p2_disable(omap);
 	}
 }
 
@@ -1349,14 +1371,14 @@ static void usbhs_ohci_clk(struct uhhtll_hcd_omap *omap, int on)
 		if (on)
 			usbhs_p1_enable(omap);
 		else
-			usbhs_p1_disble(omap);
+			usbhs_p1_disable(omap);
 	}
 
 	if (is_ohci_port(pdata->port_mode[1])) {
 		if (on)
 			usbhs_p2_enable(omap);
 		else
-			usbhs_p2_disble(omap);
+			usbhs_p2_disable(omap);
 	}
 }
 
@@ -1521,8 +1543,6 @@ static int usbhs_enable(struct uhhtll_hcd_omap *omap, int do_init)
 				ret = PTR_ERR(omap->usbhost_p1_fck);
 				dev_err(&omap->pdev->dev,
 					"Unable to get HOST PORT 1 clk\n");
-			} else {
-				ret = clk_enable(omap->usbhost_p1_fck);
 			}
 
 			omap->usbtll_p1_fck = clk_get(&omap->pdev->dev,
@@ -1532,8 +1552,6 @@ static int usbhs_enable(struct uhhtll_hcd_omap *omap, int do_init)
 				ret = PTR_ERR(omap->usbtll_p1_fck);
 				dev_err(&omap->pdev->dev,
 					"Unable to get TLL CH0 clk\n");
-			} else {
-				ret = clk_enable(omap->usbtll_p1_fck);
 			}
 
 			reg |= OMAP_UHH_HOST_P1_SET_ULPITLL;
@@ -1609,8 +1627,6 @@ static int usbhs_enable(struct uhhtll_hcd_omap *omap, int do_init)
 				ret = PTR_ERR(omap->usbhost_p2_fck);
 				dev_err(&omap->pdev->dev,
 					"Unable to get HOST PORT 2 clk\n");
-			} else {
-				ret = clk_enable(omap->usbhost_p2_fck);
 			}
 
 			omap->usbtll_p2_fck = clk_get(&omap->pdev->dev,
@@ -1620,8 +1636,6 @@ static int usbhs_enable(struct uhhtll_hcd_omap *omap, int do_init)
 				ret = PTR_ERR(omap->usbtll_p2_fck);
 				dev_err(&omap->pdev->dev,
 					"Unable to get TLL CH1 clk\n");
-			} else {
-				ret = clk_enable(omap->usbtll_p2_fck);
 			}
 
 			reg |= OMAP_UHH_HOST_P2_SET_ULPITLL;
