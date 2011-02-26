@@ -53,6 +53,7 @@ static struct {
 	struct regulator *vdds_dsi_reg;
 	struct regulator *vdds_sdi_reg;
 	struct regulator *vdda_dac_reg;
+	struct omap_dss_board_info *pdata;
 } core;
 
 static void dss_clk_enable_all_no_ctx(void);
@@ -350,16 +351,6 @@ static void dss_clk_disable_all_no_ctx(void)
 	dss_clk_disable_no_ctx(clks);
 }
 
-static void dss_clk_disable_all(void)
-{
-	enum dss_clock clks;
-
-	clks = DSS_CLK_ICK | DSS_CLK_FCK1 | DSS_CLK_FCK2 | DSS_CLK_54M;
-	if (cpu_is_omap34xx())
-		clks |= DSS_CLK_96M;
-	dss_clk_disable(clks);
-}
-
 /* REGULATORS */
 
 struct regulator *dss_get_vdds_dsi(void)
@@ -497,75 +488,14 @@ static inline void dss_uninitialize_debugfs(void)
 static int omap_dss_probe(struct platform_device *pdev)
 {
 	struct omap_dss_board_info *pdata = pdev->dev.platform_data;
-	int skip_init = 0;
 	int r;
 	int i;
 
 	core.pdev = pdev;
-
-	dss_features_init();
+	core.pdata = pdev->dev.platform_data;
 
 	dss_init_overlay_managers(pdev);
 	dss_init_overlays(pdev);
-
-	r = dss_get_clocks();
-	if (r)
-		goto err_clocks;
-
-	dss_clk_enable_all_no_ctx();
-
-	core.ctx_id = dss_get_ctx_id();
-	DSSDBG("initial ctx id %u\n", core.ctx_id);
-
-#ifdef CONFIG_FB_OMAP_BOOTLOADER_INIT
-	/* DISPC_CONTROL */
-	if (omap_readl(0x48050440) & 1)	/* LCD enabled? */
-		skip_init = 1;
-#endif
-
-	r = dss_init(skip_init);
-	if (r) {
-		DSSERR("Failed to initialize DSS\n");
-		goto err_dss;
-	}
-
-	r = rfbi_init();
-	if (r) {
-		DSSERR("Failed to initialize rfbi\n");
-		goto err_rfbi;
-	}
-
-	r = dpi_init(pdev);
-	if (r) {
-		DSSERR("Failed to initialize dpi\n");
-		goto err_dpi;
-	}
-
-	r = dispc_init();
-	if (r) {
-		DSSERR("Failed to initialize dispc\n");
-		goto err_dispc;
-	}
-
-	r = venc_init(pdev);
-	if (r) {
-		DSSERR("Failed to initialize venc\n");
-		goto err_venc;
-	}
-
-	if (cpu_is_omap34xx()) {
-		r = sdi_init(skip_init);
-		if (r) {
-			DSSERR("Failed to initialize SDI\n");
-			goto err_sdi;
-		}
-
-		r = dsi_init(pdev);
-		if (r) {
-			DSSERR("Failed to initialize DSI\n");
-			goto err_dsi;
-		}
-	}
 
 	r = dss_initialize_debugfs();
 	if (r)
@@ -589,33 +519,11 @@ static int omap_dss_probe(struct platform_device *pdev)
 			pdata->default_device = dssdev;
 	}
 
-	dss_clk_disable_all();
-
 	return 0;
 
 err_register:
 	dss_uninitialize_debugfs();
 err_debugfs:
-	if (cpu_is_omap34xx())
-		dsi_exit();
-err_dsi:
-	if (cpu_is_omap34xx())
-		sdi_exit();
-err_sdi:
-	venc_exit();
-err_venc:
-	dispc_exit();
-err_dispc:
-	dpi_exit();
-err_dpi:
-	rfbi_exit();
-err_rfbi:
-	dss_exit();
-err_dss:
-	dss_clk_disable_all_no_ctx();
-	dss_put_clocks();
-err_clocks:
-
 	return r;
 }
 
@@ -626,17 +534,6 @@ static int omap_dss_remove(struct platform_device *pdev)
 	int c;
 
 	dss_uninitialize_debugfs();
-
-	venc_exit();
-	dispc_exit();
-	dpi_exit();
-	rfbi_exit();
-	if (cpu_is_omap34xx()) {
-		dsi_exit();
-		sdi_exit();
-	}
-
-	dss_exit();
 
 	/* these should be removed at some point */
 	c = core.dss_ick->usecount;
@@ -708,14 +605,121 @@ static int omap_dss_resume(struct platform_device *pdev)
 	return dss_resume_all_devices();
 }
 
+static int omap_dsshw_probe(struct platform_device *pdev)
+{
+	int r;
+
+	core.pdev = pdev;
+	r = dss_get_clocks();
+	if (r)
+		goto err_dss;
+
+	dss_features_init();
+
+	r = dss_init(pdev);
+	if (r) {
+		DSSERR("Failed to initialize DSS\n");
+		goto err_dss;
+	}
+	return 0;
+
+err_dss:
+	return r;
+}
+static int omap_dsshw_remove(struct platform_device *pdev)
+{
+	dss_exit();
+
+	return 0;
+}
+static int omap_dispchw_probe(struct platform_device *pdev)
+{
+	int r;
+
+	r = dispc_init(pdev);
+	if (r) {
+		DSSERR("Failed to initialize dispc\n");
+		goto err_dispc;
+	}
+
+	return 0;
+err_dispc:
+	return r;
+}
+
+static int omap_dispchw_remove(struct platform_device *pdev)
+{
+	dispc_exit();
+	dpi_exit();
+
+	return 0;
+}
+
+static int omap_dsihw_probe(struct platform_device *pdev)
+{
+	int r;
+
+	r = dsi_init(pdev);
+	if (r) {
+		DSSERR("Failed to initialize dsi\n");
+		goto err_dsi;
+	}
+	return 0;
+
+err_dsi:
+	return r;
+}
+
+static int omap_dsihw_remove(struct platform_device *pdev)
+{
+	dsi_exit();
+	return 0;
+}
+
 static struct platform_driver omap_dss_driver = {
 	.probe          = omap_dss_probe,
 	.remove         = omap_dss_remove,
 	.shutdown	= omap_dss_shutdown,
+	.suspend	= NULL,
+	.resume		= NULL,
+	.driver         = {
+		.name   = "omapdss",
+		.owner  = THIS_MODULE,
+	},
+};
+
+static struct platform_driver omap_dsshw_driver = {
+	.probe          = omap_dsshw_probe,
+	.remove         = omap_dsshw_remove,
+	.shutdown	= NULL,
 	.suspend	= omap_dss_suspend,
 	.resume		= omap_dss_resume,
 	.driver         = {
-		.name   = "omapdss",
+		.name   = "dss",
+		.owner  = THIS_MODULE,
+	},
+};
+
+static struct platform_driver omap_dispchw_driver = {
+	.probe          = omap_dispchw_probe,
+	.remove         = omap_dispchw_remove,
+	.shutdown	= NULL,
+	.suspend	= NULL,
+	.resume		= NULL,
+	.driver         = {
+		.name   = "dss_dispc",
+		.owner  = THIS_MODULE,
+	},
+};
+
+static struct platform_driver omap_dsihw_driver = {
+	.probe          = omap_dsihw_probe,
+	.remove         = omap_dsihw_remove,
+	.shutdown	= NULL,
+	.suspend	= NULL,
+	.resume		= NULL,
+	.driver         = {
+		.name   = "dss_dsi1",
 		.owner  = THIS_MODULE,
 	},
 };
@@ -985,6 +989,12 @@ static int __init omap_dss_init(void)
 
 static int __init omap_dss_init2(void)
 {
+	platform_driver_register(&omap_dsshw_driver);
+	platform_driver_register(&omap_dispchw_driver);
+	platform_driver_register(&omap_dsihw_driver);
+#ifdef CONFIG_OMAP2_DSS_HDMI
+	platform_driver_register(&omap_hdmihw_driver);
+#endif
 	return platform_driver_register(&omap_dss_driver);
 }
 

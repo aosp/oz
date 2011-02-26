@@ -214,7 +214,7 @@ void dss_overlay_setup_l4_manager(struct omap_overlay_manager *mgr);
 void dss_recheck_connections(struct omap_dss_device *dssdev, bool force);
 
 /* DSS */
-int dss_init(bool skip_init);
+int dss_init(struct platform_device *pdev);
 void dss_exit(void);
 
 void dss_save_context(void);
@@ -316,7 +316,7 @@ static inline void dpi_exit(void)
 #endif
 
 /* DISPC */
-int dispc_init(void);
+int dispc_init(struct platform_device *pdev);
 void dispc_exit(void);
 void dispc_dump_clocks(struct seq_file *s);
 void dispc_dump_irqs(struct seq_file *s);

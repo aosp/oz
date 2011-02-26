@@ -33,8 +33,6 @@
 #include <plat/display.h>
 #include "dss.h"
 
-#define DSS_BASE			0x48050000
-
 #define DSS_SZ_REGS			SZ_512
 
 struct dss_reg {
@@ -72,6 +70,8 @@ static struct {
 	enum dss_clk_source dispc_clk_source;
 
 	u32		ctx[DSS_SZ_REGS / sizeof(u32)];
+	struct omap_display_platform_data *pdata;
+	struct platform_device *pdev;
 } dss;
 
 static int _omap_dss_wait_reset(void);
@@ -549,17 +549,30 @@ void dss_set_dac_pwrdn_bgz(bool enable)
 	REG_FLD_MOD(DSS_CONTROL, enable, 5, 5);	/* DAC Power-Down Control */
 }
 
-int dss_init(bool skip_init)
+int dss_init(struct platform_device *pdev)
 {
-	int r;
+	int r = 0, dss_irq;
 	u32 rev;
+	struct resource *dss_mem;
+	bool skip_init = false;
 
-	dss.base = ioremap(DSS_BASE, DSS_SZ_REGS);
+	dss.pdata = pdev->dev.platform_data;
+	dss.pdev = pdev;
+
+	dss_mem = platform_get_resource(pdev, IORESOURCE_MEM,
+		cpu_is_omap44xx() ? 1 : 0);
+	dss.base = ioremap(dss_mem->start, resource_size(dss_mem));
 	if (!dss.base) {
 		DSSERR("can't ioremap DSS\n");
 		r = -ENOMEM;
 		goto fail0;
 	}
+
+#ifdef CONFIG_FB_OMAP_BOOTLOADER_INIT
+	/* DISPC_CONTROL */
+	if (omap_readl(0x48050440) & 1)	/* LCD enabled? */
+		skip_init = true;
+#endif
 
 	if (!skip_init) {
 		/* disable LCD and DIGIT output. This seems to fix the synclost

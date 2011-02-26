@@ -41,10 +41,7 @@
 #include "dss.h"
 #include "dss_features.h"
 
-/* DISPC */
-#define DISPC_BASE			0x48050400
-
-#define DISPC_SZ_REGS			SZ_4K
+#define DISPC_SZ_REGS			SZ_16K
 
 struct dispc_reg { u16 idx; };
 
@@ -244,6 +241,8 @@ static struct {
 	spinlock_t irq_stats_lock;
 	struct dispc_irq_stats irq_stats;
 #endif
+	struct omap_display_platform_data *pdata;
+	struct platform_device *pdev;
 } dispc;
 
 static void _omap_dispc_set_irqs(void);
@@ -3629,9 +3628,13 @@ static void _omap_dispc_initial_config(void)
 	dispc_read_plane_fifo_sizes();
 }
 
-int dispc_init(void)
+int dispc_init(struct platform_device *pdev)
 {
 	u32 rev;
+	struct resource *dispc_mem;
+
+	dispc.pdata = pdev->dev.platform_data;
+	dispc.pdev = pdev;
 
 	spin_lock_init(&dispc.irq_lock);
 
@@ -3641,8 +3644,10 @@ int dispc_init(void)
 #endif
 
 	INIT_WORK(&dispc.error_work, dispc_error_worker);
-
-	dispc.base = ioremap(DISPC_BASE, DISPC_SZ_REGS);
+	dispc_mem = platform_get_resource(pdev, IORESOURCE_MEM,
+		cpu_is_omap44xx() ? 1 : 0);
+	dispc.base = ioremap(dispc_mem->start,
+		resource_size(dispc_mem));
 	if (!dispc.base) {
 		DSSERR("can't ioremap DISPC\n");
 		return -ENOMEM;
