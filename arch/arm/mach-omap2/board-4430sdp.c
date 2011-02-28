@@ -321,8 +321,8 @@ static struct omap_dss_device sdp4430_lcd_device = {
 			.pck_div	= 5,
 			.regm		= 150,
 			.regn		= 17,
-			.regm3		= 4,
-			.regm4		= 4,
+			.regm_dispc	= 4,
+			.regm_dsi	= 4,
 			.lp_clk_div	= 8,
 		},
 	},
@@ -697,11 +697,18 @@ static struct omap_board_mux board_mux[] __initdata = {
 static void __init omap4_display_init(void)
 {
 	void __iomem *phymux_base = NULL;
-	unsigned int dsimux = 0xFFFFFFFF;
+	u32 val = 0xFFFFC000;
+
 	phymux_base = ioremap(0x4A100000, 0x1000);
 	/* Turning on DSI PHY Mux*/
-	__raw_writel(dsimux, phymux_base+0x618);
-	dsimux = __raw_readl(phymux_base+0x618);
+	__raw_writel(val, phymux_base + 0x618);
+
+	/* Set mux to choose GPIO 101 for Taal 1 ext te line*/
+	val = __raw_readl(phymux_base + 0x90);
+	val = (val & 0xFFFFFFE0) | 0x11B;
+	__raw_writel(val, phymux_base + 0x90);
+
+	iounmap(phymux_base);
 
 	/* Panel Taal reset */
 	gpio_request(dsi_panel.reset_gpio, "dsi1_en_gpio");

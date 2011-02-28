@@ -23,6 +23,8 @@
 #ifndef __OMAP2_DSS_H
 #define __OMAP2_DSS_H
 
+#include <linux/interrupt.h>
+
 #ifdef CONFIG_OMAP2_DSS_DEBUG_SUPPORT
 #define DEBUG
 #endif
@@ -120,9 +122,20 @@ enum dss_clock {
 };
 
 enum dss_clk_source {
+	/* OMAP 3*/
 	DSS_SRC_DSI1_PLL_FCLK,
 	DSS_SRC_DSI2_PLL_FCLK,
+
+	/* common */
 	DSS_SRC_DSS1_ALWON_FCLK,
+
+	/* OMAP 4 */
+	DSS_SRC_PLL1_CLK1,
+	DSS_SRC_PLL2_CLK1,
+	DSS_SRC_PLL3_CLK1,
+	DSS_SRC_PLL1_CLK2,
+	DSS_SRC_PLL2_CLK2,
+	DSS_SRC_PLL1_CLK4,
 };
 
 struct dss_clock_info {
@@ -148,16 +161,18 @@ struct dsi_clock_info {
 	unsigned long fint;
 	unsigned long clkin4ddr;
 	unsigned long clkin;
-	unsigned long dsi1_pll_fclk;
-	unsigned long dsi2_pll_fclk;
+	unsigned long dsi_pll_dispc_fclk;	/* DSI1_PLL_CLK for OMAP3 */
+						/* PLLx_CLK1 for OMAP4 */
 
+	unsigned long dsi_pll_dsi_fclk;		/* DSI2_PLL_CLK for OMAP3 */
+						/* PLLx_CLK2 for OMAP4 */
 	unsigned long lp_clk;
 
 	/* dividers */
 	u16 regn;
 	u16 regm;
-	u16 regm3;
-	u16 regm4;
+	u16 regm_dispc;
+	u16 regm_dsi;
 
 	u16 lp_clk_div;
 
@@ -228,8 +243,10 @@ void dss_sdi_disable(void);
 
 void dss_select_dispc_clk_source(enum dss_clk_source clk_src);
 void dss_select_dsi_clk_source(enum dss_clk_source clk_src);
+void dss_select_lcd_clk_source(enum dss_clk_source clk_src);
 enum dss_clk_source dss_get_dispc_clk_source(void);
 enum dss_clk_source dss_get_dsi_clk_source(void);
+enum dss_clk_source dss_get_lcd_clk_source(void);
 
 void dss_set_venc_output(enum omap_dss_venc_type type);
 void dss_set_dac_pwrdn_bgz(bool enable);
@@ -270,8 +287,8 @@ void dsi_save_context(void);
 void dsi_restore_context(void);
 
 int dsi_init_display(struct omap_dss_device *display);
-void dsi_irq_handler(void);
-unsigned long dsi_get_dsi1_pll_rate(void);
+irqreturn_t dsi_irq_handler(int irq, void *arg);
+unsigned long dsi_get_pll_dispc_rate(void);
 int dsi_pll_set_clock_div(struct dsi_clock_info *cinfo);
 int dsi_pll_calc_clock_div_pck(bool is_tft, unsigned long req_pck,
 		struct dsi_clock_info *cinfo,
@@ -282,8 +299,8 @@ void dsi_pll_uninit(void);
 void dsi_get_overlay_fifo_thresholds(enum omap_plane plane,
 		u32 fifo_size, enum omap_burst_size *burst_size,
 		u32 *fifo_low, u32 *fifo_high);
-void dsi_wait_dsi1_pll_active(void);
-void dsi_wait_dsi2_pll_active(void);
+void dsi_wait_pll_dispc_active(void);
+void dsi_wait_pll_dsi_active(void);
 #else
 static inline int dsi_init(struct platform_device *pdev)
 {
@@ -292,10 +309,10 @@ static inline int dsi_init(struct platform_device *pdev)
 static inline void dsi_exit(void)
 {
 }
-static inline void dsi_wait_dsi1_pll_active(void)
+static inline void dsi_wait_pll_dispc_active(void)
 {
 }
-static inline void dsi_wait_dsi2_pll_active(void)
+static inline void dsi_wait_pll_dsi_active(void)
 {
 }
 #endif

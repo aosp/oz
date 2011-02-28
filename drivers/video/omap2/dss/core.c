@@ -187,25 +187,48 @@ static int dss_get_clocks(void)
 	core.dss_54m_fck = NULL;
 	core.dss_96m_fck = NULL;
 
-	r = dss_get_clock(&core.dss_ick, "ick");
-	if (r)
-		goto err;
+	if (cpu_is_omap44xx()) {
+		r = dss_get_clock(&core.dss_ick, "dss_sys_clk");
+		if (r)
+			goto err;
 
-	r = dss_get_clock(&core.dss1_fck, "dss1_fck");
-	if (r)
-		goto err;
+		r = dss_get_clock(&core.dss1_fck, "dss_dss_clk");
+		if (r)
+			goto err;
 
-	r = dss_get_clock(&core.dss2_fck, "dss2_fck");
-	if (r)
-		goto err;
+		r = dss_get_clock(&core.dss2_fck, "dss_dss_clk");
+		if (r)
+			goto err;
 
-	r = dss_get_clock(&core.dss_54m_fck, "tv_fck");
-	if (r)
-		goto err;
+		r = dss_get_clock(&core.dss_54m_fck, "dss_tv_clk");
+		if (r)
+			goto err;
 
-	r = dss_get_clock(&core.dss_96m_fck, "video_fck");
-	if (r)
-		goto err;
+		r = dss_get_clock(&core.dss_96m_fck, "dss_48mhz_clk");
+		if (r)
+			goto err;
+	} else {
+
+		r = dss_get_clock(&core.dss_ick, "ick");
+		if (r)
+			goto err;
+
+		r = dss_get_clock(&core.dss1_fck, "dss1_fck");
+		if (r)
+			goto err;
+
+		r = dss_get_clock(&core.dss2_fck, "dss2_fck");
+		if (r)
+			goto err;
+
+		r = dss_get_clock(&core.dss_54m_fck, "tv_fck");
+		if (r)
+			goto err;
+
+		r = dss_get_clock(&core.dss_96m_fck, "video_fck");
+		if (r)
+			goto err;
+	}
 
 	return 0;
 

@@ -1153,7 +1153,8 @@ static int taal_update(struct omap_dss_device *dssdev,
 				msecs_to_jiffies(250));
 		atomic_set(&td->do_update, 1);
 	} else {
-		r = omap_dsi_update(dssdev, TCH, x, y, w, h,
+		int vc = cpu_is_omap44xx() ? 1 : TCH;
+		r = omap_dsi_update(dssdev, vc, x, y, w, h,
 				taal_framedone_cb, dssdev);
 		if (r)
 			goto err;

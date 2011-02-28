@@ -68,6 +68,7 @@ static struct {
 
 	enum dss_clk_source dsi_clk_source;
 	enum dss_clk_source dispc_clk_source;
+	enum dss_clk_source lcd_clk_source;
 
 	u32		ctx[DSS_SZ_REGS / sizeof(u32)];
 	struct omap_display_platform_data *pdata;
@@ -211,13 +212,15 @@ void dss_sdi_disable(void)
 
 void dss_dump_clocks(struct seq_file *s)
 {
-	unsigned long dpll4_ck_rate;
-	unsigned long dpll4_m4_ck_rate;
+	unsigned long dpll4_ck_rate = 0;
+	unsigned long dpll4_m4_ck_rate = 0;
 
 	dss_clk_enable(DSS_CLK_ICK | DSS_CLK_FCK1);
 
-	dpll4_ck_rate = clk_get_rate(clk_get_parent(dss.dpll4_m4_ck));
-	dpll4_m4_ck_rate = clk_get_rate(dss.dpll4_m4_ck);
+	if (cpu_is_omap34xx()) {
+		dpll4_ck_rate = clk_get_rate(clk_get_parent(dss.dpll4_m4_ck));
+		dpll4_m4_ck_rate = clk_get_rate(dss.dpll4_m4_ck);
+	}
 
 	seq_printf(s, "- DSS -\n");
 
@@ -246,7 +249,8 @@ void dss_dump_regs(struct seq_file *s)
 	DUMPREG(DSS_REVISION);
 	DUMPREG(DSS_SYSCONFIG);
 	DUMPREG(DSS_SYSSTATUS);
-	DUMPREG(DSS_IRQSTATUS);
+	if (!cpu_is_omap44xx())
+		DUMPREG(DSS_IRQSTATUS);
 	DUMPREG(DSS_CONTROL);
 	DUMPREG(DSS_SDI_CONTROL);
 	DUMPREG(DSS_PLL_CONTROL);
@@ -260,15 +264,24 @@ void dss_select_dispc_clk_source(enum dss_clk_source clk_src)
 {
 	int b;
 
-	BUG_ON(clk_src != DSS_SRC_DSI1_PLL_FCLK &&
+	if (cpu_is_omap44xx()) {
+		BUG_ON(clk_src != DSS_SRC_DSS1_ALWON_FCLK &&
+			clk_src != DSS_SRC_PLL1_CLK1 &&
+			clk_src != DSS_SRC_PLL2_CLK1 &&
+			clk_src != DSS_SRC_PLL3_CLK1);
+
+		b = clk_src - 2;
+	} else {
+		BUG_ON(clk_src != DSS_SRC_DSI1_PLL_FCLK &&
 			clk_src != DSS_SRC_DSS1_ALWON_FCLK);
 
-	b = clk_src == DSS_SRC_DSS1_ALWON_FCLK ? 0 : 1;
+		b = clk_src == DSS_SRC_DSS1_ALWON_FCLK ? 0 : 1;
+	}
 
-	if (clk_src == DSS_SRC_DSI1_PLL_FCLK)
-		dsi_wait_dsi1_pll_active();
-
-	REG_FLD_MOD(DSS_CONTROL, b, 0, 0);	/* DISPC_CLK_SWITCH */
+	if (!cpu_is_omap44xx())
+		REG_FLD_MOD(DSS_CONTROL, b, 0, 0);	/* DISPC_CLK_SWITCH */
+	else
+		REG_FLD_MOD(DSS_CONTROL, b, 9, 8);	/* FCK_CLK_SWITCH */
 
 	dss.dispc_clk_source = clk_src;
 }
@@ -277,17 +290,35 @@ void dss_select_dsi_clk_source(enum dss_clk_source clk_src)
 {
 	int b;
 
-	BUG_ON(clk_src != DSS_SRC_DSI2_PLL_FCLK &&
+	if (cpu_is_omap44xx()) {
+		BUG_ON(clk_src != DSS_SRC_PLL1_CLK2 &&
 			clk_src != DSS_SRC_DSS1_ALWON_FCLK);
+	} else {
+		BUG_ON(clk_src != DSS_SRC_DSI2_PLL_FCLK &&
+			clk_src != DSS_SRC_DSS1_ALWON_FCLK);
+	}
 
 	b = clk_src == DSS_SRC_DSS1_ALWON_FCLK ? 0 : 1;
-
-	if (clk_src == DSS_SRC_DSI2_PLL_FCLK)
-		dsi_wait_dsi2_pll_active();
 
 	REG_FLD_MOD(DSS_CONTROL, b, 1, 1);	/* DSI_CLK_SWITCH */
 
 	dss.dsi_clk_source = clk_src;
+}
+
+void dss_select_lcd_clk_source(enum dss_clk_source clk_src)
+{
+	int b;
+
+	if (!cpu_is_omap44xx())
+		BUG();
+
+	BUG_ON(clk_src != DSS_SRC_PLL1_CLK1 &&
+		clk_src != DSS_SRC_DSS1_ALWON_FCLK);
+
+	b = clk_src == DSS_SRC_DSS1_ALWON_FCLK ? 0 : 1;
+
+	REG_FLD_MOD(DSS_CONTROL, b, 0, 0);	/* LCD1_CLK_SWITCH */
+	dss.lcd_clk_source = clk_src;
 }
 
 enum dss_clk_source dss_get_dispc_clk_source(void)
@@ -300,16 +331,22 @@ enum dss_clk_source dss_get_dsi_clk_source(void)
 	return dss.dsi_clk_source;
 }
 
+enum dss_clk_source dss_get_lcd_clk_source(void)
+{
+	return dss.lcd_clk_source;
+}
+
 /* calculate clock rates using dividers in cinfo */
 int dss_calc_clock_rates(struct dss_clock_info *cinfo)
 {
-	unsigned long prate;
+	unsigned long prate = 0;
 
 	if (cinfo->fck_div > (cpu_is_omap3630() ? 32 : 16) ||
 						cinfo->fck_div == 0)
 		return -EINVAL;
 
-	prate = clk_get_rate(clk_get_parent(dss.dpll4_m4_ck));
+	if (!cpu_is_omap44xx())
+		prate = clk_get_rate(clk_get_parent(dss.dpll4_m4_ck));
 
 	cinfo->fck = prate / cinfo->fck_div;
 
@@ -500,8 +537,8 @@ static irqreturn_t dss_irq_handler_omap3(int irq, void *arg)
 	if (irqstatus & (1<<0))	/* DISPC_IRQ */
 		dispc_irq_handler();
 #ifdef CONFIG_OMAP2_DSS_DSI
-	if (irqstatus & (1<<1))	/* DSI_IRQ */
-		dsi_irq_handler();
+	if (!cpu_is_omap44xx() && (irqstatus & (1<<1)))	/* DSI_IRQ */
+		dsi_irq_handler(0, NULL);
 #endif
 
 	return IRQ_HANDLED;
@@ -603,11 +640,18 @@ int dss_init(struct platform_device *pdev)
 	REG_FLD_MOD(DSS_CONTROL, 0, 2, 2);	/* venc clock mode = normal */
 #endif
 
-	r = request_irq(INT_24XX_DSS_IRQ,
-			cpu_is_omap24xx()
-			? dss_irq_handler_omap2
-			: dss_irq_handler_omap3,
-			0, "OMAP DSS", NULL);
+	if (!cpu_is_omap44xx())
+		r = request_irq(INT_24XX_DSS_IRQ,
+				cpu_is_omap24xx()
+				? dss_irq_handler_omap2
+				: dss_irq_handler_omap3,
+				0, "OMAP DSS", NULL);
+	else {
+		dss_irq = platform_get_irq(pdev, 0);
+		r = request_irq(dss_irq,
+				dss_irq_handler_omap2,
+				0, "OMAP DSS", NULL);
+	}
 
 	if (r < 0) {
 		DSSERR("omap2 dss: request_irq failed\n");
@@ -624,6 +668,7 @@ int dss_init(struct platform_device *pdev)
 	}
 
 	dss.dsi_clk_source = DSS_SRC_DSS1_ALWON_FCLK;
+	dss.lcd_clk_source = DSS_SRC_DSS1_ALWON_FCLK;
 	dss.dispc_clk_source = DSS_SRC_DSS1_ALWON_FCLK;
 
 	dss_save_context();
@@ -635,7 +680,8 @@ int dss_init(struct platform_device *pdev)
 	return 0;
 
 fail2:
-	free_irq(INT_24XX_DSS_IRQ, NULL);
+	if (!cpu_is_omap44xx())
+		free_irq(INT_24XX_DSS_IRQ, NULL);
 fail1:
 	iounmap(dss.base);
 fail0:
@@ -647,8 +693,8 @@ void dss_exit(void)
 	if (cpu_is_omap34xx())
 		clk_put(dss.dpll4_m4_ck);
 
-	free_irq(INT_24XX_DSS_IRQ, NULL);
-
+	if (!cpu_is_omap44xx())
+		free_irq(INT_24XX_DSS_IRQ, NULL);
 	iounmap(dss.base);
 }
 
