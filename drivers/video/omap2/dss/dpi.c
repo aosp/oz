@@ -58,10 +58,7 @@ static int dpi_set_dsi_clk(struct omap_dss_device *dssdev, bool is_tft,
 		return r;
 
 	dsi_wait_pll_dispc_active(dssdev->channel);
-	if (cpu_is_omap44xx())
-		dss_select_dispc_clk_source(DSS_SRC_PLL1_CLK1);
-	else
-		dss_select_dispc_clk_source(DSS_SRC_DSI1_PLL_FCLK);
+	dss_select_dispc_clk_source(DSS_SRC_DSI1_PLL_FCLK);
 
 	r = dispc_set_clock_div(dssdev->manager->id, &dispc_cinfo);
 	if (r)

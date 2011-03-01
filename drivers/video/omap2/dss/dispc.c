@@ -2598,7 +2598,7 @@ unsigned long dispc_fclk_rate(void)
 		return dss_clk_get_rate(DSS_CLK_FCK1);
 #ifdef CONFIG_OMAP2_DSS_DSI
 	case DSS_SRC_DSI1_PLL_FCLK:
-	case DSS_SRC_PLL1_CLK1:
+	/* also DSS_SRC_PLL1_CLK1: */
 		return dsi_get_pll_dispc_rate(OMAP_DSS_CHANNEL_LCD);
 #endif
 	case DSS_SRC_PLL3_CLK1:
@@ -2653,16 +2653,14 @@ void dispc_dump_clocks(struct seq_file *s)
 		dispc_src = "dss1_alwon_fclk";
 		break;
 	case DSS_SRC_DSI1_PLL_FCLK:
-		dispc_src = "dsi1_pll_fclk";
-		break;
-	case DSS_SRC_PLL1_CLK1:
-		dispc_src = "pll1_clk1";
+	/* also DSS_SRC_PLL1_CLK1: */
+		dispc_src = "dsi1_pll_fclk(OMAP3)/pll1_clk1(OMAP4)";
 		break;
 	case DSS_SRC_PLL2_CLK1:
-		dispc_src = "pll2_clk1";
+		dispc_src = "pll2_clk1(OMAP4)";
 		break;
 	case DSS_SRC_PLL3_CLK1:
-		dispc_src = "pll3_clk1";
+		dispc_src = "pll3_clk1(OMAP4)";
 		break;
 	default:
 		BUG();

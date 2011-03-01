@@ -327,7 +327,7 @@ void dss_select_dsi_clk_source(enum dss_clk_source clk_src)
 			clk_src != DSS_SRC_DSS1_ALWON_FCLK);
 	}
 
-	b = clk_src == DSS_SRC_DSS1_ALWON_FCLK ? 0 : 1;
+	b = clk_src != DSS_SRC_DSS1_ALWON_FCLK;
 
 	REG_FLD_MOD(DSS_CONTROL, b, 1, 1);	/* DSI_CLK_SWITCH */
 
@@ -344,7 +344,7 @@ void dss_select_lcd_clk_source(enum dss_clk_source clk_src)
 	BUG_ON(clk_src != DSS_SRC_PLL1_CLK1 &&
 		clk_src != DSS_SRC_DSS1_ALWON_FCLK);
 
-	b = clk_src == DSS_SRC_DSS1_ALWON_FCLK ? 0 : 1;
+	b = clk_src != DSS_SRC_DSS1_ALWON_FCLK;
 
 	REG_FLD_MOD(DSS_CONTROL, b, 0, 0);	/* LCD1_CLK_SWITCH */
 	dss.lcd_clk_source = clk_src;

@@ -283,7 +283,28 @@ static struct dsi_struct {
 
 	struct omap_display_platform_data *pdata;
 	struct platform_device *pdev;
-} dsi[1], *dsis[OMAP_DSS_CHANNEL_LCD + 1];
+
+	/* instance variables */
+	int irq_vsync;
+	int irq_dss;
+	int irq_framedone;
+	int channel;
+	enum dss_clk_source clk_src_dispc;
+	enum dss_clk_source clk_src_dsi;
+
+	char *pdev_name;
+	char *name;
+
+} *dsis[OMAP_DSS_CHANNEL_LCD + 1], dsi[] = { {
+	.irq_vsync	= DISPC_IRQ_VSYNC,
+	.irq_dss	= OMAP44XX_IRQ_DSS_DSI1,
+	.irq_framedone	= DISPC_IRQ_FRAMEDONE,
+	.channel	= OMAP_DSS_CHANNEL_LCD,
+	.clk_src_dispc	= DSS_SRC_PLL1_CLK1,
+	.clk_src_dsi	= DSS_SRC_PLL1_CLK2,
+	.pdev_name	= "dss_dsi1",
+	.name		= "DSI1",
+} };
 
 #ifdef DEBUG
 static unsigned int dsi_perf;
@@ -2947,7 +2968,7 @@ static void dsi_update_screen_dispc(struct omap_dss_device *dssdev,
 static void dsi_te_timeout(unsigned long arg)
 {
 	struct dsi_struct *ds = (struct dsi_struct *) arg;
-	DSSERR("DSI TE not received for 250ms for %s!\n", ds->pdev->name);
+	DSSERR("%s TE not received for 250ms\n", ds->name);
 }
 #endif
 
@@ -3000,7 +3021,7 @@ static void dsi_framedone_timeout_work_callback(struct work_struct *work)
 	 * on the HW is buggy, and would probably require resetting the whole
 	 * DSI */
 
-	DSSERR("%s Framedone not received for 250ms!\n", ds->pdev->name);
+	DSSERR("%s Framedone not received for 250ms!\n", ds->name);
 
 	dsi_handle_framedone(ds, -ETIMEDOUT);
 }
@@ -3010,7 +3031,7 @@ static void dsi_framedone_bta_callback(struct dsi_struct *ds)
 	dsi_handle_framedone(ds, 0);
 
 #ifdef CONFIG_OMAP2_DSS_FAKE_VSYNC
-	dispc_fake_irq(DISPC_IRQ_VSYNC);
+	dispc_fake_irq(ds->irq_vsync);
 #endif
 }
 
@@ -3141,9 +3162,10 @@ EXPORT_SYMBOL(omap_dsi_update);
 static int dsi_display_init_dispc(struct omap_dss_device *dssdev)
 {
 	int r;
+	struct dsi_struct *ds = dss2dsi(dssdev);
 
-	r = omap_dispc_register_isr(dsi_framedone_irq_callback, dss2dsi(dssdev),
-			DISPC_IRQ_FRAMEDONE);
+	r = omap_dispc_register_isr(dsi_framedone_irq_callback, ds,
+			ds->irq_framedone);
 	if (r) {
 		DSSERR("can't get FRAMEDONE irq\n");
 		return r;
@@ -3176,8 +3198,10 @@ static int dsi_display_init_dispc(struct omap_dss_device *dssdev)
 
 static void dsi_display_uninit_dispc(struct omap_dss_device *dssdev)
 {
-	omap_dispc_unregister_isr(dsi_framedone_irq_callback, dss2dsi(dssdev),
-			DISPC_IRQ_FRAMEDONE);
+	struct dsi_struct *ds = dss2dsi(dssdev);
+
+	omap_dispc_unregister_isr(dsi_framedone_irq_callback, ds,
+			ds->irq_framedone);
 }
 
 static int dsi_configure_dsi_clocks(struct omap_dss_device *dssdev)
@@ -3252,16 +3276,11 @@ static int dsi_display_init_dsi(struct omap_dss_device *dssdev)
 		goto err1;
 
 	dsi_wait_pll_dispc_active(dssdev->channel);
-	if (cpu_is_omap44xx()) {
-		dss_select_dispc_clk_source(DSS_SRC_PLL1_CLK1);
-		dsi_wait_pll_dsi_active(dssdev->channel);
-		dss_select_dsi_clk_source(DSS_SRC_PLL1_CLK2);
-		dss_select_lcd_clk_source(DSS_SRC_PLL1_CLK1);
-	} else {
-		dss_select_dispc_clk_source(DSS_SRC_DSI1_PLL_FCLK);
-		dsi_wait_pll_dsi_active(dssdev->channel);
-		dss_select_dsi_clk_source(DSS_SRC_DSI2_PLL_FCLK);
-	}
+	dss_select_dispc_clk_source(ds->clk_src_dispc);
+	dsi_wait_pll_dsi_active(dssdev->channel);
+	dss_select_dsi_clk_source(ds->clk_src_dsi);
+	if (cpu_is_omap44xx())
+		dss_select_lcd_clk_source(ds->clk_src_dispc);
 
 	DSSDBG("PLL OK\n");
 
@@ -3477,7 +3496,7 @@ int dsi_init(struct platform_device *pdev)
 	ds->pdata = pdev->dev.platform_data;
 	ds->pdev = pdev;
 
-	dsis[OMAP_DSS_CHANNEL_LCD] = ds;
+	dsis[ds->channel] = ds;
 
 	spin_lock_init(&ds->errors_lock);
 	ds->errors = 0;
@@ -3492,7 +3511,7 @@ int dsi_init(struct platform_device *pdev)
 	mutex_init(&ds->lock);
 	sema_init(&ds->bus_lock, 1);
 
-	ds->workqueue = create_singlethread_workqueue("dsi");
+	ds->workqueue = create_singlethread_workqueue(ds->name);
 	if (ds->workqueue == NULL)
 		return -ENOMEM;
 
@@ -3500,8 +3519,8 @@ int dsi_init(struct platform_device *pdev)
 			dsi_framedone_timeout_work_callback);
 
 	if (cpu_is_omap44xx()) {
-		r = request_irq(OMAP44XX_IRQ_DSS_DSI1, dsi_irq_handler, 0,
-			"OMAP DSI", ds);
+		r = request_irq(ds->irq_dss, dsi_irq_handler, 0,
+			ds->name, ds);
 		if (r)
 			goto err2;
 	}
@@ -3514,7 +3533,7 @@ int dsi_init(struct platform_device *pdev)
 		cpu_is_omap44xx() ? 1 : 0);
 	ds->base = ioremap(dsi_mem->start, resource_size(dsi_mem));
 	if (!ds->base) {
-		DSSERR("can't ioremap DSI\n");
+		DSSERR("can't ioremap %s\n", ds->name);
 		r = -ENOMEM;
 		goto err1;
 	}
@@ -3522,7 +3541,7 @@ int dsi_init(struct platform_device *pdev)
 	if (!cpu_is_omap44xx()) {
 		ds->vdds_dsi_reg = dss_get_vdds_dsi();
 		if (IS_ERR(ds->vdds_dsi_reg)) {
-			DSSERR("can't get VDDS_DSI regulator\n");
+			DSSERR("can't get VDDS_%s regulator\n", ds->name);
 			r = PTR_ERR(ds->vdds_dsi_reg);
 			goto err2;
 		}
@@ -3531,7 +3550,7 @@ int dsi_init(struct platform_device *pdev)
 	enable_clocks(1);
 
 	rev = dsi_read_reg(ds, DSI_REVISION);
-	printk(KERN_INFO "OMAP DSI rev %d.%d\n",
+	printk(KERN_INFO "OMAP %s rev %d.%d\n", ds->name,
 	       FLD_GET(rev, 7, 4), FLD_GET(rev, 3, 0));
 
 	enable_clocks(0);
@@ -3540,7 +3559,7 @@ int dsi_init(struct platform_device *pdev)
 err2:
 	iounmap(ds->base);
 	if (cpu_is_omap44xx())
-		free_irq(OMAP44XX_IRQ_DSS_DSI1, ds);
+		free_irq(ds->irq_dss, ds);
 err1:
 	destroy_workqueue(ds->workqueue);
 	return r;
@@ -3551,12 +3570,14 @@ void dsi_exit(struct platform_device *pdev)
 	struct omap_dss_device *dssdev = to_dss_device(&pdev->dev);
 	struct dsi_struct *ds = dss2dsi(dssdev);
 
+	dsis[ds->channel] = NULL;
+
 	if (cpu_is_omap44xx())
-		free_irq(OMAP44XX_IRQ_DSS_DSI1, ds);
+		free_irq(ds->irq_dss, ds);
 	iounmap(ds->base);
 
 	destroy_workqueue(ds->workqueue);
 
-	DSSDBG("omap_dsi_exit\n");
+	DSSDBG("%s dsi_exit\n", ds->name);
 }
 
