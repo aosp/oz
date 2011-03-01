@@ -2977,7 +2977,7 @@ static void dsi_handle_framedone(struct dsi_struct *ds, int error)
 	const int channel = cpu_is_omap44xx() ? 0 : ds->update_channel;
 	struct omap_dss_device *device = ds->vc[channel].dssdev;
 
-	cancel_delayed_work(&ds->framedone_timeout_work);
+	__cancel_delayed_work(&ds->framedone_timeout_work);
 
 	dsi_vc_disable_bta_irq(ds, channel);
 
