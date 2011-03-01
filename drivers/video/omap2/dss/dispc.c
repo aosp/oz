@@ -2599,7 +2599,7 @@ unsigned long dispc_fclk_rate(void)
 #ifdef CONFIG_OMAP2_DSS_DSI
 	case DSS_SRC_DSI1_PLL_FCLK:
 	case DSS_SRC_PLL1_CLK1:
-		return dsi_get_pll_dispc_rate();
+		return dsi_get_pll_dispc_rate(OMAP_DSS_CHANNEL_LCD);
 #endif
 	case DSS_SRC_PLL3_CLK1:
 		return 0;
@@ -3570,9 +3570,8 @@ int omap_dispc_wait_for_irq_interruptible_timeout(u32 irqmask,
 }
 
 #ifdef CONFIG_OMAP2_DSS_FAKE_VSYNC
-void dispc_fake_vsync_irq(void)
+void dispc_fake_irq(int irqstatus)
 {
-	u32 irqstatus = DISPC_IRQ_VSYNC;
 	int i;
 
 	WARN_ON(!in_interrupt());

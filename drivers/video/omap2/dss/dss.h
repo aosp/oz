@@ -281,42 +281,44 @@ static inline void sdi_exit(void)
 /* DSI */
 #ifdef CONFIG_OMAP2_DSS_DSI
 int dsi_init(struct platform_device *pdev);
-void dsi_exit(void);
+void dsi_exit(struct platform_device *pdev);
 
-void dsi_dump_clocks(struct seq_file *s);
-void dsi_dump_irqs(struct seq_file *s);
-void dsi_dump_regs(struct seq_file *s);
+void dsi_dump_clocks(enum omap_channel channel, struct seq_file *s);
+void dsi_dump_irqs(enum omap_channel channel, struct seq_file *s);
+void dsi_dump_regs(enum omap_channel channel, struct seq_file *s);
 
 void dsi_save_context(void);
 void dsi_restore_context(void);
 
 int dsi_init_display(struct omap_dss_device *display);
 irqreturn_t dsi_irq_handler(int irq, void *arg);
-unsigned long dsi_get_pll_dispc_rate(void);
-int dsi_pll_set_clock_div(struct dsi_clock_info *cinfo);
-int dsi_pll_calc_clock_div_pck(bool is_tft, unsigned long req_pck,
+unsigned long dsi_get_pll_dispc_rate(enum omap_channel channel);
+int dsi_pll_set_clock_div(enum omap_channel channel,
+		struct dsi_clock_info *cinfo);
+int dsi_pll_calc_clock_div_pck(enum omap_channel,
+		bool is_tft, unsigned long req_pck,
 		struct dsi_clock_info *cinfo,
 		struct dispc_clock_info *dispc_cinfo);
-int dsi_pll_init(struct omap_dss_device *dssdev, bool enable_hsclk,
+int dsi_pll_init(enum omap_channel, bool enable_hsclk,
 		bool enable_hsdiv);
-void dsi_pll_uninit(void);
+void dsi_pll_uninit(enum omap_channel channel);
 void dsi_get_overlay_fifo_thresholds(enum omap_plane plane,
 		u32 fifo_size, enum omap_burst_size *burst_size,
 		u32 *fifo_low, u32 *fifo_high);
-void dsi_wait_pll_dispc_active(void);
-void dsi_wait_pll_dsi_active(void);
+void dsi_wait_pll_dispc_active(enum omap_channel channel);
+void dsi_wait_pll_dsi_active(enum omap_channel channel);
 #else
 static inline int dsi_init(struct platform_device *pdev)
 {
 	return 0;
 }
-static inline void dsi_exit(void)
+static inline void dsi_exit(struct platform_device *pdev)
 {
 }
-static inline void dsi_wait_pll_dispc_active(void)
+static inline void dsi_wait_pll_dispc_active(enum omap_channel channel)
 {
 }
-static inline void dsi_wait_pll_dsi_active(void)
+static inline void dsi_wait_pll_dsi_active(enum omap_channel channel)
 {
 }
 #endif
@@ -343,7 +345,7 @@ void dispc_dump_clocks(struct seq_file *s);
 void dispc_dump_irqs(struct seq_file *s);
 void dispc_dump_regs(struct seq_file *s);
 void dispc_irq_handler(void);
-void dispc_fake_vsync_irq(void);
+void dispc_fake_irq(int irqstatus);
 
 void dispc_save_context(void);
 void dispc_restore_context(void);
