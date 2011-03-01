@@ -32,6 +32,7 @@
 #include <linux/io.h>
 #include <linux/device.h>
 #include <linux/regulator/consumer.h>
+#include <linux/pm_runtime.h>
 
 #include <plat/display.h>
 #include <plat/clock.h>
@@ -101,7 +102,7 @@ int dss_need_ctx_restore(void)
 	}
 }
 
-static void save_all_ctx(void)
+void save_all_ctx(void)
 {
 	DSSDBG("save context\n");
 
@@ -116,7 +117,7 @@ static void save_all_ctx(void)
 	dss_clk_disable_no_ctx(DSS_CLK_ICK | DSS_CLK_FCK1);
 }
 
-static void restore_all_ctx(void)
+void restore_all_ctx(void)
 {
 	DSSDBG("restore context\n");
 
@@ -298,6 +299,10 @@ static void dss_clk_enable_no_ctx(enum dss_clock clks)
 {
 	unsigned num_clks = count_clk_bits(clks);
 
+	/* don't do aggressive clock cutting on OMAP4 */
+	if (cpu_is_omap44xx())
+		return;
+
 	if (clks & DSS_CLK_ICK)
 		clk_enable(core.dss_ick);
 	if (clks & DSS_CLK_FCK1)
@@ -314,17 +319,51 @@ static void dss_clk_enable_no_ctx(enum dss_clock clks)
 
 void dss_clk_enable(enum dss_clock clks)
 {
+#if 0
 	bool check_ctx = core.num_clks_enabled == 0;
-
+#endif
 	dss_clk_enable_no_ctx(clks);
 
+#if 0
+	/*
+	 * FixMe
+	 * See the note in dss_clk_disable().
+	 */
 	if (check_ctx && cpu_is_omap34xx() && dss_need_ctx_restore())
 		restore_all_ctx();
+#endif
+}
+
+int dss_opt_clock_enable()
+{
+	int r = clk_enable(core.dss_ick);
+	if (!r) {
+		r = clk_enable(core.dss1_fck);
+		if (!r) {
+			r = clk_enable(core.dss_96m_fck);
+			if (!r)
+				return 0;
+			clk_disable(core.dss1_fck);
+		}
+		clk_disable(core.dss_ick);
+	}
+	return r;
+}
+
+void dss_opt_clock_disable()
+{
+	clk_disable(core.dss_ick);
+	clk_disable(core.dss1_fck);
+	clk_disable(core.dss_96m_fck);
 }
 
 static void dss_clk_disable_no_ctx(enum dss_clock clks)
 {
-	unsigned num_clks = count_clk_bits(clks);
+	unsigned num_clks;
+	num_clks = count_clk_bits(clks);
+
+	if (cpu_is_omap44xx())
+		return;
 
 	if (clks & DSS_CLK_ICK)
 		clk_disable(core.dss_ick);
@@ -336,8 +375,6 @@ static void dss_clk_disable_no_ctx(enum dss_clock clks)
 		clk_disable(core.dss_54m_fck);
 	if (clks & DSS_CLK_96M)
 		clk_disable(core.dss_96m_fck);
-
-	core.num_clks_enabled -= num_clks;
 }
 
 void dss_clk_disable(enum dss_clock clks)
@@ -347,8 +384,20 @@ void dss_clk_disable(enum dss_clock clks)
 
 		BUG_ON(core.num_clks_enabled < num_clks);
 
+#if 0
+		/*
+		 * FixMe
+		 * There is a yet unresolved catch-22 here.  During
+		 * initialization, this routine is called dss_init().  At that
+		 * time, the context can not be saved as the dispc memory used
+		 * to store the context is not not yet allocated.  That is
+		 * allocated later by dispc_init().  But we can't call
+		 * dispc_init() first as it needs to use core.pdev and that is
+		 * initialized by dss_init.  This'll need to be fixed for PM.
+		 */
 		if (core.num_clks_enabled == num_clks)
 			save_all_ctx();
+#endif
 	}
 
 	dss_clk_disable_no_ctx(clks);
@@ -632,6 +681,7 @@ static int omap_dsshw_probe(struct platform_device *pdev)
 {
 	int r;
 
+	pm_runtime_enable(&pdev->dev);
 	core.pdev = pdev;
 	r = dss_get_clocks();
 	if (r)

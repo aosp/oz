@@ -29,6 +29,7 @@
 #include <linux/interrupt.h>
 #include <linux/seq_file.h>
 #include <linux/clk.h>
+#include <linux/pm_runtime.h>
 
 #include <plat/display.h>
 #include "dss.h"
@@ -69,6 +70,8 @@ static struct {
 	enum dss_clk_source dsi_clk_source;
 	enum dss_clk_source dispc_clk_source;
 	enum dss_clk_source lcd_clk_source;
+
+	bool mainclk_state;
 
 	u32		ctx[DSS_SZ_REGS / sizeof(u32)];
 	struct omap_display_platform_data *pdata;
@@ -122,6 +125,35 @@ void dss_restore_context(void)
 
 #undef SR
 #undef RR
+
+/*
+ * OMAP4 does not allow aggressive DSS clock cutting, so we must keep the
+ * clocks enabled during display use.  These next two methods on OMAP4
+ * enable and disable all DSS clocks (main and needed optional).
+ */
+static int dss_mainclk_enable(void)
+{
+	int ret = 0;
+
+	if (!dss.mainclk_state) {
+		if (cpu_is_omap44xx() || cpu_is_omap34xx())
+			ret = dss_opt_clock_enable();
+
+		if (ret)
+			dss_opt_clock_disable();
+#ifdef CONFIG_PM_RUNTIME
+		else
+			ret = pm_runtime_get_sync(&dss.pdev->dev);
+#endif
+
+		if (!ret)
+			dss.mainclk_state = true;
+	} else {
+		return -EBUSY;
+	}
+
+	return ret;
+}
 
 void dss_sdi_init(u8 datapairs)
 {
@@ -269,14 +301,11 @@ void dss_select_dispc_clk_source(enum dss_clk_source clk_src)
 			clk_src != DSS_SRC_PLL1_CLK1 &&
 			clk_src != DSS_SRC_PLL2_CLK1 &&
 			clk_src != DSS_SRC_PLL3_CLK1);
-
-		b = clk_src - 2;
 	} else {
 		BUG_ON(clk_src != DSS_SRC_DSI1_PLL_FCLK &&
 			clk_src != DSS_SRC_DSS1_ALWON_FCLK);
-
-		b = clk_src == DSS_SRC_DSS1_ALWON_FCLK ? 0 : 1;
 	}
+	b = clk_src != DSS_SRC_DSS1_ALWON_FCLK;
 
 	if (!cpu_is_omap44xx())
 		REG_FLD_MOD(DSS_CONTROL, b, 0, 0);	/* DISPC_CLK_SWITCH */
@@ -598,12 +627,15 @@ int dss_init(struct platform_device *pdev)
 
 	dss_mem = platform_get_resource(pdev, IORESOURCE_MEM,
 		cpu_is_omap44xx() ? 1 : 0);
+
 	dss.base = ioremap(dss_mem->start, resource_size(dss_mem));
 	if (!dss.base) {
 		DSSERR("can't ioremap DSS\n");
 		r = -ENOMEM;
 		goto fail0;
 	}
+
+	dss_mainclk_enable();
 
 #ifdef CONFIG_FB_OMAP_BOOTLOADER_INIT
 	/* DISPC_CONTROL */
@@ -625,7 +657,9 @@ int dss_init(struct platform_device *pdev)
 		 */
 		msleep(50);
 
-		_omap_dss_reset();
+		/* In OMAP44xx HWMOD would take care of resetting the module */
+		if (!cpu_is_omap44xx())
+			_omap_dss_reset();
 	}
 
 	/* autoidle */
