@@ -476,6 +476,7 @@ static void dss_debug_dump_clocks(struct seq_file *s)
 	dispc_dump_clocks(s);
 #ifdef CONFIG_OMAP2_DSS_DSI
 	dsi_dump_clocks(OMAP_DSS_CHANNEL_LCD, s);
+	dsi_dump_clocks(OMAP_DSS_CHANNEL_LCD2, s);
 #endif
 }
 
@@ -505,10 +506,20 @@ static void dsi1_dump_regs(struct seq_file *s)
 	dsi_dump_regs(OMAP_DSS_CHANNEL_LCD, s);
 }
 
+static void dsi2_dump_regs(struct seq_file *s)
+{
+	dsi_dump_regs(OMAP_DSS_CHANNEL_LCD2, s);
+}
+
 #if defined(CONFIG_OMAP2_DSS_DSI) && defined(CONFIG_OMAP2_DSS_COLLECT_IRQ_STATS)
 static void dsi1_dump_irqs(struct seq_file *s)
 {
 	dsi_dump_irqs(OMAP_DSS_CHANNEL_LCD, s);
+}
+
+static void dsi2_dump_irqs(struct seq_file *s)
+{
+	dsi_dump_irqs(OMAP_DSS_CHANNEL_LCD2, s);
 }
 #endif
 
@@ -532,6 +543,9 @@ static int dss_initialize_debugfs(void)
 #if defined(CONFIG_OMAP2_DSS_DSI) && defined(CONFIG_OMAP2_DSS_COLLECT_IRQ_STATS)
 	debugfs_create_file("dsi1_irq", S_IRUGO, dss_debugfs_dir,
 			&dsi1_dump_irqs, &dss_debug_fops);
+	if (cpu_is_omap44xx())
+		debugfs_create_file("dsi2_irq", S_IRUGO, dss_debugfs_dir,
+					&dsi2_dump_irqs, &dss_debug_fops);
 #endif
 
 	debugfs_create_file("dss", S_IRUGO, dss_debugfs_dir,
@@ -545,6 +559,9 @@ static int dss_initialize_debugfs(void)
 #ifdef CONFIG_OMAP2_DSS_DSI
 	debugfs_create_file("dsi1", S_IRUGO, dss_debugfs_dir,
 			&dsi1_dump_regs, &dss_debug_fops);
+	if (cpu_is_omap44xx())
+		debugfs_create_file("dsi2", S_IRUGO, dss_debugfs_dir,
+				&dsi2_dump_regs, &dss_debug_fops);
 #endif
 #ifdef CONFIG_OMAP2_DSS_VENC
 	debugfs_create_file("venc", S_IRUGO, dss_debugfs_dir,
@@ -805,6 +822,18 @@ static struct platform_driver omap_dsihw_driver = {
 	.resume		= NULL,
 	.driver         = {
 		.name   = "dss_dsi1",
+		.owner  = THIS_MODULE,
+	},
+};
+
+static struct platform_driver omap_dsi2hw_driver = {
+	.probe          = omap_dsihw_probe,
+	.remove         = omap_dsihw_remove,
+	.shutdown	= NULL,
+	.suspend	= NULL,
+	.resume		= NULL,
+	.driver         = {
+		.name   = "dss_dsi2",
 		.owner  = THIS_MODULE,
 	},
 };
@@ -1077,6 +1106,7 @@ static int __init omap_dss_init2(void)
 	platform_driver_register(&omap_dsshw_driver);
 	platform_driver_register(&omap_dispchw_driver);
 	platform_driver_register(&omap_dsihw_driver);
+	platform_driver_register(&omap_dsi2hw_driver);
 #ifdef CONFIG_OMAP2_DSS_HDMI
 	platform_driver_register(&omap_hdmihw_driver);
 #endif

@@ -295,7 +295,7 @@ static struct dsi_struct {
 	char *pdev_name;
 	char *name;
 
-} *dsis[OMAP_DSS_CHANNEL_LCD + 1], dsi[] = { {
+} *dsis[OMAP_DSS_CHANNEL_LCD2 + 1], dsi[] = { {
 	.irq_vsync	= DISPC_IRQ_VSYNC,
 	.irq_dss	= OMAP44XX_IRQ_DSS_DSI1,
 	.irq_framedone	= DISPC_IRQ_FRAMEDONE,
@@ -304,6 +304,15 @@ static struct dsi_struct {
 	.clk_src_dsi	= DSS_SRC_PLL1_CLK2,
 	.pdev_name	= "dss_dsi1",
 	.name		= "DSI1",
+}, {
+	.irq_vsync	= DISPC_IRQ_VSYNC2,
+	.irq_dss	= OMAP44XX_IRQ_DSS_DSI2,
+	.irq_framedone	= DISPC_IRQ_FRAMEDONE2,
+	.channel	= OMAP_DSS_CHANNEL_LCD2,
+	.clk_src_dispc	= DSS_SRC_PLL2_CLK1,
+	.clk_src_dsi	= DSS_SRC_PLL2_CLK2,
+	.pdev_name	= "dss_dsi2",
+	.name		= "DSI2",
 } };
 
 #ifdef DEBUG
@@ -782,7 +791,7 @@ static unsigned long dsi_fclk_rate(struct dsi_struct *ds)
 {
 	unsigned long r;
 
-	if (dss_get_dsi_clk_source() == DSS_SRC_DSS1_ALWON_FCLK) {
+	if (dss_get_dsi_clk_source(ds->channel) == DSS_SRC_DSS1_ALWON_FCLK) {
 		/* DSI FCLK source is DSS1_ALWON_FCK, which is dss1_fck */
 		r = dss_clk_get_rate(DSS_CLK_FCK1);
 	} else {
@@ -1284,15 +1293,16 @@ void dsi_dump_clocks(enum omap_channel channel, struct seq_file *s)
 			"\t%-16luregm4(OMAP3) / regm5(OMAP4)  %u\t(%s)\n",
 			cinfo->dsi_pll_dsi_fclk,
 			cinfo->regm_dsi,
-			dss_get_dsi_clk_source() == DSS_SRC_DSS1_ALWON_FCLK ?
-			"off" : "on");
+			dss_get_dsi_clk_source(channel) ==
+			DSS_SRC_DSS1_ALWON_FCLK ? "off" : "on");
 
 	seq_printf(s,	"- DSI -\n");
 
 	seq_printf(s,	"dsi fclk source = %s\n",
-			dss_get_dsi_clk_source() == DSS_SRC_DSS1_ALWON_FCLK ?
-			"dss1_alwon_fclk" : "dsi2_pll_fclk(OMAP3) / "
-			"pllx_clk2(OMAP4)");
+			dss_get_dsi_clk_source(channel) ==
+			DSS_SRC_DSS1_ALWON_FCLK ?
+			"dss1_alwon_fclk" :
+			"dsi2_pll_fclk(OMAP3) / pllx_clk2(OMAP4)");
 
 	seq_printf(s,	"DSI_FCLK\t%lu\n", dsi_fclk_rate(ds));
 
@@ -3278,9 +3288,9 @@ static int dsi_display_init_dsi(struct omap_dss_device *dssdev)
 	dsi_wait_pll_dispc_active(dssdev->channel);
 	dss_select_dispc_clk_source(ds->clk_src_dispc);
 	dsi_wait_pll_dsi_active(dssdev->channel);
-	dss_select_dsi_clk_source(ds->clk_src_dsi);
+	dss_select_dsi_clk_source(dssdev->channel, ds->clk_src_dsi);
 	if (cpu_is_omap44xx())
-		dss_select_lcd_clk_source(ds->clk_src_dispc);
+		dss_select_lcd_clk_source(dssdev->channel, ds->clk_src_dispc);
 
 	DSSDBG("PLL OK\n");
 
@@ -3317,9 +3327,10 @@ err3:
 	dsi_complexio_uninit(ds);
 err2:
 	dss_select_dispc_clk_source(DSS_SRC_DSS1_ALWON_FCLK);
-	dss_select_dsi_clk_source(DSS_SRC_DSS1_ALWON_FCLK);
+	dss_select_dsi_clk_source(dssdev->channel, DSS_SRC_DSS1_ALWON_FCLK);
 	if (cpu_is_omap44xx())
-		dss_select_lcd_clk_source(DSS_SRC_DSS1_ALWON_FCLK);
+		dss_select_lcd_clk_source(dssdev->channel,
+						DSS_SRC_DSS1_ALWON_FCLK);
 err1:
 	dsi_pll_uninit(dssdev->channel);
 err0:
@@ -3338,9 +3349,10 @@ static void dsi_display_uninit_dsi(struct omap_dss_device *dssdev)
 	dsi_vc_enable(ds, 3, 0);
 
 	dss_select_dispc_clk_source(DSS_SRC_DSS1_ALWON_FCLK);
-	dss_select_dsi_clk_source(DSS_SRC_DSS1_ALWON_FCLK);
+	dss_select_dsi_clk_source(dssdev->channel, DSS_SRC_DSS1_ALWON_FCLK);
 	if (cpu_is_omap44xx())
-		dss_select_lcd_clk_source(DSS_SRC_DSS1_ALWON_FCLK);
+		dss_select_lcd_clk_source(dssdev->channel,
+						DSS_SRC_DSS1_ALWON_FCLK);
 	dsi_complexio_uninit(ds);
 	dsi_pll_uninit(dssdev->channel);
 }
@@ -3491,7 +3503,16 @@ int dsi_init(struct platform_device *pdev)
 	int r;
 	struct resource *dsi_mem;
 
-	struct dsi_struct *ds = dsi;
+	struct dsi_struct *ds;
+
+	/* find DSI device */
+	for (r = 0; r < ARRAY_SIZE(dsi); r++) {
+		if (!strcmp(dsi[r].pdev_name, pdev->name))
+			break;
+	}
+	if (r == ARRAY_SIZE(dsi))
+		return -EINVAL;
+	ds = dsi + r;
 
 	ds->pdata = pdev->dev.platform_data;
 	ds->pdev = pdev;

@@ -67,9 +67,11 @@ static struct {
 	struct dss_clock_info cache_dss_cinfo;
 	struct dispc_clock_info cache_dispc_cinfo;
 
-	enum dss_clk_source dsi_clk_source;
+	enum dss_clk_source dsi1_clk_source;
+	enum dss_clk_source dsi2_clk_source;
 	enum dss_clk_source dispc_clk_source;
-	enum dss_clk_source lcd_clk_source;
+	enum dss_clk_source lcd1_clk_source;
+	enum dss_clk_source lcd2_clk_source;
 
 	bool mainclk_state;
 
@@ -292,62 +294,66 @@ void dss_dump_regs(struct seq_file *s)
 #undef DUMPREG
 }
 
-void dss_select_dispc_clk_source(enum dss_clk_source clk_src)
+void dss_select_dispc_clk_source(enum dss_clk_source src)
 {
-	int b;
-
 	if (cpu_is_omap44xx()) {
-		BUG_ON(clk_src != DSS_SRC_DSS1_ALWON_FCLK &&
-			clk_src != DSS_SRC_PLL1_CLK1 &&
-			clk_src != DSS_SRC_PLL2_CLK1 &&
-			clk_src != DSS_SRC_PLL3_CLK1);
+		BUG_ON(src != DSS_SRC_DSS1_ALWON_FCLK &&
+			src != DSS_SRC_PLL1_CLK1 &&
+			src != DSS_SRC_PLL2_CLK1 &&
+			src != DSS_SRC_PLL3_CLK1);
+		REG_FLD_MOD(DSS_CONTROL, src, 9, 8);	/* FCK_CLK_SWITCH */
 	} else {
-		BUG_ON(clk_src != DSS_SRC_DSI1_PLL_FCLK &&
-			clk_src != DSS_SRC_DSS1_ALWON_FCLK);
-	}
-	b = clk_src != DSS_SRC_DSS1_ALWON_FCLK;
-
-	if (!cpu_is_omap44xx())
-		REG_FLD_MOD(DSS_CONTROL, b, 0, 0);	/* DISPC_CLK_SWITCH */
-	else
-		REG_FLD_MOD(DSS_CONTROL, b, 9, 8);	/* FCK_CLK_SWITCH */
-
-	dss.dispc_clk_source = clk_src;
-}
-
-void dss_select_dsi_clk_source(enum dss_clk_source clk_src)
-{
-	int b;
-
-	if (cpu_is_omap44xx()) {
-		BUG_ON(clk_src != DSS_SRC_PLL1_CLK2 &&
-			clk_src != DSS_SRC_DSS1_ALWON_FCLK);
-	} else {
-		BUG_ON(clk_src != DSS_SRC_DSI2_PLL_FCLK &&
-			clk_src != DSS_SRC_DSS1_ALWON_FCLK);
+		BUG_ON(src != DSS_SRC_DSI1_PLL_FCLK &&
+			src != DSS_SRC_DSS1_ALWON_FCLK);
+		REG_FLD_MOD(DSS_CONTROL, src, 0, 0);	/* DISPC_CLK_SWITCH */
 	}
 
-	b = clk_src != DSS_SRC_DSS1_ALWON_FCLK;
-
-	REG_FLD_MOD(DSS_CONTROL, b, 1, 1);	/* DSI_CLK_SWITCH */
-
-	dss.dsi_clk_source = clk_src;
+	dss.dispc_clk_source = src;
 }
 
-void dss_select_lcd_clk_source(enum dss_clk_source clk_src)
+void dss_select_dsi_clk_source(enum omap_channel channel,
+	enum dss_clk_source src)
 {
-	int b;
+	if (cpu_is_omap44xx()) {
+		BUG_ON(((src != DSS_SRC_PLL1_CLK2 &&
+			 channel == OMAP_DSS_CHANNEL_LCD) ||
+			(src != DSS_SRC_PLL2_CLK2 &&
+			 channel == OMAP_DSS_CHANNEL_LCD2)) &&
+			src != DSS_SRC_DSS1_ALWON_FCLK);
+	} else {
+		BUG_ON((src != DSS_SRC_DSI2_PLL_FCLK &&
+			src != DSS_SRC_DSS1_ALWON_FCLK) ||
+			channel != OMAP_DSS_CHANNEL_LCD);
+	}
 
+	if (channel == OMAP_DSS_CHANNEL_LCD) {
+		REG_FLD_MOD(DSS_CONTROL, src, 1, 1);	/* DSI_CLK_SWITCH */
+		dss.dsi1_clk_source = src;
+	} else {
+		REG_FLD_MOD(DSS_CONTROL, src, 10, 10);	/* DSI2_CLK_SWITCH */
+		dss.dsi2_clk_source = src;
+	}
+}
+
+void dss_select_lcd_clk_source(enum omap_channel channel,
+	enum dss_clk_source src)
+{
 	if (!cpu_is_omap44xx())
 		BUG();
 
-	BUG_ON(clk_src != DSS_SRC_PLL1_CLK1 &&
-		clk_src != DSS_SRC_DSS1_ALWON_FCLK);
+	BUG_ON(((src != DSS_SRC_PLL1_CLK1 &&
+		 channel == OMAP_DSS_CHANNEL_LCD) ||
+		(src != DSS_SRC_PLL2_CLK1 &&
+		 channel == OMAP_DSS_CHANNEL_LCD2)) &&
+		src != DSS_SRC_DSS1_ALWON_FCLK);
 
-	b = clk_src != DSS_SRC_DSS1_ALWON_FCLK;
-
-	REG_FLD_MOD(DSS_CONTROL, b, 0, 0);	/* LCD1_CLK_SWITCH */
-	dss.lcd_clk_source = clk_src;
+	if (channel == OMAP_DSS_CHANNEL_LCD) {
+		REG_FLD_MOD(DSS_CONTROL, src, 0, 0);	/* LCD1_CLK_SWITCH */
+		dss.lcd1_clk_source = src;
+	} else {
+		REG_FLD_MOD(DSS_CONTROL, src, 12, 12);	/* LCD2_CLK_SWITCH */
+		dss.lcd2_clk_source = src;
+	}
 }
 
 enum dss_clk_source dss_get_dispc_clk_source(void)
@@ -355,14 +361,20 @@ enum dss_clk_source dss_get_dispc_clk_source(void)
 	return dss.dispc_clk_source;
 }
 
-enum dss_clk_source dss_get_dsi_clk_source(void)
+enum dss_clk_source dss_get_dsi_clk_source(enum omap_channel channel)
 {
-	return dss.dsi_clk_source;
+	if (channel == OMAP_DSS_CHANNEL_LCD)
+		return dss.dsi1_clk_source;
+	else
+		return dss.dsi2_clk_source;
 }
 
-enum dss_clk_source dss_get_lcd_clk_source(void)
+enum dss_clk_source dss_get_lcd_clk_source(enum omap_channel channel)
 {
-	return dss.lcd_clk_source;
+	if (channel == OMAP_DSS_CHANNEL_LCD)
+		return dss.lcd1_clk_source;
+	else
+		return dss.lcd2_clk_source;
 }
 
 /* calculate clock rates using dividers in cinfo */
@@ -701,8 +713,10 @@ int dss_init(struct platform_device *pdev)
 		}
 	}
 
-	dss.dsi_clk_source = DSS_SRC_DSS1_ALWON_FCLK;
-	dss.lcd_clk_source = DSS_SRC_DSS1_ALWON_FCLK;
+	dss.dsi1_clk_source = DSS_SRC_DSS1_ALWON_FCLK;
+	dss.dsi2_clk_source = DSS_SRC_DSS1_ALWON_FCLK;
+	dss.lcd1_clk_source = DSS_SRC_DSS1_ALWON_FCLK;
+	dss.lcd2_clk_source = DSS_SRC_DSS1_ALWON_FCLK;
 	dss.dispc_clk_source = DSS_SRC_DSS1_ALWON_FCLK;
 
 	dss_save_context();

@@ -304,6 +304,14 @@ static struct nokia_dsi_panel_data dsi_panel = {
 		.use_esd_check	= false,
 };
 
+static struct nokia_dsi_panel_data dsi2_panel = {
+		.name   = "taal2",
+		.reset_gpio     = 104,
+		.use_ext_te     = false,
+		.ext_te_gpio    = 103,
+		.use_esd_check  = false,
+};
+
 static struct omap_dss_device sdp4430_lcd_device = {
 	.name			= "lcd",
 	.driver_name		= "taal",
@@ -329,8 +337,34 @@ static struct omap_dss_device sdp4430_lcd_device = {
 	.channel		= OMAP_DSS_CHANNEL_LCD,
 };
 
+static struct omap_dss_device sdp4430_lcd2_device = {
+	.name			= "lcd2",
+	.driver_name		= "taal2",
+	.type			= OMAP_DISPLAY_TYPE_DSI,
+	.data			= &dsi2_panel,
+	.phy.dsi		= {
+		.clk_lane	= 1,
+		.clk_pol	= 0,
+		.data1_lane	= 2,
+		.data1_pol	= 0,
+		.data2_lane	= 3,
+		.data2_pol	= 0,
+		.div		= {
+			.lck_div	= 1,
+			.pck_div	= 5,
+			.regm		= 150,
+			.regn		= 17,
+			.regm_dispc	= 4,
+			.regm_dsi	= 4,
+			.lp_clk_div	= 8,
+		},
+	},
+	.channel		= OMAP_DSS_CHANNEL_LCD2,
+};
+
 static struct omap_dss_device *sdp4430_dss_devices[] = {
 	&sdp4430_lcd_device,
+	&sdp4430_lcd2_device,
 };
 
 static struct omap_dss_board_info sdp4430_dss_data = {
@@ -708,11 +742,19 @@ static void __init omap4_display_init(void)
 	val = (val & 0xFFFFFFE0) | 0x11B;
 	__raw_writel(val, phymux_base + 0x90);
 
+	/* Set mux to choose GPIO 103 for Taal 2 ext te line*/
+	val = __raw_readl(phymux_base + 0x94);
+	val = (val & 0xFFFFFFE0) | 0x11B;
+	__raw_writel(val, phymux_base + 0x94);
+
 	iounmap(phymux_base);
 
 	/* Panel Taal reset */
 	gpio_request(dsi_panel.reset_gpio, "dsi1_en_gpio");
 	gpio_direction_output(dsi_panel.reset_gpio, 0);
+
+	gpio_request(dsi2_panel.reset_gpio, "dsi2_en_gpio");
+	gpio_direction_output(dsi2_panel.reset_gpio, 0);
 }
 
 static void __init omap_4430sdp_init(void)

@@ -989,6 +989,7 @@ void __init omap_display_init(struct omap_dss_board_info *board_data)
 		"dss",
 		"dss_dispc",
 		"dss_dsi1",
+		"dss_dsi2",
 		"dss_hdmi",
 		"dss_rfbi",
 		"dss_venc"

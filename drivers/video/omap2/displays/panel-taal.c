@@ -191,6 +191,24 @@ static struct panel_config panel_configs[] = {
 			.low		= 10,
 		},
 	},
+	{
+		.name           = "taal2",
+		.type           = PANEL_TAAL,
+		.timings        = {
+			.x_res          = 864,
+			.y_res          = 480,
+		},
+		.sleep          = {
+			.sleep_in       = 5,
+			.sleep_out      = 5,
+			.hw_reset       = 5,
+			.enable_te      = 100, /* possible panel bug */
+		},
+		.reset_sequence = {
+			.high           = 10,
+			.low            = 10,
+		},
+	},
 };
 
 struct taal_data {
@@ -732,8 +750,10 @@ static int taal_probe(struct omap_dss_device *dssdev)
 		props.max_brightness = 255;
 	else
 		props.max_brightness = 127;
-	bldev = backlight_device_register("taal", &dssdev->dev, dssdev,
-					  &taal_bl_ops, &props);
+
+		bldev = backlight_device_register(dssdev->name,
+			&dssdev->dev, dssdev, &taal_bl_ops, &props);
+
 	if (IS_ERR(bldev)) {
 		r = PTR_ERR(bldev);
 		goto err_bl;
@@ -762,9 +782,10 @@ static int taal_probe(struct omap_dss_device *dssdev)
 		gpio_direction_input(gpio);
 
 		r = request_irq(gpio_to_irq(gpio), taal_te_isr,
-				IRQF_DISABLED | IRQF_TRIGGER_RISING,
-				"taal vsync", dssdev);
-
+			IRQF_DISABLED | IRQF_TRIGGER_RISING,
+			(dssdev->channel == OMAP_DSS_CHANNEL_LCD ?
+			 "taal vsync" : "taal vsync2"),
+			dssdev);
 		if (r) {
 			dev_err(&dssdev->dev, "IRQ request failed\n");
 			gpio_free(gpio);
@@ -1574,9 +1595,48 @@ static struct omap_dss_driver taal_driver = {
 	},
 };
 
+static struct omap_dss_driver taal2_driver = {
+	.probe		= taal_probe,
+	.remove		= taal_remove,
+
+	.enable		= taal_enable,
+	.disable	= taal_disable,
+	.suspend	= taal_suspend,
+	.resume		= taal_resume,
+
+	.set_update_mode = taal_set_update_mode,
+	.get_update_mode = taal_get_update_mode,
+
+	.update		= taal_update,
+	.sync		= taal_sync,
+
+	.get_resolution	= taal_get_resolution,
+	.get_recommended_bpp = omapdss_default_get_recommended_bpp,
+
+	.enable_te	= taal_enable_te,
+	.get_te		= taal_get_te,
+
+	.set_rotate	= taal_rotate,
+	.get_rotate	= taal_get_rotate,
+	.set_mirror	= taal_mirror,
+	.get_mirror	= taal_get_mirror,
+	.run_test	= taal_run_test,
+	.memory_read	= taal_memory_read,
+
+	.get_timings	= taal_get_timings,
+
+	.driver         = {
+		.name   = "taal2",
+		.owner  = THIS_MODULE,
+	},
+};
+
+
 static int __init taal_init(void)
 {
 	omap_dss_register_driver(&taal_driver);
+	if (cpu_is_omap44xx())
+		omap_dss_register_driver(&taal2_driver);
 
 	return 0;
 }
@@ -1584,6 +1644,8 @@ static int __init taal_init(void)
 static void __exit taal_exit(void)
 {
 	omap_dss_unregister_driver(&taal_driver);
+	if (cpu_is_omap44xx())
+		omap_dss_unregister_driver(&taal2_driver);
 }
 
 module_init(taal_init);

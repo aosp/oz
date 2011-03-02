@@ -246,11 +246,13 @@ int dss_sdi_enable(void);
 void dss_sdi_disable(void);
 
 void dss_select_dispc_clk_source(enum dss_clk_source clk_src);
-void dss_select_dsi_clk_source(enum dss_clk_source clk_src);
-void dss_select_lcd_clk_source(enum dss_clk_source clk_src);
+void dss_select_dsi_clk_source(enum omap_channel channel,
+		enum dss_clk_source clk_src);
+void dss_select_lcd_clk_source(enum omap_channel channel,
+		enum dss_clk_source clk_src);
 enum dss_clk_source dss_get_dispc_clk_source(void);
-enum dss_clk_source dss_get_dsi_clk_source(void);
-enum dss_clk_source dss_get_lcd_clk_source(void);
+enum dss_clk_source dss_get_dsi_clk_source(enum omap_channel channel);
+enum dss_clk_source dss_get_lcd_clk_source(enum omap_channel channel);
 
 void dss_set_venc_output(enum omap_dss_venc_type type);
 void dss_set_dac_pwrdn_bgz(bool enable);

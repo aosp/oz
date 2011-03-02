@@ -2600,6 +2600,8 @@ unsigned long dispc_fclk_rate(void)
 	case DSS_SRC_DSI1_PLL_FCLK:
 	/* also DSS_SRC_PLL1_CLK1: */
 		return dsi_get_pll_dispc_rate(OMAP_DSS_CHANNEL_LCD);
+	case DSS_SRC_PLL2_CLK1:
+		return dsi_get_pll_dispc_rate(OMAP_DSS_CHANNEL_LCD2);
 #endif
 	case DSS_SRC_PLL3_CLK1:
 		return 0;
