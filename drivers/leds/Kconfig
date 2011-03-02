@@ -372,6 +372,7 @@ config LEDS_NETXBIG
 config LEDS_OMAP4430_SDP_DISPLAY
 	bool "Display LED support for OMAP4430 SDP"
 	depends on LEDS_CLASS && MACH_OMAP_4430SDP
+	default y
 	help
 	  This option enables support for display LEDs on the
 	  OMAP4430 SDP.
