@@ -564,7 +564,8 @@ static int dss_initialize_debugfs(void)
 				&dsi2_dump_regs, &dss_debug_fops);
 #endif
 #ifdef CONFIG_OMAP2_DSS_VENC
-	debugfs_create_file("venc", S_IRUGO, dss_debugfs_dir,
+	if (!cpu_is_omap44xx())
+		debugfs_create_file("venc", S_IRUGO, dss_debugfs_dir,
 			&venc_dump_regs, &dss_debug_fops);
 #endif
 	return 0;

@@ -647,6 +647,9 @@ int venc_init(struct platform_device *pdev)
 {
 	u8 rev_id;
 
+	if (cpu_is_omap44xx())
+		return 0;
+
 	mutex_init(&venc.venc_lock);
 
 	venc.wss_data = 0;
@@ -676,6 +679,9 @@ int venc_init(struct platform_device *pdev)
 
 void venc_exit(void)
 {
+	if (cpu_is_omap44xx())
+		return;
+
 	omap_dss_unregister_driver(&venc_driver);
 
 	iounmap(venc.base);

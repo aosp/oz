@@ -280,6 +280,7 @@ static struct dsi_struct {
 	spinlock_t irq_stats_lock;
 	struct dsi_irq_stats irq_stats;
 #endif
+	bool enabled;
 
 	struct omap_display_platform_data *pdata;
 	struct platform_device *pdev;
@@ -1267,6 +1268,9 @@ void dsi_dump_clocks(enum omap_channel channel, struct seq_file *s)
 	struct dsi_struct *ds = dsi4channel(channel);
 	struct dsi_clock_info *cinfo = &ds->current_cinfo;
 
+	if (!ds->enabled)
+		return;
+
 	enable_clocks(1);
 
 	clksel = REG_GET(ds, DSI_PLL_CONFIGURATION2, 11, 11);
@@ -1327,6 +1331,9 @@ void dsi_dump_irqs(enum omap_channel channel, struct seq_file *s)
 	unsigned long flags;
 	struct dsi_irq_stats stats;
 	struct dsi_struct *ds = dsi4channel(channel);
+
+	if (!ds->enabled)
+		return;
 
 	spin_lock_irqsave(&ds->irq_stats_lock, flags);
 
@@ -1414,6 +1421,9 @@ void dsi_dump_irqs(enum omap_channel channel, struct seq_file *s)
 void dsi_dump_regs(enum omap_channel channel, struct seq_file *s)
 {
 	struct dsi_struct *ds = dsi4channel(channel);
+
+	if (!ds->enabled)
+		return;
 
 #define DUMPREG(ds, r) seq_printf(s, "%-35s %08x\n", #r, dsi_read_reg(ds, r))
 
@@ -3141,26 +3151,28 @@ int omap_dsi_update(struct omap_dss_device *dssdev,
 	 * see rather obscure HW error happening, as DSS halts. */
 	BUG_ON(x % 2 == 1);
 
-	if (dssdev->manager->caps & OMAP_DSS_OVL_MGR_CAP_DISPC) {
-		ds->framedone_callback = callback;
-		ds->framedone_data = data;
+	if (dssdev->manager) {
+		if (dssdev->manager->caps & OMAP_DSS_OVL_MGR_CAP_DISPC) {
+			ds->framedone_callback = callback;
+			ds->framedone_data = data;
 
-		ds->update_region.x = x;
-		ds->update_region.y = y;
-		ds->update_region.w = w;
-		ds->update_region.h = h;
-		ds->update_region.device = dssdev;
+			ds->update_region.x = x;
+			ds->update_region.y = y;
+			ds->update_region.w = w;
+			ds->update_region.h = h;
+			ds->update_region.device = dssdev;
 
-		dsi_update_screen_dispc(dssdev, x, y, w, h);
-	} else {
-		int r;
+			dsi_update_screen_dispc(dssdev, x, y, w, h);
+		} else {
+			int r;
 
-		r = dsi_update_screen_l4(dssdev, x, y, w, h);
-		if (r)
-			return r;
+			r = dsi_update_screen_l4(dssdev, x, y, w, h);
+			if (r)
+				return r;
 
-		dsi_perf_show(ds, "L4");
-		callback(0, data);
+			dsi_perf_show(ds, "L4");
+			callback(0, data);
+		}
 	}
 
 	return 0;
@@ -3407,6 +3419,7 @@ int omapdss_dsi_display_enable(struct omap_dss_device *dssdev)
 	if (r)
 		goto err2;
 
+	ds->enabled = true;
 	mutex_unlock(&ds->lock);
 
 	return 0;
@@ -3442,6 +3455,8 @@ void omapdss_dsi_display_disable(struct omap_dss_device *dssdev)
 	dsi_enable_pll_clock(ds, 0);
 
 	omap_dss_stop_device(dssdev);
+
+	ds->enabled = false;
 
 	mutex_unlock(&ds->lock);
 }
