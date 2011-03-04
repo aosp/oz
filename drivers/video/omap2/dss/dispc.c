@@ -191,20 +191,12 @@ struct omap_dispc_isr_data {
 	u32			mask;
 };
 
-struct dispc_h_coef {
-	s8 hc4;
-	s8 hc3;
-	u8 hc2;
-	s8 hc1;
-	s8 hc0;
-};
-
-struct dispc_v_coef {
-	s8 vc22;
-	s8 vc2;
-	u8 vc1;
-	s8 vc0;
-	s8 vc00;
+struct dispc_hv_coef {
+	s8 hc4;	/* also vc22 */
+	s8 hc3;	/* also vc2 */
+	u8 hc2;	/* also vc1 */
+	s8 hc1;	/* also vc0 */
+	s8 hc0;	/* also vc00 */
 };
 
 #define REG_GET(idx, start, end) \
@@ -815,7 +807,7 @@ static void _dispc_set_scale_coef(enum omap_plane plane, int hscaleup,
 		int vscaleup, int five_taps)
 {
 	/* Coefficients for horizontal up-sampling */
-	static const struct dispc_h_coef coef_hup[8] = {
+	static const struct dispc_hv_coef coef_hup[8] = {
 		{  0,   0, 128,   0,  0 },
 		{ -1,  13, 124,  -8,  0 },
 		{ -2,  30, 112, -11, -1 },
@@ -827,7 +819,7 @@ static void _dispc_set_scale_coef(enum omap_plane plane, int hscaleup,
 	};
 
 	/* Coefficients for vertical up-sampling */
-	static const struct dispc_v_coef coef_vup_3tap[8] = {
+	static const struct dispc_hv_coef coef_vup_3tap[8] = {
 		{ 0,  0, 128,  0, 0 },
 		{ 0,  3, 123,  2, 0 },
 		{ 0, 12, 111,  5, 0 },
@@ -838,7 +830,7 @@ static void _dispc_set_scale_coef(enum omap_plane plane, int hscaleup,
 		{ 0,  2, 123,  3, 0 },
 	};
 
-	static const struct dispc_v_coef coef_vup_5tap[8] = {
+	static const struct dispc_hv_coef coef_vup_5tap[8] = {
 		{  0,   0, 128,   0,  0 },
 		{ -1,  13, 124,  -8,  0 },
 		{ -2,  30, 112, -11, -1 },
@@ -850,7 +842,7 @@ static void _dispc_set_scale_coef(enum omap_plane plane, int hscaleup,
 	};
 
 	/* Coefficients for horizontal down-sampling */
-	static const struct dispc_h_coef coef_hdown[8] = {
+	static const struct dispc_hv_coef coef_hdown[8] = {
 		{   0, 36, 56, 36,  0 },
 		{   4, 40, 55, 31, -2 },
 		{   8, 44, 54, 27, -5 },
@@ -862,7 +854,7 @@ static void _dispc_set_scale_coef(enum omap_plane plane, int hscaleup,
 	};
 
 	/* Coefficients for vertical down-sampling */
-	static const struct dispc_v_coef coef_vdown_3tap[8] = {
+	static const struct dispc_hv_coef coef_vdown_3tap[8] = {
 		{ 0, 36, 56, 36, 0 },
 		{ 0, 40, 57, 31, 0 },
 		{ 0, 45, 56, 27, 0 },
@@ -873,7 +865,7 @@ static void _dispc_set_scale_coef(enum omap_plane plane, int hscaleup,
 		{ 0, 31, 57, 40, 0 },
 	};
 
-	static const struct dispc_v_coef coef_vdown_5tap[8] = {
+	static const struct dispc_hv_coef coef_vdown_5tap[8] = {
 		{   0, 36, 56, 36,  0 },
 		{   4, 40, 55, 31, -2 },
 		{   8, 44, 54, 27, -5 },
@@ -884,8 +876,8 @@ static void _dispc_set_scale_coef(enum omap_plane plane, int hscaleup,
 		{  -2, 31, 55, 40,  4 },
 	};
 
-	const struct dispc_h_coef *h_coef;
-	const struct dispc_v_coef *v_coef;
+	const struct dispc_hv_coef *h_coef;
+	const struct dispc_hv_coef *v_coef;
 	int i;
 
 	if (hscaleup)
@@ -906,9 +898,9 @@ static void _dispc_set_scale_coef(enum omap_plane plane, int hscaleup,
 			| FLD_VAL(h_coef[i].hc2, 23, 16)
 			| FLD_VAL(h_coef[i].hc3, 31, 24);
 		hv = FLD_VAL(h_coef[i].hc4, 7, 0)
-			| FLD_VAL(v_coef[i].vc0, 15, 8)
-			| FLD_VAL(v_coef[i].vc1, 23, 16)
-			| FLD_VAL(v_coef[i].vc2, 31, 24);
+			| FLD_VAL(v_coef[i].hc1, 15, 8)
+			| FLD_VAL(v_coef[i].hc2, 23, 16)
+			| FLD_VAL(v_coef[i].hc3, 31, 24);
 
 		_dispc_write_firh_reg(plane, i, h);
 		_dispc_write_firhv_reg(plane, i, hv);
@@ -917,8 +909,8 @@ static void _dispc_set_scale_coef(enum omap_plane plane, int hscaleup,
 	if (five_taps) {
 		for (i = 0; i < 8; i++) {
 			u32 v;
-			v = FLD_VAL(v_coef[i].vc00, 7, 0)
-				| FLD_VAL(v_coef[i].vc22, 15, 8);
+			v = FLD_VAL(v_coef[i].hc0, 7, 0)
+				| FLD_VAL(v_coef[i].hc4, 15, 8);
 			_dispc_write_firv_reg(plane, i, v);
 		}
 	}
@@ -1419,7 +1411,6 @@ static void _dispc_set_vid_accu1(enum omap_plane plane, int haccu, int vaccu)
 
 	dispc_write_reg(ac1_reg[plane-1], val);
 }
-
 
 static void _dispc_set_scaling(enum omap_plane plane,
 		u16 orig_width, u16 orig_height,
