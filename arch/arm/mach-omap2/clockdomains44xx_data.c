@@ -112,7 +112,7 @@ static struct clockdomain abe_44xx_clkdm = {
 	.prcm_partition	  = OMAP4430_CM1_PARTITION,
 	.cm_inst	  = OMAP4430_CM1_ABE_INST,
 	.clkdm_offs	  = OMAP4430_CM1_ABE_ABE_CDOFFS,
-	.flags		  = CLKDM_CAN_HWSUP_SWSUP,
+	.flags		  = CLKDM_CAN_SWSUP,
 	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
 };
 
