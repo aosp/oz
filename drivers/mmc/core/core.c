@@ -1135,8 +1135,8 @@ void mmc_rescan(struct work_struct *work)
 #ifdef CONFIG_TIWLAN_SDIO
 	if ((host->bus_ops != NULL) && host->bus_ops->detect && !host->bus_dead)
 #else
-	if ((host->bus_ops != NULL) && host->bus_ops->detect && !host->bus_dead
-					&& mmc_card_is_removable(host))
+	if (host->bus_ops && host->bus_ops->detect && !host->bus_dead
+	    && !(host->caps & MMC_CAP_NONREMOVABLE))
 #endif
 		host->bus_ops->detect(host);
 
