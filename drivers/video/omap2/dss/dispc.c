@@ -40,6 +40,7 @@
 
 #include "dss.h"
 #include "dss_features.h"
+#include <mach/tiler.h>
 
 #define DISPC_SZ_REGS			SZ_16K
 
@@ -1699,6 +1700,26 @@ static s32 pixinc(int pixels, u8 ps)
 		BUG();
 }
 
+static void calc_tiler_row_rotation(struct tiler_view_t *view,
+		s32 *row_inc, unsigned *offset1, bool ilace)
+{
+	/* assume TB. We worry about swapping top/bottom outside of this call */
+
+	if (ilace) {
+		/* even and odd frames are interleaved */
+
+		/* offset1 is always at an odd line */
+		*offset1 = view->v_inc;
+	}
+	*row_inc = view->v_inc + 1 - view->width * view->bpp;
+
+	DSSDBG(" ps: %d, width: %d, offset1: %d,"
+		" height: %d, row_inc:%d\n",
+		view->bpp, view->width, *offset1, view->height, *row_inc);
+
+	return;
+}
+
 static void calc_vrfb_rotation_offset(u8 rotation, bool mirror,
 		u16 screen_width,
 		u16 width, u16 height,
@@ -2110,16 +2131,44 @@ static int _dispc_setup_plane(enum omap_plane plane,
 	if (fieldmode)
 		field_offset = 1;
 
-	if (rotation_type == OMAP_DSS_ROT_DMA)
+	/* default values */
+	row_inc = pix_inc = 0x1;
+	offset0 = offset1 = 0x0;
+
+	if (cpu_is_omap44xx()) {
+		/* set BURSTTYPE */
+		bool use_tiler = rotation_type == OMAP_DSS_ROT_TILER;
+		REG_FLD_MOD(dispc_reg_att[plane], use_tiler, 29, 29);
+	}
+
+	if (rotation_type == OMAP_DSS_ROT_TILER) {
+		struct tiler_view_t view = {0};
+		unsigned long tiler_width = width, tiler_height = height;
+		/* tiler needs 0-degree width & height */
+		if (rotation & 1)
+			swap(tiler_width, tiler_height);
+
+		tilview_create(&view, paddr, tiler_width, tiler_height);
+		tilview_rotate(&view, rotation * 90);
+		tilview_flip(&view, mirror, false);
+		paddr = view.tsptr;
+
+		/* we cannot do TB field interlaced in rotated view */
+		calc_tiler_row_rotation(&view, &row_inc,
+					&offset1, ilace);
+
+		DSSDBG("w, h = %ld %ld\n", tiler_width, tiler_height);
+	} else if (rotation_type == OMAP_DSS_ROT_DMA) {
 		calc_dma_rotation_offset(rotation, mirror,
 				screen_width, width, frame_height, color_mode,
 				fieldmode, field_offset,
 				&offset0, &offset1, &row_inc, &pix_inc);
-	else
+	} else {
 		calc_vrfb_rotation_offset(rotation, mirror,
 				screen_width, width, frame_height, color_mode,
 				fieldmode, field_offset,
 				&offset0, &offset1, &row_inc, &pix_inc);
+	}
 
 	DSSDBG("offset0 %u, offset1 %u, row_inc %d, pix_inc %d\n",
 			offset0, offset1, row_inc, pix_inc);
