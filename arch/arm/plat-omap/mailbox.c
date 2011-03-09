@@ -345,8 +345,8 @@ static void omap_mbox_fini(struct omap_mbox *mbox)
 
 struct omap_mbox *omap_mbox_get(const char *name, struct notifier_block *nb)
 {
-	struct omap_mbox *_mbox, *mbox = NULL;
-	int i, ret;
+	struct omap_mbox *mbox = NULL;
+	int ret = 0;
 
 	if (!mboxes)
 		return ERR_PTR(-EINVAL);
@@ -355,7 +355,6 @@ struct omap_mbox *omap_mbox_get(const char *name, struct notifier_block *nb)
 	for (mbox = *mboxes; mbox; mbox++) {
 		if (!strcmp(mbox->name, name))
 			break;
-		}
 	}
 
 	if (!mbox) {
