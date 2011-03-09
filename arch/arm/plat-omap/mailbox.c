@@ -348,6 +348,7 @@ struct omap_mbox *omap_mbox_get(const char *name, struct notifier_block *nb)
 	struct omap_mbox *mbox = NULL;
 	int ret = 0;
 
+
 	if (!mboxes)
 		return ERR_PTR(-EINVAL);
 
