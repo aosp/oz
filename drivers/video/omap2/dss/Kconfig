@@ -1,15 +1,16 @@
 menuconfig OMAP2_DSS
-        tristate "OMAP2/3 Display Subsystem support (EXPERIMENTAL)"
-        depends on ARCH_OMAP2 || ARCH_OMAP3
-        help
-          OMAP2/3 Display Subsystem support.
+	tristate "OMAP2+ Display Subsystem support (EXPERIMENTAL)"
+	depends on ARCH_OMAP2PLUS
+	default y
+	help
+	  OMAP2+ Display Subsystem support.
 
 if OMAP2_DSS
 
 config OMAP2_VRAM_SIZE
 	int "VRAM size (MB)"
-	range 0 32
-	default 0
+	range 0 64
+	default 4
 	help
 	  The amount of SDRAM to reserve at boot time for video RAM use.
 	  This VRAM will be used by omapfb and other drivers that need
@@ -19,7 +20,7 @@ config OMAP2_VRAM_SIZE
 	  in the board file.
 
 config OMAP2_DSS_DEBUG_SUPPORT
-        bool "Debug support"
+	bool "Debug support"
 	default y
 	help
 	  This enables debug messages. You need to enable printing
@@ -44,7 +45,7 @@ config OMAP2_DSS_DPI
 
 config OMAP2_DSS_RFBI
 	bool "RFBI support"
-        default n
+	default n
 	help
 	  MIPI DBI support (RFBI, Remote Framebuffer Interface, in Texas
 	  Instrument's terminology).
@@ -56,14 +57,15 @@ config OMAP2_DSS_RFBI
 
 config OMAP2_DSS_VENC
 	bool "VENC support"
-        default y
+	depends on ARCH_OMAP2 || ARCH_OMAP3
+	default y
 	help
 	  OMAP Video Encoder support for S-Video and composite TV-out.
 
 config OMAP2_DSS_SDI
 	bool "SDI support"
 	depends on ARCH_OMAP3
-        default n
+	default n
 	help
 	  SDI (Serial Display Interface) support.
 
@@ -72,8 +74,8 @@ config OMAP2_DSS_SDI
 
 config OMAP2_DSS_DSI
 	bool "DSI support"
-	depends on ARCH_OMAP3
-        default n
+	depends on ARCH_OMAP3 || ARCH_OMAP4
+	default y
 	help
 	  MIPI DSI (Display Serial Interface) support.
 

@@ -161,12 +161,14 @@ static ssize_t display_timings_store(struct device *dev,
 
 	found = 0;
 #ifdef CONFIG_OMAP2_DSS_VENC
-	if (strncmp("pal", buf, 3) == 0) {
-		t = omap_dss_pal_timings;
-		found = 1;
-	} else if (strncmp("ntsc", buf, 4) == 0) {
-		t = omap_dss_ntsc_timings;
-		found = 1;
+	if (!cpu_is_omap44xx()) {
+		if (strncmp("pal", buf, 3) == 0) {
+			t = omap_dss_pal_timings;
+			found = 1;
+		} else if (strncmp("ntsc", buf, 4) == 0) {
+			t = omap_dss_ntsc_timings;
+			found = 1;
+		}
 	}
 #endif
 	if (!found && sscanf(buf, "%u,%hu/%hu/%hu/%hu,%hu/%hu/%hu/%hu",
@@ -396,20 +398,29 @@ void dss_init_device(struct platform_device *pdev,
 	switch (dssdev->type) {
 #ifdef CONFIG_OMAP2_DSS_DPI
 	case OMAP_DISPLAY_TYPE_DPI:
+		break;
 #endif
 #ifdef CONFIG_OMAP2_DSS_RFBI
 	case OMAP_DISPLAY_TYPE_DBI:
+		break;
 #endif
 #ifdef CONFIG_OMAP2_DSS_SDI
 	case OMAP_DISPLAY_TYPE_SDI:
+		break;
 #endif
 #ifdef CONFIG_OMAP2_DSS_DSI
 	case OMAP_DISPLAY_TYPE_DSI:
+		break;
 #endif
 #ifdef CONFIG_OMAP2_DSS_VENC
 	case OMAP_DISPLAY_TYPE_VENC:
-#endif
+		if (cpu_is_omap44xx()) {
+			DSSERR("Display '%s' is not supported on OMAP4.\n",
+				dssdev->name);
+			return;
+		}
 		break;
+#endif
 	default:
 		DSSERR("Support for display '%s' not compiled in.\n",
 				dssdev->name);
@@ -429,7 +440,10 @@ void dss_init_device(struct platform_device *pdev,
 #endif
 #ifdef CONFIG_OMAP2_DSS_VENC
 	case OMAP_DISPLAY_TYPE_VENC:
-		r = venc_init_display(dssdev);
+		if (cpu_is_omap44xx())
+			r = -EINVAL;
+		else
+			r = venc_init_display(dssdev);
 		break;
 #endif
 #ifdef CONFIG_OMAP2_DSS_SDI

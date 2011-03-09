@@ -54,6 +54,8 @@ static const struct dss_reg_field omap2_dss_reg_fields[] = {
 	{ FEAT_REG_FIFOLOWTHRESHOLD, 8, 0 },
 	{ FEAT_REG_FIFOHIGHTHRESHOLD, 24, 16 },
 	{ FEAT_REG_FIFOSIZE, 8, 0 },
+	{ FEAT_REG_HORIZONTALACCU, 9, 0},
+	{ FEAT_REG_VERTICALACCU, 25, 16},
 };
 
 static const struct dss_reg_field omap3_dss_reg_fields[] = {
@@ -62,6 +64,18 @@ static const struct dss_reg_field omap3_dss_reg_fields[] = {
 	{ FEAT_REG_FIFOLOWTHRESHOLD, 11, 0 },
 	{ FEAT_REG_FIFOHIGHTHRESHOLD, 27, 16 },
 	{ FEAT_REG_FIFOSIZE, 10, 0 },
+	{ FEAT_REG_HORIZONTALACCU, 9, 0},
+	{ FEAT_REG_VERTICALACCU, 25, 16},
+};
+
+static const struct dss_reg_field omap4_dss_reg_fields[] = {
+	{ FEAT_REG_FIRHINC, 12, 0 },
+	{ FEAT_REG_FIRVINC, 28, 16 },
+	{ FEAT_REG_FIFOLOWTHRESHOLD, 15, 0 },
+	{ FEAT_REG_FIFOHIGHTHRESHOLD, 31, 16 },
+	{ FEAT_REG_FIFOSIZE, 15, 0 },
+	{ FEAT_REG_HORIZONTALACCU, 10, 0},
+	{ FEAT_REG_VERTICALACCU, 26, 16},
 };
 
 static const enum omap_display_type omap2_dss_supported_displays[] = {
@@ -134,6 +148,46 @@ static const enum omap_color_mode omap3_dss_supported_color_modes[] = {
 	OMAP_DSS_COLOR_RGBA32 | OMAP_DSS_COLOR_RGBX32,
 };
 
+static const enum omap_color_mode omap4_dss_supported_color_modes[] = {
+	/* OMAP_DSS_GFX */
+	OMAP_DSS_COLOR_CLUT1 | OMAP_DSS_COLOR_CLUT2 |
+	OMAP_DSS_COLOR_CLUT4 | OMAP_DSS_COLOR_CLUT8 |
+	OMAP_DSS_COLOR_RGB12U | OMAP_DSS_COLOR_ARGB16 |
+	OMAP_DSS_COLOR_RGB16 | OMAP_DSS_COLOR_RGB24U |
+	OMAP_DSS_COLOR_RGB24P | OMAP_DSS_COLOR_ARGB32 |
+	OMAP_DSS_COLOR_RGBA32 | OMAP_DSS_COLOR_RGBX32,
+
+	/* OMAP_DSS_VIDEO1 */
+	OMAP_DSS_COLOR_NV12 | OMAP_DSS_COLOR_RGBA12 |
+	OMAP_DSS_COLOR_XRGB12 | OMAP_DSS_COLOR_ARGB16_1555 |
+	OMAP_DSS_COLOR_RGBX24_32_ALGN | OMAP_DSS_COLOR_XRGB15 |
+	OMAP_DSS_COLOR_RGB12U | OMAP_DSS_COLOR_ARGB16 |
+	OMAP_DSS_COLOR_RGB16 | OMAP_DSS_COLOR_RGB24U |
+	OMAP_DSS_COLOR_RGB24P | OMAP_DSS_COLOR_YUV2 |
+	OMAP_DSS_COLOR_UYVY | OMAP_DSS_COLOR_ARGB32 |
+	OMAP_DSS_COLOR_RGBA32 | OMAP_DSS_COLOR_RGBX32,
+
+	/* OMAP_DSS_VIDEO2 */
+	OMAP_DSS_COLOR_NV12 | OMAP_DSS_COLOR_RGBA12 |
+	OMAP_DSS_COLOR_XRGB12 | OMAP_DSS_COLOR_ARGB16_1555 |
+	OMAP_DSS_COLOR_RGBX24_32_ALGN | OMAP_DSS_COLOR_XRGB15 |
+	OMAP_DSS_COLOR_RGB12U | OMAP_DSS_COLOR_ARGB16 |
+	OMAP_DSS_COLOR_RGB16 | OMAP_DSS_COLOR_RGB24U |
+	OMAP_DSS_COLOR_RGB24P | OMAP_DSS_COLOR_YUV2 |
+	OMAP_DSS_COLOR_UYVY | OMAP_DSS_COLOR_ARGB32 |
+	OMAP_DSS_COLOR_RGBA32 | OMAP_DSS_COLOR_RGBX32,
+
+	/* OMAP_DSS_VIDEO3 */
+	OMAP_DSS_COLOR_NV12 | OMAP_DSS_COLOR_RGBA12 |
+	OMAP_DSS_COLOR_XRGB12 | OMAP_DSS_COLOR_ARGB16_1555 |
+	OMAP_DSS_COLOR_RGBX24_32_ALGN | OMAP_DSS_COLOR_XRGB15 |
+	OMAP_DSS_COLOR_RGB12U | OMAP_DSS_COLOR_ARGB16 |
+	OMAP_DSS_COLOR_RGB16 | OMAP_DSS_COLOR_RGB24U |
+	OMAP_DSS_COLOR_RGB24P | OMAP_DSS_COLOR_YUV2 |
+	OMAP_DSS_COLOR_UYVY | OMAP_DSS_COLOR_ARGB32 |
+	OMAP_DSS_COLOR_RGBA32 | OMAP_DSS_COLOR_RGBX32,
+};
+
 /* OMAP2 DSS Features */
 static struct omap_dss_features omap2_dss_features = {
 	.reg_fields = omap2_dss_reg_fields,
@@ -141,7 +195,8 @@ static struct omap_dss_features omap2_dss_features = {
 
 	.has_feature	=
 		FEAT_LCDENABLEPOL | FEAT_LCDENABLESIGNAL |
-		FEAT_PCKFREEENABLE | FEAT_FUNCGATED,
+		FEAT_PCKFREEENABLE | FEAT_FUNCGATED |
+		FEAT_ROWREPEATENABLE | FEAT_RESIZECONF,
 
 	.num_mgrs = 2,
 	.num_ovls = 3,
@@ -157,7 +212,8 @@ static struct omap_dss_features omap3430_dss_features = {
 	.has_feature	=
 		FEAT_GLOBAL_ALPHA | FEAT_LCDENABLEPOL |
 		FEAT_LCDENABLESIGNAL | FEAT_PCKFREEENABLE |
-		FEAT_FUNCGATED,
+		FEAT_FUNCGATED | FEAT_ROWREPEATENABLE |
+		FEAT_LINEBUFFERSPLIT | FEAT_RESIZECONF,
 
 	.num_mgrs = 2,
 	.num_ovls = 3,
@@ -172,7 +228,9 @@ static struct omap_dss_features omap3630_dss_features = {
 	.has_feature    =
 		FEAT_GLOBAL_ALPHA | FEAT_LCDENABLEPOL |
 		FEAT_LCDENABLESIGNAL | FEAT_PCKFREEENABLE |
-		FEAT_PRE_MULT_ALPHA | FEAT_FUNCGATED,
+		FEAT_PRE_MULT_ALPHA | FEAT_FUNCGATED |
+		FEAT_ROWREPEATENABLE |
++		FEAT_LINEBUFFERSPLIT | FEAT_RESIZECONF,
 
 	.num_mgrs = 2,
 	.num_ovls = 3,
@@ -182,17 +240,19 @@ static struct omap_dss_features omap3630_dss_features = {
 
 /* OMAP4 DSS Features */
 static struct omap_dss_features omap4_dss_features = {
-	.reg_fields = omap3_dss_reg_fields,
-	.num_reg_fields = ARRAY_SIZE(omap3_dss_reg_fields),
+	.reg_fields = omap4_dss_reg_fields,
+	.num_reg_fields = ARRAY_SIZE(omap4_dss_reg_fields),
 
 	.has_feature	=
 		FEAT_GLOBAL_ALPHA | FEAT_PRE_MULT_ALPHA |
-		FEAT_MGR_LCD2,
+		FEAT_MGR_LCD2 |
+		FEAT_GLOBAL_ALPHA_VID1 | FEAT_OVL_VID3 |
+		FEAT_OVL_ZORDER,
 
 	.num_mgrs = 3,
-	.num_ovls = 3,
+	.num_ovls = 4,
 	.supported_displays = omap4_dss_supported_displays,
-	.supported_color_modes = omap3_dss_supported_color_modes,
+	.supported_color_modes = omap4_dss_supported_color_modes,
 };
 
 /* Functions returning values related to a DSS feature */

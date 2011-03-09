@@ -23,6 +23,8 @@
 #ifndef __OMAP2_DSS_H
 #define __OMAP2_DSS_H
 
+#include <linux/interrupt.h>
+
 #ifdef CONFIG_OMAP2_DSS_DEBUG_SUPPORT
 #define DEBUG
 #endif
@@ -120,9 +122,20 @@ enum dss_clock {
 };
 
 enum dss_clk_source {
-	DSS_SRC_DSI1_PLL_FCLK,
-	DSS_SRC_DSI2_PLL_FCLK,
-	DSS_SRC_DSS1_ALWON_FCLK,
+	/* OMAP 3*/
+	DSS_SRC_DSI1_PLL_FCLK = 1,
+	DSS_SRC_DSI2_PLL_FCLK = 1,
+
+	/* common */
+	DSS_SRC_DSS1_ALWON_FCLK = 0,
+
+	/* OMAP 4 */
+	DSS_SRC_PLL1_CLK1 = 1,
+	DSS_SRC_PLL2_CLK1 = 2,
+	DSS_SRC_PLL3_CLK1 = 3,
+	DSS_SRC_PLL1_CLK2 = DSS_SRC_DSI2_PLL_FCLK,
+	DSS_SRC_PLL2_CLK2 = DSS_SRC_DSI2_PLL_FCLK,
+	DSS_SRC_PLL1_CLK4,
 };
 
 struct dss_clock_info {
@@ -148,16 +161,18 @@ struct dsi_clock_info {
 	unsigned long fint;
 	unsigned long clkin4ddr;
 	unsigned long clkin;
-	unsigned long dsi1_pll_fclk;
-	unsigned long dsi2_pll_fclk;
+	unsigned long dsi_pll_dispc_fclk;	/* DSI1_PLL_CLK for OMAP3 */
+						/* PLLx_CLK1 for OMAP4 */
 
+	unsigned long dsi_pll_dsi_fclk;		/* DSI2_PLL_CLK for OMAP3 */
+						/* PLLx_CLK2 for OMAP4 */
 	unsigned long lp_clk;
 
 	/* dividers */
 	u16 regn;
 	u16 regm;
-	u16 regm3;
-	u16 regm4;
+	u16 regm_dispc;
+	u16 regm_dsi;
 
 	u16 lp_clk_div;
 
@@ -178,6 +193,10 @@ struct bus_type *dss_get_bus(void);
 struct regulator *dss_get_vdds_dsi(void);
 struct regulator *dss_get_vdds_sdi(void);
 struct regulator *dss_get_vdda_dac(void);
+int dss_opt_clock_enable(void);
+void dss_opt_clock_disable(void);
+void save_all_ctx(void);
+void restore_all_ctx(void);
 
 /* display */
 int dss_suspend_all_devices(void);
@@ -214,7 +233,7 @@ void dss_overlay_setup_l4_manager(struct omap_overlay_manager *mgr);
 void dss_recheck_connections(struct omap_dss_device *dssdev, bool force);
 
 /* DSS */
-int dss_init(bool skip_init);
+int dss_init(struct platform_device *pdev);
 void dss_exit(void);
 
 void dss_save_context(void);
@@ -227,9 +246,13 @@ int dss_sdi_enable(void);
 void dss_sdi_disable(void);
 
 void dss_select_dispc_clk_source(enum dss_clk_source clk_src);
-void dss_select_dsi_clk_source(enum dss_clk_source clk_src);
+void dss_select_dsi_clk_source(enum omap_channel channel,
+		enum dss_clk_source clk_src);
+void dss_select_lcd_clk_source(enum omap_channel channel,
+		enum dss_clk_source clk_src);
 enum dss_clk_source dss_get_dispc_clk_source(void);
-enum dss_clk_source dss_get_dsi_clk_source(void);
+enum dss_clk_source dss_get_dsi_clk_source(enum omap_channel channel);
+enum dss_clk_source dss_get_lcd_clk_source(enum omap_channel channel);
 
 void dss_set_venc_output(enum omap_dss_venc_type type);
 void dss_set_dac_pwrdn_bgz(bool enable);
@@ -260,42 +283,44 @@ static inline void sdi_exit(void)
 /* DSI */
 #ifdef CONFIG_OMAP2_DSS_DSI
 int dsi_init(struct platform_device *pdev);
-void dsi_exit(void);
+void dsi_exit(struct platform_device *pdev);
 
-void dsi_dump_clocks(struct seq_file *s);
-void dsi_dump_irqs(struct seq_file *s);
-void dsi_dump_regs(struct seq_file *s);
+void dsi_dump_clocks(enum omap_channel channel, struct seq_file *s);
+void dsi_dump_irqs(enum omap_channel channel, struct seq_file *s);
+void dsi_dump_regs(enum omap_channel channel, struct seq_file *s);
 
 void dsi_save_context(void);
 void dsi_restore_context(void);
 
 int dsi_init_display(struct omap_dss_device *display);
-void dsi_irq_handler(void);
-unsigned long dsi_get_dsi1_pll_rate(void);
-int dsi_pll_set_clock_div(struct dsi_clock_info *cinfo);
-int dsi_pll_calc_clock_div_pck(bool is_tft, unsigned long req_pck,
+irqreturn_t dsi_irq_handler(int irq, void *arg);
+unsigned long dsi_get_pll_dispc_rate(enum omap_channel channel);
+int dsi_pll_set_clock_div(enum omap_channel channel,
+		struct dsi_clock_info *cinfo);
+int dsi_pll_calc_clock_div_pck(enum omap_channel,
+		bool is_tft, unsigned long req_pck,
 		struct dsi_clock_info *cinfo,
 		struct dispc_clock_info *dispc_cinfo);
-int dsi_pll_init(struct omap_dss_device *dssdev, bool enable_hsclk,
+int dsi_pll_init(enum omap_channel, bool enable_hsclk,
 		bool enable_hsdiv);
-void dsi_pll_uninit(void);
+void dsi_pll_uninit(enum omap_channel channel);
 void dsi_get_overlay_fifo_thresholds(enum omap_plane plane,
 		u32 fifo_size, enum omap_burst_size *burst_size,
 		u32 *fifo_low, u32 *fifo_high);
-void dsi_wait_dsi1_pll_active(void);
-void dsi_wait_dsi2_pll_active(void);
+void dsi_wait_pll_dispc_active(enum omap_channel channel);
+void dsi_wait_pll_dsi_active(enum omap_channel channel);
 #else
 static inline int dsi_init(struct platform_device *pdev)
 {
 	return 0;
 }
-static inline void dsi_exit(void)
+static inline void dsi_exit(struct platform_device *pdev)
 {
 }
-static inline void dsi_wait_dsi1_pll_active(void)
+static inline void dsi_wait_pll_dispc_active(enum omap_channel channel)
 {
 }
-static inline void dsi_wait_dsi2_pll_active(void)
+static inline void dsi_wait_pll_dsi_active(enum omap_channel channel)
 {
 }
 #endif
@@ -316,13 +341,13 @@ static inline void dpi_exit(void)
 #endif
 
 /* DISPC */
-int dispc_init(void);
+int dispc_init(struct platform_device *pdev);
 void dispc_exit(void);
 void dispc_dump_clocks(struct seq_file *s);
 void dispc_dump_irqs(struct seq_file *s);
 void dispc_dump_regs(struct seq_file *s);
 void dispc_irq_handler(void);
-void dispc_fake_vsync_irq(void);
+void dispc_fake_irq(int irqstatus);
 
 void dispc_save_context(void);
 void dispc_restore_context(void);
@@ -342,6 +367,9 @@ void dispc_setup_plane_fifo(enum omap_plane plane, u32 low, u32 high);
 void dispc_enable_fifomerge(bool enable);
 void dispc_set_burst_size(enum omap_plane plane,
 		enum omap_burst_size burst_size);
+void dispc_set_zorder(enum omap_plane plane,
+			enum omap_overlay_zorder zorder);
+void dispc_enable_zorder(enum omap_plane plane, bool enable);
 
 void dispc_set_plane_ba0(enum omap_plane plane, u32 paddr);
 void dispc_set_plane_ba1(enum omap_plane plane, u32 paddr);

@@ -29,11 +29,10 @@
 #include <linux/interrupt.h>
 #include <linux/seq_file.h>
 #include <linux/clk.h>
+#include <linux/pm_runtime.h>
 
 #include <plat/display.h>
 #include "dss.h"
-
-#define DSS_BASE			0x48050000
 
 #define DSS_SZ_REGS			SZ_512
 
@@ -68,10 +67,17 @@ static struct {
 	struct dss_clock_info cache_dss_cinfo;
 	struct dispc_clock_info cache_dispc_cinfo;
 
-	enum dss_clk_source dsi_clk_source;
+	enum dss_clk_source dsi1_clk_source;
+	enum dss_clk_source dsi2_clk_source;
 	enum dss_clk_source dispc_clk_source;
+	enum dss_clk_source lcd1_clk_source;
+	enum dss_clk_source lcd2_clk_source;
+
+	bool mainclk_state;
 
 	u32		ctx[DSS_SZ_REGS / sizeof(u32)];
+	struct omap_display_platform_data *pdata;
+	struct platform_device *pdev;
 } dss;
 
 static int _omap_dss_wait_reset(void);
@@ -121,6 +127,35 @@ void dss_restore_context(void)
 
 #undef SR
 #undef RR
+
+/*
+ * OMAP4 does not allow aggressive DSS clock cutting, so we must keep the
+ * clocks enabled during display use.  These next two methods on OMAP4
+ * enable and disable all DSS clocks (main and needed optional).
+ */
+static int dss_mainclk_enable(void)
+{
+	int ret = 0;
+
+	if (!dss.mainclk_state) {
+		if (cpu_is_omap44xx() || cpu_is_omap34xx())
+			ret = dss_opt_clock_enable();
+
+		if (ret)
+			dss_opt_clock_disable();
+#ifdef CONFIG_PM_RUNTIME
+		else
+			ret = pm_runtime_get_sync(&dss.pdev->dev);
+#endif
+
+		if (!ret)
+			dss.mainclk_state = true;
+	} else {
+		return -EBUSY;
+	}
+
+	return ret;
+}
 
 void dss_sdi_init(u8 datapairs)
 {
@@ -211,13 +246,15 @@ void dss_sdi_disable(void)
 
 void dss_dump_clocks(struct seq_file *s)
 {
-	unsigned long dpll4_ck_rate;
-	unsigned long dpll4_m4_ck_rate;
+	unsigned long dpll4_ck_rate = 0;
+	unsigned long dpll4_m4_ck_rate = 0;
 
 	dss_clk_enable(DSS_CLK_ICK | DSS_CLK_FCK1);
 
-	dpll4_ck_rate = clk_get_rate(clk_get_parent(dss.dpll4_m4_ck));
-	dpll4_m4_ck_rate = clk_get_rate(dss.dpll4_m4_ck);
+	if (cpu_is_omap34xx()) {
+		dpll4_ck_rate = clk_get_rate(clk_get_parent(dss.dpll4_m4_ck));
+		dpll4_m4_ck_rate = clk_get_rate(dss.dpll4_m4_ck);
+	}
 
 	seq_printf(s, "- DSS -\n");
 
@@ -246,48 +283,79 @@ void dss_dump_regs(struct seq_file *s)
 	DUMPREG(DSS_REVISION);
 	DUMPREG(DSS_SYSCONFIG);
 	DUMPREG(DSS_SYSSTATUS);
-	DUMPREG(DSS_IRQSTATUS);
+	if (!cpu_is_omap44xx())
+		DUMPREG(DSS_IRQSTATUS);
 	DUMPREG(DSS_CONTROL);
+#ifdef CONFIG_OMAP2_DSS_SDI
 	DUMPREG(DSS_SDI_CONTROL);
 	DUMPREG(DSS_PLL_CONTROL);
+#endif
 	DUMPREG(DSS_SDI_STATUS);
 
 	dss_clk_disable(DSS_CLK_ICK | DSS_CLK_FCK1);
 #undef DUMPREG
 }
 
-void dss_select_dispc_clk_source(enum dss_clk_source clk_src)
+void dss_select_dispc_clk_source(enum dss_clk_source src)
 {
-	int b;
+	if (cpu_is_omap44xx()) {
+		BUG_ON(src != DSS_SRC_DSS1_ALWON_FCLK &&
+			src != DSS_SRC_PLL1_CLK1 &&
+			src != DSS_SRC_PLL2_CLK1 &&
+			src != DSS_SRC_PLL3_CLK1);
+		REG_FLD_MOD(DSS_CONTROL, src, 9, 8);	/* FCK_CLK_SWITCH */
+	} else {
+		BUG_ON(src != DSS_SRC_DSI1_PLL_FCLK &&
+			src != DSS_SRC_DSS1_ALWON_FCLK);
+		REG_FLD_MOD(DSS_CONTROL, src, 0, 0);	/* DISPC_CLK_SWITCH */
+	}
 
-	BUG_ON(clk_src != DSS_SRC_DSI1_PLL_FCLK &&
-			clk_src != DSS_SRC_DSS1_ALWON_FCLK);
-
-	b = clk_src == DSS_SRC_DSS1_ALWON_FCLK ? 0 : 1;
-
-	if (clk_src == DSS_SRC_DSI1_PLL_FCLK)
-		dsi_wait_dsi1_pll_active();
-
-	REG_FLD_MOD(DSS_CONTROL, b, 0, 0);	/* DISPC_CLK_SWITCH */
-
-	dss.dispc_clk_source = clk_src;
+	dss.dispc_clk_source = src;
 }
 
-void dss_select_dsi_clk_source(enum dss_clk_source clk_src)
+void dss_select_dsi_clk_source(enum omap_channel channel,
+	enum dss_clk_source src)
 {
-	int b;
+	if (cpu_is_omap44xx()) {
+		BUG_ON(((src != DSS_SRC_PLL1_CLK2 &&
+			 channel == OMAP_DSS_CHANNEL_LCD) ||
+			(src != DSS_SRC_PLL2_CLK2 &&
+			 channel == OMAP_DSS_CHANNEL_LCD2)) &&
+			src != DSS_SRC_DSS1_ALWON_FCLK);
+	} else {
+		BUG_ON((src != DSS_SRC_DSI2_PLL_FCLK &&
+			src != DSS_SRC_DSS1_ALWON_FCLK) ||
+			channel != OMAP_DSS_CHANNEL_LCD);
+	}
 
-	BUG_ON(clk_src != DSS_SRC_DSI2_PLL_FCLK &&
-			clk_src != DSS_SRC_DSS1_ALWON_FCLK);
+	if (channel == OMAP_DSS_CHANNEL_LCD) {
+		REG_FLD_MOD(DSS_CONTROL, src, 1, 1);	/* DSI_CLK_SWITCH */
+		dss.dsi1_clk_source = src;
+	} else {
+		REG_FLD_MOD(DSS_CONTROL, src, 10, 10);	/* DSI2_CLK_SWITCH */
+		dss.dsi2_clk_source = src;
+	}
+}
 
-	b = clk_src == DSS_SRC_DSS1_ALWON_FCLK ? 0 : 1;
+void dss_select_lcd_clk_source(enum omap_channel channel,
+	enum dss_clk_source src)
+{
+	if (!cpu_is_omap44xx())
+		BUG();
 
-	if (clk_src == DSS_SRC_DSI2_PLL_FCLK)
-		dsi_wait_dsi2_pll_active();
+	BUG_ON(((src != DSS_SRC_PLL1_CLK1 &&
+		 channel == OMAP_DSS_CHANNEL_LCD) ||
+		(src != DSS_SRC_PLL2_CLK1 &&
+		 channel == OMAP_DSS_CHANNEL_LCD2)) &&
+		src != DSS_SRC_DSS1_ALWON_FCLK);
 
-	REG_FLD_MOD(DSS_CONTROL, b, 1, 1);	/* DSI_CLK_SWITCH */
-
-	dss.dsi_clk_source = clk_src;
+	if (channel == OMAP_DSS_CHANNEL_LCD) {
+		REG_FLD_MOD(DSS_CONTROL, src, 0, 0);	/* LCD1_CLK_SWITCH */
+		dss.lcd1_clk_source = src;
+	} else {
+		REG_FLD_MOD(DSS_CONTROL, src, 12, 12);	/* LCD2_CLK_SWITCH */
+		dss.lcd2_clk_source = src;
+	}
 }
 
 enum dss_clk_source dss_get_dispc_clk_source(void)
@@ -295,21 +363,33 @@ enum dss_clk_source dss_get_dispc_clk_source(void)
 	return dss.dispc_clk_source;
 }
 
-enum dss_clk_source dss_get_dsi_clk_source(void)
+enum dss_clk_source dss_get_dsi_clk_source(enum omap_channel channel)
 {
-	return dss.dsi_clk_source;
+	if (channel == OMAP_DSS_CHANNEL_LCD)
+		return dss.dsi1_clk_source;
+	else
+		return dss.dsi2_clk_source;
+}
+
+enum dss_clk_source dss_get_lcd_clk_source(enum omap_channel channel)
+{
+	if (channel == OMAP_DSS_CHANNEL_LCD)
+		return dss.lcd1_clk_source;
+	else
+		return dss.lcd2_clk_source;
 }
 
 /* calculate clock rates using dividers in cinfo */
 int dss_calc_clock_rates(struct dss_clock_info *cinfo)
 {
-	unsigned long prate;
+	unsigned long prate = 0;
 
 	if (cinfo->fck_div > (cpu_is_omap3630() ? 32 : 16) ||
 						cinfo->fck_div == 0)
 		return -EINVAL;
 
-	prate = clk_get_rate(clk_get_parent(dss.dpll4_m4_ck));
+	if (!cpu_is_omap44xx())
+		prate = clk_get_rate(clk_get_parent(dss.dpll4_m4_ck));
 
 	cinfo->fck = prate / cinfo->fck_div;
 
@@ -500,8 +580,8 @@ static irqreturn_t dss_irq_handler_omap3(int irq, void *arg)
 	if (irqstatus & (1<<0))	/* DISPC_IRQ */
 		dispc_irq_handler();
 #ifdef CONFIG_OMAP2_DSS_DSI
-	if (irqstatus & (1<<1))	/* DSI_IRQ */
-		dsi_irq_handler();
+	if (!cpu_is_omap44xx() && (irqstatus & (1<<1)))	/* DSI_IRQ */
+		dsi_irq_handler(0, NULL);
 #endif
 
 	return IRQ_HANDLED;
@@ -549,17 +629,33 @@ void dss_set_dac_pwrdn_bgz(bool enable)
 	REG_FLD_MOD(DSS_CONTROL, enable, 5, 5);	/* DAC Power-Down Control */
 }
 
-int dss_init(bool skip_init)
+int dss_init(struct platform_device *pdev)
 {
-	int r;
+	int r = 0, dss_irq;
 	u32 rev;
+	struct resource *dss_mem;
+	bool skip_init = false;
 
-	dss.base = ioremap(DSS_BASE, DSS_SZ_REGS);
+	dss.pdata = pdev->dev.platform_data;
+	dss.pdev = pdev;
+
+	dss_mem = platform_get_resource(pdev, IORESOURCE_MEM,
+		cpu_is_omap44xx() ? 1 : 0);
+
+	dss.base = ioremap(dss_mem->start, resource_size(dss_mem));
 	if (!dss.base) {
 		DSSERR("can't ioremap DSS\n");
 		r = -ENOMEM;
 		goto fail0;
 	}
+
+	dss_mainclk_enable();
+
+#ifdef CONFIG_FB_OMAP_BOOTLOADER_INIT
+	/* DISPC_CONTROL */
+	if (omap_readl(0x48050440) & 1)	/* LCD enabled? */
+		skip_init = true;
+#endif
 
 	if (!skip_init) {
 		/* disable LCD and DIGIT output. This seems to fix the synclost
@@ -575,7 +671,9 @@ int dss_init(bool skip_init)
 		 */
 		msleep(50);
 
-		_omap_dss_reset();
+		/* In OMAP44xx HWMOD would take care of resetting the module */
+		if (!cpu_is_omap44xx())
+			_omap_dss_reset();
 	}
 
 	/* autoidle */
@@ -585,16 +683,28 @@ int dss_init(bool skip_init)
 	REG_FLD_MOD(DSS_CONTROL, 0, 0, 0);
 
 #ifdef CONFIG_OMAP2_DSS_VENC
-	REG_FLD_MOD(DSS_CONTROL, 1, 4, 4);	/* venc dac demen */
-	REG_FLD_MOD(DSS_CONTROL, 1, 3, 3);	/* venc clock 4x enable */
-	REG_FLD_MOD(DSS_CONTROL, 0, 2, 2);	/* venc clock mode = normal */
+	if (!cpu_is_omap44xx()) {
+		/* venc dac demen */
+		REG_FLD_MOD(DSS_CONTROL, 1, 4, 4);
+		/* venc clock 4x enable */
+		REG_FLD_MOD(DSS_CONTROL, 1, 3, 3);
+		/* venc clock mode = normal */
+		REG_FLD_MOD(DSS_CONTROL, 0, 2, 2);
+	}
 #endif
 
-	r = request_irq(INT_24XX_DSS_IRQ,
-			cpu_is_omap24xx()
-			? dss_irq_handler_omap2
-			: dss_irq_handler_omap3,
-			0, "OMAP DSS", NULL);
+	if (!cpu_is_omap44xx())
+		r = request_irq(INT_24XX_DSS_IRQ,
+				cpu_is_omap24xx()
+				? dss_irq_handler_omap2
+				: dss_irq_handler_omap3,
+				0, "OMAP DSS", NULL);
+	else {
+		dss_irq = platform_get_irq(pdev, 0);
+		r = request_irq(dss_irq,
+				dss_irq_handler_omap2,
+				0, "OMAP DSS", NULL);
+	}
 
 	if (r < 0) {
 		DSSERR("omap2 dss: request_irq failed\n");
@@ -610,7 +720,10 @@ int dss_init(bool skip_init)
 		}
 	}
 
-	dss.dsi_clk_source = DSS_SRC_DSS1_ALWON_FCLK;
+	dss.dsi1_clk_source = DSS_SRC_DSS1_ALWON_FCLK;
+	dss.dsi2_clk_source = DSS_SRC_DSS1_ALWON_FCLK;
+	dss.lcd1_clk_source = DSS_SRC_DSS1_ALWON_FCLK;
+	dss.lcd2_clk_source = DSS_SRC_DSS1_ALWON_FCLK;
 	dss.dispc_clk_source = DSS_SRC_DSS1_ALWON_FCLK;
 
 	dss_save_context();
@@ -622,7 +735,8 @@ int dss_init(bool skip_init)
 	return 0;
 
 fail2:
-	free_irq(INT_24XX_DSS_IRQ, NULL);
+	if (!cpu_is_omap44xx())
+		free_irq(INT_24XX_DSS_IRQ, NULL);
 fail1:
 	iounmap(dss.base);
 fail0:
@@ -634,8 +748,8 @@ void dss_exit(void)
 	if (cpu_is_omap34xx())
 		clk_put(dss.dpll4_m4_ck);
 
-	free_irq(INT_24XX_DSS_IRQ, NULL);
-
+	if (!cpu_is_omap44xx())
+		free_irq(INT_24XX_DSS_IRQ, NULL);
 	iounmap(dss.base);
 }
 

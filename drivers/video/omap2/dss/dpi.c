@@ -48,22 +48,23 @@ static int dpi_set_dsi_clk(struct omap_dss_device *dssdev, bool is_tft,
 	struct dispc_clock_info dispc_cinfo;
 	int r;
 
-	r = dsi_pll_calc_clock_div_pck(is_tft, pck_req, &dsi_cinfo,
-			&dispc_cinfo);
+	r = dsi_pll_calc_clock_div_pck(dssdev->channel, is_tft,
+		pck_req, &dsi_cinfo, &dispc_cinfo);
 	if (r)
 		return r;
 
-	r = dsi_pll_set_clock_div(&dsi_cinfo);
+	r = dsi_pll_set_clock_div(dssdev->channel, &dsi_cinfo);
 	if (r)
 		return r;
 
+	dsi_wait_pll_dispc_active(dssdev->channel);
 	dss_select_dispc_clk_source(DSS_SRC_DSI1_PLL_FCLK);
 
 	r = dispc_set_clock_div(dssdev->manager->id, &dispc_cinfo);
 	if (r)
 		return r;
 
-	*fck = dsi_cinfo.dsi1_pll_fclk;
+	*fck = dsi_cinfo.dsi_pll_dispc_fclk;
 	*lck_div = dispc_cinfo.lck_div;
 	*pck_div = dispc_cinfo.pck_div;
 
@@ -181,7 +182,7 @@ int omapdss_dpi_display_enable(struct omap_dss_device *dssdev)
 
 #ifdef CONFIG_OMAP2_DSS_USE_DSI_PLL
 	dss_clk_enable(DSS_CLK_FCK2);
-	r = dsi_pll_init(dssdev, 0, 1);
+	r = dsi_pll_init(dssdev->channel, 0, 1);
 	if (r)
 		goto err3;
 #endif
@@ -197,7 +198,7 @@ int omapdss_dpi_display_enable(struct omap_dss_device *dssdev)
 
 err4:
 #ifdef CONFIG_OMAP2_DSS_USE_DSI_PLL
-	dsi_pll_uninit();
+	dsi_pll_uninit(dssdev->channel);
 err3:
 	dss_clk_disable(DSS_CLK_FCK2);
 #endif
@@ -218,7 +219,7 @@ void omapdss_dpi_display_disable(struct omap_dss_device *dssdev)
 
 #ifdef CONFIG_OMAP2_DSS_USE_DSI_PLL
 	dss_select_dispc_clk_source(DSS_SRC_DSS1_ALWON_FCLK);
-	dsi_pll_uninit();
+	dsi_pll_uninit(dssdev->channel);
 	dss_clk_disable(DSS_CLK_FCK2);
 #endif
 
@@ -264,14 +265,14 @@ int dpi_check_timings(struct omap_dss_device *dssdev,
 	{
 		struct dsi_clock_info dsi_cinfo;
 		struct dispc_clock_info dispc_cinfo;
-		r = dsi_pll_calc_clock_div_pck(is_tft,
+		r = dsi_pll_calc_clock_div_pck(dssdev->channel, is_tft,
 				timings->pixel_clock * 1000,
 				&dsi_cinfo, &dispc_cinfo);
 
 		if (r)
 			return r;
 
-		fck = dsi_cinfo.dsi1_pll_fclk;
+		fck = dsi_cinfo.dsi_pll_dispc_fclk;
 		lck_div = dispc_cinfo.lck_div;
 		pck_div = dispc_cinfo.pck_div;
 	}

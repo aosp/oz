@@ -299,6 +299,8 @@ config MACH_OMAP_4430SDP
 	bool "OMAP 4430 SDP board"
 	default y
 	depends on ARCH_OMAP4
+	select NEW_LEDS
+	select LEDS_CLASS
 	select OMAP_PACKAGE_CBL
 	select OMAP_PACKAGE_CBS
 
