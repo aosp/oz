@@ -1527,11 +1527,26 @@ static const struct dispc_hv_coef *get_scaling_coef(int orig_size, int out_size,
 		return two_m < 24 ? fir3_m8 : fir3_m16;
 }
 
+const struct dispc_hv_coef *_dispc_calculate_scaling(u16 orig_size,
+	u16 out_size, bool ilace, bool five_taps, int scale, int *fir_inc)
+{
+	/* be neat and clear FIR if not scaling */
+	if (!scale) {
+		*fir_inc = 0;
+		return fir5_zero;
+	}
+
+	*fir_inc = (1024 * orig_size) / out_size;
+	if (*fir_inc > 4095)
+		*fir_inc = 4095;
+	return get_scaling_coef(orig_size, out_size, 0, ilace, five_taps);
+}
+
 static void _dispc_set_scaling(enum omap_plane plane,
 		u16 orig_width, u16 orig_height,
 		u16 out_width, u16 out_height,
 		bool ilace, bool five_taps,
-		bool fieldmode)
+		bool fieldmode, int scale_x, int scale_y)
 {
 	int fir_hinc;
 	int fir_vinc;
@@ -1542,28 +1557,10 @@ static void _dispc_set_scaling(enum omap_plane plane,
 
 	BUG_ON(plane == OMAP_DSS_GFX);
 
-	if (orig_width && orig_width != out_width) {
-		fir_hinc = (1024 * orig_width) / out_width;
-		if (fir_hinc > 4095)
-			fir_hinc = 4095;
-		hfir = get_scaling_coef(orig_width, out_width, 0, 0, true);
-	} else {
-		fir_hinc = 1024;
-		hfir = fir3_m8;
-	}
-
-	if (orig_height && orig_height != out_height) {
-		fir_vinc = (1024 * orig_height) / out_height;
-		if (fir_vinc > 4095)
-			fir_vinc = 4095;
-		vfir = get_scaling_coef(orig_height, out_height, 0, ilace,
-					five_taps);
-	} else {
-		fir_vinc = 1024;
-		vfir = fir3_m8;
-		five_taps = false;
-	}
-
+	hfir = _dispc_calculate_scaling(orig_width, out_width, false,
+					true, scale_x, &fir_hinc);
+	vfir = _dispc_calculate_scaling(orig_height, out_height, ilace,
+					five_taps, scale_y, &fir_vinc);
 	_dispc_set_scale_coef(plane, hfir, vfir, five_taps);
 	_dispc_set_fir(plane, fir_hinc, fir_vinc);
 
@@ -1571,8 +1568,8 @@ static void _dispc_set_scaling(enum omap_plane plane,
 
 	/* RESIZEENABLE and VERTICALTAPS */
 	l &= ~((0x3 << 5) | (0x1 << 21));
-	l |= fir_hinc ? (1 << 5) : 0;
-	l |= fir_vinc ? (1 << 6) : 0;
+	l |= scale_x ? (1 << 5) : 0;
+	l |= scale_y ? (1 << 6) : 0;
 	l |= five_taps ? (1 << 21) : 0;
 
 	/* VRESIZECONF and HRESIZECONF */
@@ -2038,6 +2035,7 @@ static int _dispc_setup_plane(enum omap_plane plane,
 	s32 pix_inc;
 	u16 frame_height = height;
 	unsigned int field_offset = 0;
+	bool scale_x, scale_y;
 
 	if (paddr == 0)
 		return -EINVAL;
@@ -2187,19 +2185,24 @@ static int _dispc_setup_plane(enum omap_plane plane,
 	_dispc_set_plane_pos(plane, pos_x, pos_y);
 
 	_dispc_set_pic_size(plane, width, height);
-
-	if (plane != OMAP_DSS_GFX) {
-		_dispc_set_scaling(plane, width, height,
-				   out_width, out_height,
-				   ilace, five_taps, fieldmode);
-		_dispc_set_vid_size(plane, out_width, out_height);
-		_dispc_set_vid_color_conv(plane, cconv);
-	}
-
 	_dispc_set_rotation_attrs(plane, rotation, mirror, color_mode);
 
 	_dispc_set_pre_mult_alpha(plane, pre_mult_alpha);
 	_dispc_setup_global_alpha(plane, global_alpha);
+
+	/* rest of the setup is for VID pipelines */
+	if (plane == OMAP_DSS_GFX)
+		return 0;
+
+	/* scale only if we need to */
+	scale_x = width != out_width;
+	scale_y = height != out_height;
+
+	_dispc_set_scaling(plane, width, height,
+			   out_width, out_height,
+			   ilace, five_taps, fieldmode, scale_x, scale_y);
+	_dispc_set_vid_size(plane, out_width, out_height);
+	_dispc_set_vid_color_conv(plane, cconv);
 
 	return 0;
 }
