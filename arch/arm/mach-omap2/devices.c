@@ -1043,10 +1043,10 @@ void __init display_init(struct omap_dss_board_info *board_data)
 #if defined(CONFIG_VIDEO_OMAP2_VOUT) || \
 	defined(CONFIG_VIDEO_OMAP2_VOUT_MODULE)
 #if defined(CONFIG_FB_OMAP2) || defined(CONFIG_FB_OMAP2_MODULE)
-static struct resource omap_vout_resource[3 - CONFIG_FB_OMAP2_NUM_FBS] = {
+static struct resource omap_vout_resource[4 - CONFIG_FB_OMAP2_NUM_FBS] = {
 };
 #else
-static struct resource omap_vout_resource[2] = {
+static struct resource omap_vout_resource[3] = {
 };
 #endif
 

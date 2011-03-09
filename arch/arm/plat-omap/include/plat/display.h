@@ -605,4 +605,8 @@ int omap_rfbi_update(struct omap_dss_device *dssdev,
 		u16 x, u16 y, u16 w, u16 h,
 		void (*callback)(void *), void *data);
 
+/* dss features used by v4l2 */
+bool dss_feat_color_mode_supported(enum omap_plane plane,
+		enum omap_color_mode color_mode);
+
 #endif
