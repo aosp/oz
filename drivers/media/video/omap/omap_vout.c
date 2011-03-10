@@ -174,6 +174,10 @@ const static struct v4l2_fmtdesc omap_formats[] = {
 		.description = "UYVY, packed",
 		.pixelformat = V4L2_PIX_FMT_UYVY,
 	},
+	{
+		.description = "NV12 - YUV420 format",
+		.pixelformat = V4L2_PIX_FMT_NV12,
+	},
 };
 
 #define NUM_OUTPUT_FORMATS (ARRAY_SIZE(omap_formats))
@@ -194,6 +198,9 @@ static int video_mode_to_dss_mode(struct omap_vout_device *vout)
 	switch (pix->pixelformat) {
 	case 0:
 		mode = OMAP_DSS_COLOR_CLUT1;
+		break;
+	case V4L2_PIX_FMT_NV12:
+		mode = OMAP_DSS_COLOR_NV12;
 		break;
 	case V4L2_PIX_FMT_YUYV:
 		mode = OMAP_DSS_COLOR_YUV2;
@@ -344,13 +351,20 @@ static int omap_vout_try_format(struct v4l2_pix_format *pix)
 		pix->colorspace = V4L2_COLORSPACE_SRGB;
 		bpp = RGB32_BPP;
 		break;
+	case V4L2_PIX_FMT_NV12:
+		pix->colorspace = V4L2_COLORSPACE_JPEG;
+		bpp = 1;
+		break;
 	}
+	/* :NOTE: NV12 has width bytes per line in both Y and UV sections */
 	pix->bytesperline = pix->width * bpp;
 	if (cpu_is_omap44xx())
 		/* TILER buffers are page strided */
 		pix->bytesperline = PAGE_ALIGN(pix->bytesperline);
 	/* :TODO: add 2-pixel round restrictions to YUYV and NV12 formats */
 	pix->sizeimage = pix->bytesperline * pix->height;
+	if (V4L2_PIX_FMT_NV12 == pix->pixelformat)
+		pix->sizeimage += pix->sizeimage >> 1;
 
 	return bpp;
 }
@@ -542,7 +556,9 @@ static void omap_vout_tiler_buffer_free(struct omap_vout_device *vout,
 
 	for (i = startindex; i < startindex + count; i++) {
 		tiler_free(vout->tiler_blocks + i);
+		tiler_free(vout->uv_blocks + i);
 		vout->buf_phy_addr[i] = 0;
+		vout->buf_phy_uv_addr[i] = 0;
 	}
 }
 
@@ -583,6 +599,22 @@ static int omap_vout_tiler_buffer_setup(struct omap_vout_device *vout,
 		vout->tiler_blocks[i].height = vout->pix.height;
 		res = tiler_alloc(vout->tiler_blocks + i, fmt, 0, 0);
 
+		/* allocate uv block for NV12 format */
+		if (!res &&
+		    OMAP_DSS_COLOR_NV12 == video_mode_to_dss_mode(vout)) {
+			vout->uv_blocks[i].width =
+				vout->tiler_blocks[i].width >> 1;
+			vout->uv_blocks[i].height =
+				vout->tiler_blocks[i].height >> 1;
+			res = tiler_alloc(vout->uv_blocks + i, TILFMT_16BIT,
+				PAGE_SIZE,
+				vout->tiler_blocks[i].phys & ~PAGE_MASK);
+			if (res)
+				tiler_free(vout->tiler_blocks + i);
+			else
+				vout->buf_phy_uv_addr[i] =
+					vout->uv_blocks[i].phys;
+		}
 		if (res) {
 			n_alloc = i - start;
 			break;
@@ -605,8 +637,9 @@ static int omap_vout_tiler_buffer_setup(struct omap_vout_device *vout,
 
 	for (i = start; i < start + n_alloc; i++) {
 		v4l2_dbg(1, debug, &vout->vid_dev->v4l2_dev,
-				"y=%08lx\n",
-				vout->buf_phy_addr[i]);
+				"y=%08lx uv=%08lx\n",
+				vout->buf_phy_addr[i],
+				vout->buf_phy_uv_addr[i]);
 	}
 
 	*count = n_alloc;
@@ -667,6 +700,7 @@ static int omap_vout_calculate_offset(struct omap_vout_device *vout)
 	int *cropped_offset = &vout->cropped_offset;
 	int vr_ps = 1, ps = 2, temp_ps = 2;
 	int offset = 0, ctop = 0, cleft = 0, line_length = 0;
+	int *cropped_uv_offset = &vout->cropped_uv_offset;
 	struct tiler_view_t view;
 	u32 tsptr;
 
@@ -717,6 +751,14 @@ static int omap_vout_calculate_offset(struct omap_vout_device *vout)
 		tilview_crop(&view, crop->left, crop->top,
 						crop->width, crop->height);
 		*cropped_offset = view.tsptr - tsptr;
+
+		if (OMAP_DSS_COLOR_NV12 == vout->dss_mode) {
+			tilview_get(&view, vout->uv_blocks + vout->cur_frm->i);
+			tsptr = view.tsptr;
+			tilview_crop(&view, crop->left / 2, crop->top / 2,
+					crop->width / 2, crop->height / 2);
+			*cropped_uv_offset = view.tsptr - tsptr;
+		}
 		goto done;
 	}
 
@@ -790,7 +832,7 @@ static int omap_vout_calculate_offset(struct omap_vout_device *vout)
  */
 int omapvid_setup_overlay(struct omap_vout_device *vout,
 		struct omap_overlay *ovl, int posx, int posy, int outw,
-		int outh, u32 addr)
+		int outh, u32 addr, u32 uv_addr)
 {
 	int ret = 0;
 	struct omap_overlay_info info;
@@ -825,6 +867,8 @@ int omapvid_setup_overlay(struct omap_vout_device *vout,
 
 	ovl->get_overlay_info(ovl, &info);
 	info.paddr = addr;
+	if (OMAP_DSS_COLOR_NV12 == vout->dss_mode)
+		info.puv_addr = uv_addr;
 	info.vaddr = NULL;
 	info.width = cropwidth;
 	info.height = cropheight;
@@ -850,10 +894,11 @@ int omapvid_setup_overlay(struct omap_vout_device *vout,
 	}
 
 	v4l2_dbg(1, debug, &vout->vid_dev->v4l2_dev,
-		"%s enable=%d addr=%x width=%d\n height=%d color_mode=%d\n"
-		"rotation=%d mirror=%d posx=%d posy=%d out_width = %d \n"
+		"%s enable=%d addr=%x/%x width=%d\n height=%d color_mode=%d\n"
+		"rotation=%d mirror=%d posx=%d posy=%d out_width = %d\n"
 		"out_height=%d rotation_type=%d screen_width=%d\n",
-		__func__, info.enabled, info.paddr, info.width, info.height,
+		__func__, info.enabled, info.paddr, info.puv_addr,
+		info.width, info.height,
 		info.color_mode, info.rotation, info.mirror, info.pos_x,
 		info.pos_y, info.out_width, info.out_height, info.rotation_type,
 		info.screen_width);
@@ -872,7 +917,7 @@ setup_ovl_err:
 /*
  * Initialize the overlay structure
  */
-int omapvid_init(struct omap_vout_device *vout, u32 addr)
+int omapvid_init(struct omap_vout_device *vout, u32 addr, u32 uvaddr)
 {
 	int ret = 0, i;
 	struct v4l2_window *win;
@@ -923,7 +968,7 @@ int omapvid_init(struct omap_vout_device *vout, u32 addr)
 		}
 
 		ret = omapvid_setup_overlay(vout, ovl, posx, posy,
-				outw, outh, addr);
+				outw, outh, addr, uvaddr);
 		if (ret)
 			goto omapvid_init_err;
 	}
@@ -955,7 +1000,7 @@ int omapvid_apply_changes(struct omap_vout_device *vout)
 
 static int omapvid_process_frame(struct omap_vout_device *vout)
 {
-	u32 addr;
+	u32 addr, uv_addr;
 	int ret = 0;
 	struct omapvideo_info *ovid;
 	struct omap_overlay *ovl;
@@ -974,9 +1019,12 @@ static int omapvid_process_frame(struct omap_vout_device *vout)
 	addr = (unsigned long)
 			vout->queued_buf_addr[vout->next_frm->i] +
 			vout->cropped_offset;
+	uv_addr = (unsigned long)vout->queued_buf_uv_addr[
+			vout->next_frm->i]
+			+ vout->cropped_uv_offset;
 
 	/* First save the configuration in ovelray structure */
-	ret = omapvid_init(vout, addr);
+	ret = omapvid_init(vout, addr, uv_addr);
 	if (ret)
 		printk(KERN_ERR VOUT_NAME
 				"failed to set overlay info\n");
@@ -1119,6 +1167,9 @@ static int omap_vout_buffer_setup(struct videobuf_queue *q, unsigned int *count,
 		i = PAGE_ALIGN(vout->pix.width * vout->bpp);
 
 		*size = vout->buffer_size = vout->pix.height * i;
+		/* NV12 buffer is 50% larger than Y area */
+		if (OMAP_DSS_COLOR_NV12 == vout->dss_mode)
+			*size = vout->buffer_size += *size >> 1;
 
 		v4l2_dbg(1, debug, &vout->vid_dev->v4l2_dev,
 				"\nheight=%d, size = %d, vout->buffer_sz=%d\n",
@@ -1239,9 +1290,12 @@ static int omap_vout_buffer_prepare(struct videobuf_queue *q,
 	if (cpu_is_omap44xx()) {
 		/* use the TILER ssptr */
 		dmabuf = vout->buf_phy_addr[vb->i];
-		if (V4L2_MEMORY_MMAP == vb->memory)
+		if (V4L2_MEMORY_MMAP == vb->memory) {
 			vout->queued_buf_addr[vb->i] =
 					(u8 *) vout->buf_phy_addr[vb->i];
+			vout->queued_buf_uv_addr[vb->i] =
+					(u8 *) vout->buf_phy_uv_addr[vb->i];
+		}
 		return 0;
 	}
 
@@ -1425,21 +1479,27 @@ static int omap_vout_mmap(struct file *file, struct vm_area_struct *vma)
 			size -= PAGE_SIZE;
 		}
 	} else {
-		unsigned long offs, len, moffs, boffs, bsize;
 		struct tiler_block_t *blk = vout->tiler_blocks + i;
+		unsigned long moffs, boffs, offs, len, bsize;
 
 		/* get in-buffer position */
 		moffs = (vma->vm_pgoff << PAGE_SHIFT) -
 						(q->bufs[i]->boff & PAGE_MASK);
 
-		/* map block */
-		boffs = start = 0;
-		bsize = tiler_size(blk);
-		if (moffs < boffs + bsize && moffs + size > boffs) {
-			offs = max(moffs, boffs) - boffs;
-			len  = min(moffs + size, boffs + bsize) - boffs;
-			if (tiler_mmap_blk(blk, offs, len, vma, start))
-				return -EAGAIN;
+		/* map blocks */
+		for (boffs = start = 0; ; boffs += bsize) {
+			bsize = tiler_size(blk);
+			if (moffs < boffs + bsize && moffs + size > boffs) {
+				offs = max(moffs, boffs) - boffs;
+				len  = min(moffs + size, boffs + bsize) - boffs;
+				if (tiler_mmap_blk(blk, offs, len, vma, start))
+					return -EAGAIN;
+				start += len;
+			}
+			if (blk == vout->uv_blocks + i ||
+			    OMAP_DSS_COLOR_NV12 != vout->dss_mode)
+				break;
+			blk = vout->uv_blocks + i;
 		}
 
 		/* check if we mapped the whole buffer */
@@ -1668,6 +1728,8 @@ static int vidioc_s_fmt_vid_out(struct file *file, void *fh,
 
 	bpp = omap_vout_try_format(&f->fmt.pix);
 	f->fmt.pix.sizeimage = f->fmt.pix.width * f->fmt.pix.height * bpp;
+	if (V4L2_PIX_FMT_NV12 == f->fmt.pix.pixelformat)
+		f->fmt.pix.sizeimage += f->fmt.pix.sizeimage >> 1;
 
 	/* try & set the new output format */
 	vout->bpp = bpp;
@@ -1683,7 +1745,7 @@ static int vidioc_s_fmt_vid_out(struct file *file, void *fh,
 	omap_vout_new_format(&vout->pix, &vout->fbuf, &vout->crop, &vout->win);
 
 	/* Save the changes in the overlay strcuture */
-	ret = omapvid_init(vout, 0);
+	ret = omapvid_init(vout, 0, 0);
 	if (ret) {
 		v4l2_err(&vout->vid_dev->v4l2_dev, "failed to change mode\n");
 		goto s_fmt_vid_out_exit;
@@ -2133,6 +2195,7 @@ static int vidioc_streamon(struct file *file, void *fh, enum v4l2_buf_type i)
 {
 	int ret = 0, j;
 	u32 addr = 0, mask = 0;
+	u32 uv_addr = 0;
 	struct omap_vout_device *vout = fh;
 	struct videobuf_queue *q = &vout->vbq;
 	struct omapvideo_info *ovid = &vout->vid_info;
@@ -2174,6 +2237,8 @@ static int vidioc_streamon(struct file *file, void *fh, enum v4l2_buf_type i)
 	}
 	addr = (unsigned long) vout->queued_buf_addr[vout->cur_frm->i]
 		+ vout->cropped_offset;
+	uv_addr = (unsigned long) vout->queued_buf_uv_addr[vout->cur_frm->i]
+		+ vout->cropped_uv_offset;
 
 	mask = DISPC_IRQ_VSYNC | DISPC_IRQ_EVSYNC_EVEN |
 		DISPC_IRQ_EVSYNC_ODD | DISPC_IRQ_FRAMEDONE |
@@ -2189,6 +2254,7 @@ static int vidioc_streamon(struct file *file, void *fh, enum v4l2_buf_type i)
 			ovl->get_overlay_info(ovl, &info);
 			info.enabled = 1;
 			info.paddr = addr;
+			info.puv_addr = uv_addr;
 			if (ovl->set_overlay_info(ovl, &info)) {
 				ret = -EINVAL;
 				goto streamon_err1;
@@ -2197,7 +2263,7 @@ static int vidioc_streamon(struct file *file, void *fh, enum v4l2_buf_type i)
 	}
 
 	/* First save the configuration in ovelray structure */
-	ret = omapvid_init(vout, addr);
+	ret = omapvid_init(vout, addr, uv_addr);
 	if (ret)
 		v4l2_err(&vout->vid_dev->v4l2_dev,
 				"failed to set overlay info\n");
@@ -2637,7 +2703,7 @@ static int __init omap_vout_create_video_devices(struct platform_device *pdev)
 		video_set_drvdata(vfd, vout);
 
 		/* Configure the overlay structure */
-		ret = omapvid_init(vid_dev->vouts[k], 0);
+		ret = omapvid_init(vid_dev->vouts[k], 0, 0);
 		if (!ret)
 			goto success;
 

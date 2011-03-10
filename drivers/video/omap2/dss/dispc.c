@@ -191,6 +191,9 @@ struct dispc_reg { u16 idx; };
 
 /* OMAP4 introduced VID registers */
 /* n = 0 for VID1, n = 1 for VID2, n = 2 for VID3, n = 3 for WB */
+#define DISPC_VID_BA_UV0(n)		DISPC_REG(0x0600 + (n)*0x08)
+#define DISPC_VID_BA_UV1(n)		DISPC_REG(0x0604 + (n)*0x08)
+
 #define DISPC_VID_ATTRIBUTES2(n)	DISPC_REG(0x0624 + (n)*0x04)
 
 /*
@@ -396,6 +399,8 @@ void dispc_save_context(void)
 	SR(VID_PRELOAD(0));
 
 	if (dss_has_feature(FEAT_FMT_NV12)) {
+		SR(VID_BA_UV0(0));
+		SR(VID_BA_UV1(0));
 		SR(VID_FIR2(0));
 		SR(VID_ACCU2_0(0));
 		SR(VID_ACCU2_1(0));
@@ -478,6 +483,8 @@ void dispc_save_context(void)
 	SR(VID_PRELOAD(1));
 
 	if (dss_has_feature(FEAT_FMT_NV12)) {
+		SR(VID_BA_UV0(1));
+		SR(VID_BA_UV1(1));
 		SR(VID_FIR2(1));
 		SR(VID_ACCU2_0(1));
 		SR(VID_ACCU2_1(1));
@@ -561,6 +568,8 @@ void dispc_save_context(void)
 
 		SR(VID3_PRELOAD);
 		if (dss_has_feature(FEAT_FMT_NV12)) {
+			SR(VID_BA_UV0(2));
+			SR(VID_BA_UV1(2));
 			SR(VID3_WB_ACCU2_0(1));
 			SR(VID3_WB_ACCU2_1(1));
 			SR(VID3_WB_FIR2(1));
@@ -704,6 +713,8 @@ void dispc_restore_context(void)
 	RR(VID_PRELOAD(0));
 
 	if (dss_has_feature(FEAT_FMT_NV12)) {
+		RR(VID_BA_UV0(0));
+		RR(VID_BA_UV1(0));
 		RR(VID_ACCU2_0(0));
 		RR(VID_ACCU2_1(0));
 		RR(VID_FIR2(0));
@@ -786,6 +797,8 @@ void dispc_restore_context(void)
 	RR(VID_PRELOAD(1));
 
 	if (dss_has_feature(FEAT_FMT_NV12)) {
+		RR(VID_BA_UV0(1));
+		RR(VID_BA_UV1(1));
 		RR(VID_ACCU2_0(1));
 		RR(VID_ACCU2_1(1));
 		RR(VID_FIR2(1));
@@ -870,6 +883,8 @@ void dispc_restore_context(void)
 		RR(VID3_PRELOAD);
 
 		if (dss_has_feature(FEAT_FMT_NV12)) {
+			RR(VID_BA_UV0(2));
+			RR(VID_BA_UV1(2));
 			RR(VID3_WB_ACCU2_0(1));
 			RR(VID3_WB_ACCU2_1(1));
 			RR(VID3_WB_FIR2(1));
@@ -1199,6 +1214,34 @@ static void _dispc_set_plane_ba1(enum omap_plane plane, u32 paddr)
 
 	dispc_write_reg(ba1_reg[plane], paddr);
 }
+
+static void _dispc_set_plane_ba_uv0(enum omap_plane plane, u32 paddr)
+{
+	const struct dispc_reg ba_uv0_reg[] = { DISPC_VID_BA_UV0(0),
+				DISPC_VID_BA_UV0(1),
+				DISPC_VID_BA_UV0(2),
+	};
+
+	BUG_ON(plane == OMAP_DSS_GFX);
+
+	dispc_write_reg(ba_uv0_reg[plane - 1], paddr);
+	/* plane - 1 => no UV_BA for GFX*/
+
+}
+
+static void _dispc_set_plane_ba_uv1(enum omap_plane plane, u32 paddr)
+{
+	const struct dispc_reg ba_uv1_reg[] = { DISPC_VID_BA_UV1(0),
+				DISPC_VID_BA_UV1(1),
+				DISPC_VID_BA_UV1(2)
+	};
+
+	BUG_ON(plane == OMAP_DSS_GFX);
+
+	dispc_write_reg(ba_uv1_reg[plane - 1], paddr);
+	/* plane - 1 => no UV_BA for GFX*/
+}
+
 
 static void _dispc_set_plane_pos(enum omap_plane plane, int x, int y)
 {
@@ -2030,6 +2073,14 @@ static void _dispc_set_rotation_attrs(enum omap_plane plane, u8 rotation,
 	REG_FLD_MOD(dispc_reg_att[plane], vidrot, 13, 12);
 	if (dss_has_feature(FEAT_ROWREPEATENABLE))
 		REG_FLD_MOD(dispc_reg_att[plane], row_repeat ? 1 : 0, 18, 18);
+
+	if (color_mode == OMAP_DSS_COLOR_NV12) {
+		/* this will never happen for GFX */
+		bool doublestride = (rotation == OMAP_DSS_ROT_0 ||
+				     rotation == OMAP_DSS_ROT_180);
+		/* DOUBLESTRIDE */
+		REG_FLD_MOD(dispc_reg_att[plane], doublestride, 22, 22);
+	}
 }
 
 static int color_mode_to_bpp(enum omap_color_mode color_mode)
@@ -2042,6 +2093,7 @@ static int color_mode_to_bpp(enum omap_color_mode color_mode)
 	case OMAP_DSS_COLOR_CLUT4:
 		return 4;
 	case OMAP_DSS_COLOR_CLUT8:
+	case OMAP_DSS_COLOR_NV12:
 		return 8;
 	case OMAP_DSS_COLOR_RGB12U:
 	case OMAP_DSS_COLOR_RGB16:
@@ -2391,7 +2443,7 @@ void dispc_set_channel_out(enum omap_plane plane, enum omap_channel channel_out)
 }
 
 static int _dispc_setup_plane(enum omap_plane plane,
-		u32 paddr, u16 screen_width,
+		u32 paddr, u32 puv_addr, u16 screen_width,
 		u16 pos_x, u16 pos_y,
 		u16 width, u16 height,
 		u16 out_width, u16 out_height,
@@ -2536,6 +2588,14 @@ static int _dispc_setup_plane(enum omap_plane plane,
 					&offset1, ilace);
 
 		DSSDBG("w, h = %ld %ld\n", tiler_width, tiler_height);
+
+		if (puv_addr) {
+			tilview_create(&view, puv_addr, tiler_width / 2,
+						tiler_height / 2);
+			tilview_rotate(&view, rotation * 90);
+			tilview_flip(&view, mirror, false);
+			puv_addr = view.tsptr;
+		}
 	} else if (rotation_type == OMAP_DSS_ROT_DMA) {
 		calc_dma_rotation_offset(rotation, mirror,
 				screen_width, width, frame_height, color_mode,
@@ -2555,6 +2615,11 @@ static int _dispc_setup_plane(enum omap_plane plane,
 
 	_dispc_set_plane_ba0(plane, paddr + offset0);
 	_dispc_set_plane_ba1(plane, paddr + offset1);
+
+	if (OMAP_DSS_COLOR_NV12 == color_mode) {
+		_dispc_set_plane_ba_uv0(plane, puv_addr + offset0);
+		_dispc_set_plane_ba_uv1(plane, puv_addr + offset1);
+	}
 
 	_dispc_set_row_inc(plane, row_inc);
 	_dispc_set_pix_inc(plane, pix_inc);
@@ -2587,6 +2652,13 @@ static int _dispc_setup_plane(enum omap_plane plane,
 
 		/* account for chroma decimation */
 		switch (color_mode) {
+		case OMAP_DSS_COLOR_NV12: /* YUV420 */
+			/* UV is subsampled vertically & horizontally */
+			ch_height >>= 1;
+			ch_width >>= 1;
+			scale_uv = true;
+			break;
+
 		case OMAP_DSS_COLOR_YUV2:
 		case OMAP_DSS_COLOR_UYVY: /* YUV422 */
 			/* chroma is not subsampled if rotated by 90 or 270 */
@@ -4293,7 +4365,7 @@ int dispc_enable_plane(enum omap_plane plane, bool enable)
 }
 
 int dispc_setup_plane(enum omap_plane plane,
-		       u32 paddr, u16 screen_width,
+		       u32 paddr, u32 puv_addr, u16 screen_width,
 		       u16 pos_x, u16 pos_y,
 		       u16 width, u16 height,
 		       u16 out_width, u16 out_height,
@@ -4305,9 +4377,9 @@ int dispc_setup_plane(enum omap_plane plane,
 {
 	int r = 0;
 
-	DSSDBG("dispc_setup_plane %d, pa %x, sw %d, %d,%d, %dx%d -> "
+	DSSDBG("dispc_setup_plane %d, pa %x/%x, sw %d, %d,%d, %dx%d -> "
 	       "%dx%d, ilace %d, cmode %x, rot %d, mir %d chan %d\n",
-	       plane, paddr, screen_width, pos_x, pos_y,
+	       plane, paddr, puv_addr, screen_width, pos_x, pos_y,
 	       width, height,
 	       out_width, out_height,
 	       ilace, color_mode,
@@ -4316,7 +4388,7 @@ int dispc_setup_plane(enum omap_plane plane,
 	enable_clocks(1);
 
 	r = _dispc_setup_plane(plane,
-			   paddr, screen_width,
+			   paddr, puv_addr, screen_width,
 			   pos_x, pos_y,
 			   width, height,
 			   out_width, out_height,

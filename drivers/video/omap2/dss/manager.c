@@ -418,6 +418,7 @@ struct overlay_cache_data {
 
 	bool manual_update;
 	enum omap_overlay_zorder zorder;
+	u32 puv_addr; /* relevent for NV12 format only */
 };
 
 struct manager_cache_data {
@@ -772,6 +773,10 @@ static int configure_overlay(enum omap_plane plane)
 		}
 
 		switch (c->color_mode) {
+		case OMAP_DSS_COLOR_NV12:
+			bpp = 8;
+			break;
+
 		case OMAP_DSS_COLOR_RGB16:
 		case OMAP_DSS_COLOR_ARGB16:
 		case OMAP_DSS_COLOR_YUV2:
@@ -840,6 +845,7 @@ static int configure_overlay(enum omap_plane plane)
 
 	r = dispc_setup_plane(plane,
 			paddr,
+			c->puv_addr,
 			c->screen_width,
 			x, y,
 			w, h,
@@ -1267,6 +1273,7 @@ static int omap_dss_mgr_apply(struct omap_overlay_manager *mgr)
 		oc->dirty = true;
 
 		oc->paddr = ovl->info.paddr;
+		oc->puv_addr = ovl->info.puv_addr;
 		oc->vaddr = ovl->info.vaddr;
 		oc->screen_width = ovl->info.screen_width;
 		oc->width = ovl->info.width;

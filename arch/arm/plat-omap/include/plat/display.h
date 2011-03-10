@@ -314,6 +314,7 @@ struct omap_overlay_info {
 	u8 global_alpha;
 	u8 pre_mult_alpha;
 	enum omap_overlay_zorder zorder;
+	u32 puv_addr;	/* for NV12 format */
 };
 
 struct omap_overlay {
