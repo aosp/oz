@@ -24,6 +24,10 @@
  *
  ******************************************************************************/
 
+#ifndef AUTOCONF_INCLUDED
+#include <linux/config.h>
+#endif
+
 #include <linux/version.h>
 #include <linux/module.h>
 #include <linux/fb.h>
@@ -204,16 +208,6 @@ static void OMAPLFBFlipNoLock(OMAPLFB_SWAPCHAIN *psSwapChain,
 			manager->apply(manager);
 		}
 
-#if 1 // XXX 
-		/*
-		 * Ref: What things looked like prior to:
-		 * 654986845b4e67f28f8f0a660502cd46afa185ad
-		 */
-		if (driver && driver->get_update_mode(display) ==
-			OMAP_DSS_UPDATE_MANUAL)
-			driver->update(display, 0, 0, overlay_info.width,
-				overlay_info.height);
-#else // 1
 		if (dss_ovl_manually_updated(overlay)) {
 			if (driver->sched_update)
 				driver->sched_update(display, 0, 0,
@@ -225,7 +219,6 @@ static void OMAPLFBFlipNoLock(OMAPLFB_SWAPCHAIN *psSwapChain,
 							overlay_info.height);
 
 		}
-#endif
 
 	}
 }

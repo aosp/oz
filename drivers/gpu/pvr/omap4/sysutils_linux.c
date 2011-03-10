@@ -255,7 +255,7 @@ IMG_VOID DisableSGXClocks(SYS_DATA *psSysData)
 	PVR_DPF((PVR_DBG_MESSAGE, "DisableSGXClocks: Disabling SGX Clocks"));
 
 #if defined(LDM_PLATFORM) && !defined(SUPPORT_DRI_DRM)
-// XXX TL .38	pm_runtime_put_sync(&gpsPVRLDMDev->dev);
+	pm_runtime_put_sync(&gpsPVRLDMDev->dev);
 #endif
 
 #if defined(OMAP4_PRCM_ENABLE)
