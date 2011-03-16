@@ -48,10 +48,10 @@
 #include <plat/usb.h>
 #include <plat/display.h>
 #include <plat/nand.h>
+#include <plat/mmc.h>
 
 #include "mux.h"
 #include "sdram-micron-mt46h32m32lf-6.h"
-#include "hsmmc.h"
 
 #define PANDORA_WIFI_IRQ_GPIO		21
 #define PANDORA_WIFI_NRESET_GPIO	23

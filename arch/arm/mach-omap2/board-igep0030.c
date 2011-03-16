@@ -31,9 +31,9 @@
 #include <plat/gpmc.h>
 #include <plat/usb.h>
 #include <plat/onenand.h>
+#include <plat/mmc.h>
 
 #include "mux.h"
-#include "hsmmc.h"
 #include "sdram-numonyx-m65kxxxxam.h"
 
 #define IGEP3_GPIO_LED0_GREEN	54

@@ -907,7 +907,8 @@ static inline void omap2_mmc_mux(struct omap_mmc_platform_data *mmc_controller,
 }
 
 void __init omap2_init_mmc(struct omap_mmc_platform_data **mmc_data,
-			int nr_controllers)
+			int nr_controllers,
+			struct omap2_hsmmc_info *controllers)
 {
 	int i;
 	char *name;
@@ -916,12 +917,14 @@ void __init omap2_init_mmc(struct omap_mmc_platform_data **mmc_data,
 		unsigned long base, size;
 		unsigned int irq = 0;
 
-		if (!mmc_data[i])
+		controllers->mmc = controllers->mmc - 1;
+
+		if (!mmc_data[controllers->mmc])
 			continue;
 
-		omap2_mmc_mux(mmc_data[i], i);
+		omap2_mmc_mux(mmc_data[controllers->mmc], controllers->mmc);
 
-		switch (i) {
+		switch (controllers->mmc) {
 		case 0:
 			base = OMAP2_MMC1_BASE;
 			irq = INT_24XX_MMC_IRQ;
@@ -956,7 +959,7 @@ void __init omap2_init_mmc(struct omap_mmc_platform_data **mmc_data,
 			size = OMAP2420_MMC_SIZE;
 			name = "mmci-omap";
 		} else if (cpu_is_omap44xx()) {
-			if (i < 3)
+			if (controllers->mmc < 3)
 				irq += OMAP44XX_IRQ_GIC_START;
 			size = OMAP4_HSMMC_SIZE;
 			name = "mmci-omap-hs";
@@ -964,7 +967,9 @@ void __init omap2_init_mmc(struct omap_mmc_platform_data **mmc_data,
 			size = OMAP3_HSMMC_SIZE;
 			name = "mmci-omap-hs";
 		}
-		omap_mmc_add(name, i, base, size, irq, mmc_data[i]);
+		omap_mmc_add(name, controllers->mmc, base, size, irq,
+				mmc_data[controllers->mmc]);
+		controllers++;
 	};
 }
 

@@ -45,9 +45,9 @@
 #include <plat/gpmc.h>
 #include <plat/nand.h>
 #include <plat/usb.h>
+#include <plat/mmc.h>
 
 #include "mux.h"
-#include "hsmmc.h"
 #include "timer-gp.h"
 
 #define NAND_BLOCK_SIZE		SZ_128K

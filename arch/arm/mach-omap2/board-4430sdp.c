@@ -45,7 +45,6 @@
 #include <plat/nokia-dsi-panel.h>
 
 #include "mux.h"
-#include "hsmmc.h"
 #include "timer-gp.h"
 #include "control.h"
 

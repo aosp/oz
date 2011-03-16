@@ -27,9 +27,9 @@
 #include <plat/gpmc.h>
 #include <plat/common.h>
 #include <plat/onenand.h>
+#include <plat/mmc.h>
 
 #include "mux.h"
-#include "hsmmc.h"
 #include "sdram-nokia.h"
 
 static struct regulator_consumer_supply rm680_vemmc_consumers[] = {

@@ -48,12 +48,12 @@
 #include <plat/display.h>
 #include <plat/panel-generic-dpi.h>
 #include <plat/mcspi.h>
+#include <plat/mmc.h>
 
 #include <mach/hardware.h>
 
 #include "mux.h"
 #include "sdram-micron-mt46h32m32lf-6.h"
-#include "hsmmc.h"
 
 #define CM_T35_GPIO_PENDOWN	57
 

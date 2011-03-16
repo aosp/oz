@@ -31,6 +31,7 @@
 #include <plat/gpmc.h>
 #include <plat/onenand.h>
 #include <plat/gpmc-smc91x.h>
+#include <plat/mmc.h>
 
 #include <mach/board-rx51.h>
 
@@ -40,7 +41,6 @@
 #include <../drivers/staging/iio/light/tsl2563.h>
 
 #include "mux.h"
-#include "hsmmc.h"
 
 #define SYSTEM_REV_B_USES_VAUX3	0x1699
 #define SYSTEM_REV_S_USES_VAUX3 0x8

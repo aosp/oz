@@ -26,11 +26,11 @@
 
 #include <plat/common.h>
 #include <plat/usb.h>
+#include <plat/mmc.h>
 
 #include <mach/board-zoom.h>
 
 #include "mux.h"
-#include "hsmmc.h"
 
 #define OMAP_ZOOM_WLAN_PMENA_GPIO	(101)
 #define OMAP_ZOOM_WLAN_IRQ_GPIO		(162)

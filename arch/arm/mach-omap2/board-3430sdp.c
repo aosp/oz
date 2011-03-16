@@ -39,13 +39,13 @@
 #include <plat/gpmc.h>
 #include <plat/display.h>
 #include <plat/panel-generic-dpi.h>
+#include <plat/mmc.h>
 
 #include <plat/gpmc-smc91x.h>
 
 #include "board-flash.h"
 #include "mux.h"
 #include "sdram-qimonda-hyb18m512160af-6.h"
-#include "hsmmc.h"
 #include "pm.h"
 #include "control.h"
 

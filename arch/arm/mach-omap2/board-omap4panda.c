@@ -39,7 +39,6 @@
 #include <plat/mmc.h>
 #include "timer-gp.h"
 
-#include "hsmmc.h"
 #include "control.h"
 #include "mux.h"
 

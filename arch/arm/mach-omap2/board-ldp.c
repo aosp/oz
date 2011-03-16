@@ -43,10 +43,10 @@
 
 #include <asm/delay.h>
 #include <plat/usb.h>
+#include <plat/mmc.h>
 
 #include "board-flash.h"
 #include "mux.h"
-#include "hsmmc.h"
 #include "control.h"
 
 #define LDP_SMSC911X_CS		1

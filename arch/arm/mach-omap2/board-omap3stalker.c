@@ -41,6 +41,7 @@
 #include <plat/usb.h>
 #include <plat/display.h>
 #include <plat/panel-generic-dpi.h>
+#include <plat/mmc.h>
 
 #include <plat/mcspi.h>
 #include <linux/input/matrix_keypad.h>
@@ -52,7 +53,6 @@
 
 #include "sdram-micron-mt46h32m32lf-6.h"
 #include "mux.h"
-#include "hsmmc.h"
 #include "timer-gp.h"
 
 #if defined(CONFIG_SMSC911X) || defined(CONFIG_SMSC911X_MODULE)

@@ -17,7 +17,6 @@
 #include <plat/mmc.h>
 #include <plat/omap-pm.h>
 
-#include "hsmmc.h"
 #include "control.h"
 
 #if defined(CONFIG_MMC_OMAP_HS) || defined(CONFIG_MMC_OMAP_HS_MODULE)
@@ -358,7 +357,7 @@ void __init omap2_hsmmc_init(struct omap2_hsmmc_info *controllers)
 		hsmmc_data[c->mmc - 1] = mmc;
 	}
 
-	omap2_init_mmc(hsmmc_data, OMAP34XX_NR_MMC);
+	omap2_init_mmc(hsmmc_data, OMAP34XX_NR_MMC, controllers);
 
 	/* pass the device nodes back to board setup code */
 	for (c = controllers; c->mmc; c++) {

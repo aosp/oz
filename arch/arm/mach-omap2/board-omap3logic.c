@@ -34,7 +34,6 @@
 #include <asm/mach/map.h>
 
 #include "mux.h"
-#include "hsmmc.h"
 #include "timer-gp.h"
 #include "control.h"
 
@@ -44,6 +43,7 @@
 #include <plat/gpmc-smsc911x.h>
 #include <plat/gpmc.h>
 #include <plat/sdrc.h>
+#include <plat/mmc.h>
 
 #define OMAP3LOGIC_SMSC911X_CS			1
 

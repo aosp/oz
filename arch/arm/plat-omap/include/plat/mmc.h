@@ -155,22 +155,49 @@ struct omap_mmc_platform_data {
 extern void omap_mmc_notify_cover_event(struct device *dev, int slot,
 					int is_closed);
 
+struct mmc_card;
+
+struct omap2_hsmmc_info {
+	u8	mmc;		/* controller 1/2/3 */
+	u32	caps;		/* 4/8 wires and any additional host
+				 * capabilities OR'd (ref. linux/mmc/host.h) */
+	bool	transceiver;	/* MMC-2 option */
+	bool	ext_clock;	/* use external pin for input clock */
+	bool	cover_only;	/* No card detect - just cover switch */
+	bool	nonremovable;	/* Nonremovable e.g. eMMC */
+	bool	power_saving;	/* Try to sleep or power off when possible */
+	bool	no_off;		/* power_saving and power is not to go off */
+	bool	vcc_aux_disable_is_sleep; /* Regulator off remapped to sleep */
+	int	gpio_cd;	/* or -EINVAL */
+	int	gpio_wp;	/* or -EINVAL */
+	char	*name;		/* or NULL for default */
+	struct device *dev;	/* returned: pointer to mmc adapter */
+	int	ocr_mask;	/* temporary HACK */
+	/* Remux (pad configuration) when powering on/off */
+	void (*remux)(struct device *dev, int slot, int power_on);
+	/* init some special card */
+	void (*init_card)(struct mmc_card *card);
+};
+
 #if	defined(CONFIG_MMC_OMAP) || defined(CONFIG_MMC_OMAP_MODULE) || \
 	defined(CONFIG_MMC_OMAP_HS) || defined(CONFIG_MMC_OMAP_HS_MODULE)
 void omap1_init_mmc(struct omap_mmc_platform_data **mmc_data,
 				int nr_controllers);
 void omap2_init_mmc(struct omap_mmc_platform_data **mmc_data,
-				int nr_controllers);
+				int nr_controllers,
+				struct omap2_hsmmc_info *controllers);
 int omap_mmc_add(const char *name, int id, unsigned long base,
 				unsigned long size, unsigned int irq,
 				struct omap_mmc_platform_data *data);
+void omap2_hsmmc_init(struct omap2_hsmmc_info *);
 #else
 static inline void omap1_init_mmc(struct omap_mmc_platform_data **mmc_data,
 				int nr_controllers)
 {
 }
 static inline void omap2_init_mmc(struct omap_mmc_platform_data **mmc_data,
-				int nr_controllers)
+				int nr_controllers,
+				struct omap2_hsmmc_info *controllers)
 {
 }
 static inline int omap_mmc_add(const char *name, int id, unsigned long base,
@@ -178,6 +205,9 @@ static inline int omap_mmc_add(const char *name, int id, unsigned long base,
 				struct omap_mmc_platform_data *data)
 {
 	return 0;
+}
+static inline void omap2_hsmmc_init(struct omap2_hsmmc_info *info)
+{
 }
 
 #endif

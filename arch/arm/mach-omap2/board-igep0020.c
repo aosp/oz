@@ -34,9 +34,9 @@
 #include <plat/display.h>
 #include <plat/panel-generic-dpi.h>
 #include <plat/onenand.h>
+#include <plat/mmc.h>
 
 #include "mux.h"
-#include "hsmmc.h"
 #include "sdram-numonyx-m65kxxxxam.h"
 
 #define IGEP2_SMSC911X_CS       5
