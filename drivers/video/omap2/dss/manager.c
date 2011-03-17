@@ -29,6 +29,7 @@
 #include <linux/spinlock.h>
 #include <linux/jiffies.h>
 
+#include <plat/board.h>
 #include <plat/display.h>
 #include <plat/cpu.h>
 
@@ -539,7 +540,9 @@ static int dss_mgr_wait_for_vsync(struct omap_overlay_manager *mgr)
 	else if ((mgr->device->type == OMAP_DISPLAY_TYPE_DPI)
 			&& (mgr->device->channel == OMAP_DSS_CHANNEL_LCD2))
 			irq = DISPC_IRQ_VSYNC2;
-        irq = DISPC_IRQ_VSYNC;
+	if (omap4_board_rev() == OMAP4_BLAZETABLET_BOARD) {
+		irq = DISPC_IRQ_VSYNC;
+	}
 	return omap_dispc_wait_for_irq_interruptible_timeout(irq, timeout);
 }
 
@@ -566,16 +569,28 @@ static int dss_mgr_wait_for_go(struct omap_overlay_manager *mgr)
 			if (mode != OMAP_DSS_UPDATE_AUTO)
 				return 0;
 
-			/* Hardcode VSYNC in case it is LCD1 */
-			irq = (channel == OMAP_DSS_CHANNEL_LCD) ?
-				//DISPC_IRQ_FRAMEDONE
-				DISPC_IRQ_VSYNC
-				: DISPC_IRQ_FRAMEDONE2;
+			if (omap4_board_rev() == OMAP4_BLAZETABLET_BOARD) {
+				/* Hardcode VSYNC in case it is LCD1 */
+				irq = (channel == OMAP_DSS_CHANNEL_LCD) ?
+					DISPC_IRQ_VSYNC
+					: DISPC_IRQ_FRAMEDONE2;
+			}
+			else {
+				irq = (channel == OMAP_DSS_CHANNEL_LCD) ?
+					DISPC_IRQ_FRAMEDONE
+					: DISPC_IRQ_FRAMEDONE2;
+			}
 		} else {
-			irq = (channel == OMAP_DSS_CHANNEL_LCD) ?
-					//DISPC_IRQ_FRAMEDONE
-				DISPC_IRQ_VSYNC
-				: DISPC_IRQ_VSYNC2;
+			if (omap4_board_rev() == OMAP4_BLAZETABLET_BOARD) {
+				irq = (channel == OMAP_DSS_CHANNEL_LCD) ?
+					DISPC_IRQ_VSYNC
+					: DISPC_IRQ_VSYNC2;
+			}
+			else {
+				irq = (channel == OMAP_DSS_CHANNEL_LCD) ?
+					DISPC_IRQ_VSYNC
+					: DISPC_IRQ_VSYNC2;
+			}
 		}
 	}
 
@@ -649,11 +664,17 @@ int dss_mgr_wait_for_go_ovl(struct omap_overlay *ovl)
 			if (mode != OMAP_DSS_UPDATE_AUTO)
 				return 0;
 
-            /* Hardcode VSYNC in case it is LCD1 */
-			irq = (channel == OMAP_DSS_CHANNEL_LCD) ?
-				//DISPC_IRQ_FRAMEDONE
-                                  DISPC_IRQ_VSYNC
-				: DISPC_IRQ_FRAMEDONE2;
+			if (omap4_board_rev() == OMAP4_BLAZETABLET_BOARD) {
+	            /* Hardcode VSYNC in case it is LCD1 */
+				irq = (channel == OMAP_DSS_CHANNEL_LCD) ?
+					DISPC_IRQ_VSYNC
+					: DISPC_IRQ_FRAMEDONE2;
+			}
+			else {
+				irq = (channel == OMAP_DSS_CHANNEL_LCD) ?
+					DISPC_IRQ_FRAMEDONE
+					: DISPC_IRQ_FRAMEDONE2;
+			}
 		} else {
 			irq = (channel == OMAP_DSS_CHANNEL_LCD) ?
 				DISPC_IRQ_VSYNC
@@ -1058,18 +1079,20 @@ static int configure_dispc(void)
 		if (!mgr_go[i])
 			continue;
 
-		/* We don't need GO with manual update display. LCD iface will
-		 * always be turned off after frame, and new settings will be
-		 * taken in to use at next update */
-         //if (!mc->manual_upd_display)
-         //dispc_go(i);
-
-		/* We need this to be called for manager changes to be applied
-		 * on hardware. Since in DSI Video Mode we don't
-		 * disable->re-enable lcd on each frame, we have this
-		 * REQUIREMENT. We still need to investigate further on this */
-
+		if (omap4_board_rev() == OMAP4_BLAZETABLET_BOARD) {
+			/* We need this to be called for manager changes to be applied
+			 * on hardware. Since in DSI Video Mode we don't
+			 * disable->re-enable lcd on each frame, we have this
+			 * REQUIREMENT. We still need to investigate further on this */
 			dispc_go(i);
+		}
+		else {
+			/* We don't need GO with manual update display. LCD iface will
+			 * always be turned off after frame, and new settings will be
+			 * taken in to use at next update */
+			if (!mc->manual_upd_display)
+				dispc_go(i);
+		}
 	}
 
 	if (busy)

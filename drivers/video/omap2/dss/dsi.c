@@ -790,9 +790,9 @@ static void dsi_vc_enable_bta_irq(enum omap_dsi_index ix,
 {
 	u32 l;
 
-    // we don't need bta... TODO: a best way to validate this
-        if(omap4_board_rev()==OMAP4_BLAZETABLET_BOARD)
-	return;
+	// we don't need bta... TODO: a best way to validate this
+	if(omap4_board_rev()==OMAP4_BLAZETABLET_BOARD)
+		return;
 
 	dsi_write_reg(ix, DSI_VC_IRQSTATUS(channel), DSI_VC_IRQ_BTA);
 
@@ -806,9 +806,9 @@ static void dsi_vc_disable_bta_irq(enum omap_dsi_index ix,
 {
 	u32 l;
 
-        // we don't need bta... TODO: a best way to validate this
-        if(omap4_board_rev()==OMAP4_BLAZETABLET_BOARD)
-            return;
+	// we don't need bta... TODO: a best way to validate this
+	if(omap4_board_rev()==OMAP4_BLAZETABLET_BOARD)
+		return;
 
 	l = dsi_read_reg(ix, DSI_VC_IRQENABLE(channel));
 	l &= ~DSI_VC_IRQ_BTA;
@@ -1696,12 +1696,12 @@ static void dsi_complexio_config(struct omap_dss_device *dssdev)
 	int clk_lane   = dssdev->phy.dsi.clk_lane;
 	int data1_lane = dssdev->phy.dsi.data1_lane;
 	int data2_lane = dssdev->phy.dsi.data2_lane;
-        int data3_lane = dssdev->phy.dsi.data3_lane;
-        int data4_lane = dssdev->phy.dsi.data4_lane;
+	int data3_lane = dssdev->phy.dsi.data3_lane;
+	int data4_lane = dssdev->phy.dsi.data4_lane;
 	int clk_pol    = dssdev->phy.dsi.clk_pol;
 	int data1_pol  = dssdev->phy.dsi.data1_pol;
 	int data2_pol  = dssdev->phy.dsi.data2_pol;
-        int data3_pol  = dssdev->phy.dsi.data3_pol;
+	int data3_pol  = dssdev->phy.dsi.data3_pol;
 	int data4_pol  = dssdev->phy.dsi.data4_pol;
 
 	r = dsi_read_reg(ix, DSI_COMPLEXIO_CFG1);
@@ -1712,13 +1712,13 @@ static void dsi_complexio_config(struct omap_dss_device *dssdev)
 	r = FLD_MOD(r, data2_lane, 10, 8);
 	r = FLD_MOD(r, data2_pol, 11, 11);
 
-        if(omap4_board_rev()==OMAP4_BLAZETABLET_BOARD)
+	if(omap4_board_rev()==OMAP4_BLAZETABLET_BOARD)
 	{
 		r = FLD_MOD(r, data3_lane, 14, 12);
 		r = FLD_MOD(r, data3_pol, 15, 15);
 		r = FLD_MOD(r, data4_lane, 18, 16);
 		r = FLD_MOD(r, data4_pol, 19, 19);
-    }
+	}
 
 	dsi_write_reg(ix, DSI_COMPLEXIO_CFG1, r);
 
@@ -2272,9 +2272,9 @@ static int dsi_vc_send_bta(enum omap_dsi_index ix, int channel)
 {
 	struct dsi_struct *p_dsi = (ix == DSI1) ? &dsi1 : &dsi2;
 
-		// we don't need bta... TODO: a best way to validate this
-		if(omap4_board_rev()==OMAP4_BLAZETABLET_BOARD)
-			return 0;
+	// we don't need bta... TODO: a best way to validate this
+	if(omap4_board_rev()==OMAP4_BLAZETABLET_BOARD)
+		return 0;
 
 	if (p_dsi->debug_write || p_dsi->debug_read)
 		DSSDBG("dsi_vc_send_bta %d\n", channel);
@@ -2298,9 +2298,9 @@ int dsi_vc_send_bta_sync(enum omap_dsi_index ix, int channel)
 	u32 err;
 	struct dsi_struct *p_dsi = (ix == DSI1) ? &dsi1 : &dsi2;
 
-		// we don't need bta... TODO: a best way to validate this
-		if(omap4_board_rev()==OMAP4_BLAZETABLET_BOARD)
-			return 0;
+	// we don't need bta... TODO: a best way to validate this
+	if(omap4_board_rev()==OMAP4_BLAZETABLET_BOARD)
+		return 0;
 
 	INIT_COMPLETION(p_dsi->bta_completion);
 
@@ -3220,10 +3220,10 @@ static void dsi_update_screen_dispc(struct omap_dss_device *dssdev,
 }
 
 static void dsi_videomode_update_screen_dispc(struct omap_dss_device *dssdev,
-               u16 x, u16 y, u16 w, u16 h)
+	u16 x, u16 y, u16 w, u16 h)
 {
 	udelay(1000);
-    dss_start_update(dssdev);
+	dss_start_update(dssdev);
 }
 
 #ifdef DSI_CATCH_MISSING_TE
@@ -3549,7 +3549,7 @@ int omap_dsi_update(struct omap_dss_device *dssdev,
 			if(omap4_board_rev()==OMAP4_BLAZETABLET_BOARD)
 				dsi_videomode_update_screen_dispc(dssdev, x, y, w, h);
 			else
-			dsi_update_screen_dispc(dssdev, x, y, w, h);
+				dsi_update_screen_dispc(dssdev, x, y, w, h);
 		} else {
 			dsi_update_screen_l4(dssdev, x, y, w, h);
 			dsi_perf_show(ix, "L4");
@@ -3567,11 +3567,19 @@ static int dsi_display_init_dispc(struct omap_dss_device *dssdev)
 {
 	int r;
 
+	if (omap4_board_rev() == OMAP4_BLAZETABLET_BOARD) {
         //hardcoding this for DSI videomode as it waits for VSYNC instead of FRAMEDONE
-	r = omap_dispc_register_isr((dssdev->channel == OMAP_DSS_CHANNEL_LCD) ?
-		dsi_framedone_irq_callback : dsi2_framedone_irq_callback,
-		NULL, (dssdev->channel == OMAP_DSS_CHANNEL_LCD) ?
-		DISPC_IRQ_VSYNC : DISPC_IRQ_VSYNC);
+		r = omap_dispc_register_isr((dssdev->channel == OMAP_DSS_CHANNEL_LCD) ?
+			dsi_framedone_irq_callback : dsi2_framedone_irq_callback,
+			NULL, (dssdev->channel == OMAP_DSS_CHANNEL_LCD) ?
+			DISPC_IRQ_VSYNC : DISPC_IRQ_VSYNC);
+	}
+	else {
+		r = omap_dispc_register_isr((dssdev->channel == OMAP_DSS_CHANNEL_LCD) ?
+			dsi_framedone_irq_callback : dsi2_framedone_irq_callback,
+			NULL, (dssdev->channel == OMAP_DSS_CHANNEL_LCD) ?
+			DISPC_IRQ_FRAMEDONE : DISPC_IRQ_FRAMEDONE2);
+	}
 	if (r) {
 		DSSERR("can't get FRAMEDONE irq\n");
 		return r;
@@ -3598,18 +3606,31 @@ static int dsi_display_init_dispc(struct omap_dss_device *dssdev)
 			.y_res		= 480,
 		};
 
-        //just set the values on panel-d2l, no need to hardcode them here anymore.
-        dispc_set_lcd_timings(dssdev->channel, &dssdev->panel.timings);
+		if (omap4_board_rev() == OMAP4_BLAZETABLET_BOARD) {
+	        //just set the values on panel-d2l, no need to hardcode them here anymore.
+	        dispc_set_lcd_timings(dssdev->channel, &dssdev->panel.timings);
+		}
+		else {
+			dispc_set_lcd_timings(dssdev->channel, &timings);
+		}
 	}
 	return 0;
 }
 
 static void dsi_display_uninit_dispc(struct omap_dss_device *dssdev)
 {
-	omap_dispc_unregister_isr((dssdev->channel == OMAP_DSS_CHANNEL_LCD) ?
-		dsi_framedone_irq_callback : dsi2_framedone_irq_callback,
-		NULL, (dssdev->channel == OMAP_DSS_CHANNEL_LCD) ?
-		DISPC_IRQ_VSYNC : DISPC_IRQ_VSYNC);
+	if (omap4_board_rev() == OMAP4_BLAZETABLET_BOARD) {
+		omap_dispc_unregister_isr((dssdev->channel == OMAP_DSS_CHANNEL_LCD) ?
+			dsi_framedone_irq_callback : dsi2_framedone_irq_callback,
+			NULL, (dssdev->channel == OMAP_DSS_CHANNEL_LCD) ?
+			DISPC_IRQ_VSYNC : DISPC_IRQ_VSYNC);
+	}
+	else {
+		omap_dispc_unregister_isr((dssdev->channel == OMAP_DSS_CHANNEL_LCD) ?
+			dsi_framedone_irq_callback : dsi2_framedone_irq_callback,
+			NULL, (dssdev->channel == OMAP_DSS_CHANNEL_LCD) ?
+			DISPC_IRQ_FRAMEDONE : DISPC_IRQ_FRAMEDONE2);
+	}
 }
 
 static int dsi_configure_dsi_clocks(struct omap_dss_device *dssdev)
@@ -4231,8 +4252,6 @@ void dsi2_exit(void)
 
 	DSSDBG("omap_dsi2_exit\n");
 }
-
-
 
 //set extra register hardcoding values for now (according to kozio)
 void dsi_set_stop_mode(bool stop) {
