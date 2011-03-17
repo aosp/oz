@@ -1426,7 +1426,72 @@ static struct omap_hwmod omap44xx_dsp_hwmod = {
 	.masters_cnt	= ARRAY_SIZE(omap44xx_dsp_masters),
 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
 };
+/*
+ * 'kbd' class
+ * keyboard controller
+ */
 
+static struct omap_hwmod_class_sysconfig omap44xx_kbd_sysc = {
+	.rev_offs	= 0x0000,
+	.sysc_offs	= 0x0010,
+	.syss_offs	= 0x0014,
+	.sysc_flags	= (SYSC_HAS_AUTOIDLE | SYSC_HAS_CLOCKACTIVITY |
+			   SYSC_HAS_EMUFREE | SYSC_HAS_ENAWAKEUP |
+			   SYSC_HAS_SIDLEMODE | SYSC_HAS_SOFTRESET |
+			   SYSS_HAS_RESET_STATUS),
+	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
+	.sysc_fields	= &omap_hwmod_sysc_type1,
+};
+
+static struct omap_hwmod_class omap44xx_kbd_hwmod_class = {
+	.name = "kbd",
+	.sysc = &omap44xx_kbd_sysc,
+};
+
+/* kbd */
+static struct omap_hwmod omap44xx_kbd_hwmod;
+static struct omap_hwmod_irq_info omap44xx_kbd_irqs[] = {
+	{ .irq = 120 + OMAP44XX_IRQ_GIC_START },
+};
+
+static struct omap_hwmod_addr_space omap44xx_kbd_addrs[] = {
+	{
+		.pa_start	= 0x4a31c000,
+		.pa_end		= 0x4a31c07f,
+		.flags		= ADDR_TYPE_RT
+	},
+};
+
+/* l4_wkup -> kbd */
+static struct omap_hwmod_ocp_if omap44xx_l4_wkup__kbd = {
+	.master		= &omap44xx_l4_wkup_hwmod,
+	.slave		= &omap44xx_kbd_hwmod,
+	.clk		= "l4_wkup_clk_mux_ck",
+	.addr		= omap44xx_kbd_addrs,
+	.addr_cnt	= ARRAY_SIZE(omap44xx_kbd_addrs),
+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+};
+
+/* kbd slave ports */
+static struct omap_hwmod_ocp_if *omap44xx_kbd_slaves[] = {
+	&omap44xx_l4_wkup__kbd,
+};
+
+static struct omap_hwmod omap44xx_kbd_hwmod = {
+	.name		= "kbd",
+	.class		= &omap44xx_kbd_hwmod_class,
+	.mpu_irqs	= omap44xx_kbd_irqs,
+	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_kbd_irqs),
+	.main_clk	= "kbd_fck",
+	.prcm = {
+		.omap4 = {
+			.clkctrl_reg = OMAP4430_CM_WKUP_KEYBOARD_CLKCTRL,
+		},
+	},
+	.slaves		= omap44xx_kbd_slaves,
+	.slaves_cnt	= ARRAY_SIZE(omap44xx_kbd_slaves),
+	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
+};
 /*
  * 'mailbox' class
  * mailbox module allowing communication between the on-chip processors
@@ -3497,6 +3562,9 @@ static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
 	&omap44xx_iva_hwmod,
 	&omap44xx_iva_seq0_hwmod,
 	&omap44xx_iva_seq1_hwmod,
+
+	/* kbd class */
+	&omap44xx_kbd_hwmod,
 
 	/* mailbox class */
 	&omap44xx_mailbox_hwmod,
