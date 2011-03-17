@@ -242,7 +242,7 @@ static int __devinit omap4_keypad_probe(struct platform_device *pdev)
 	omap4_keypad_config(keypad_data);
 
 	error = request_irq(keypad_data->irq, omap4_keypad_interrupt,
-			     IRQF_TRIGGER_RISING,
+			     IRQF_TRIGGER_FALLING,
 			     "omap4-keypad", keypad_data);
 	if (error) {
 		dev_err(&pdev->dev, "failed to register interrupt\n");
@@ -295,7 +295,7 @@ static struct platform_driver omap4_keypad_driver = {
 	.probe		= omap4_keypad_probe,
 	.remove		= __devexit_p(omap4_keypad_remove),
 	.driver		= {
-		.name	= "omap4-keypad",
+		.name	= "omap-keypad",
 		.owner	= THIS_MODULE,
 	},
 };
