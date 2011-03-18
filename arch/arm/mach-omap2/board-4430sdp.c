@@ -26,6 +26,7 @@
 #include <linux/leds_pwm.h>
 #include <linux/leds-omap4430sdp-display.h>
 #include <linux/delay.h>
+#include <linux/input/sfh7741.h>
 
 #include <mach/hardware.h>
 #include <mach/omap4-common.h>
@@ -199,6 +200,86 @@ void keyboard_mux_init(void)
 				OMAP_INPUT_EN);
 }
 
+/* Proximity Sensor */
+static void omap_prox_activate(int state)
+{
+	gpio_set_value(OMAP4_SFH7741_ENABLE_GPIO , state);
+}
+
+static int omap_prox_read(void)
+{
+	int proximity;
+	proximity = gpio_get_value(OMAP4_SFH7741_SENSOR_OUTPUT_GPIO);
+#ifdef CONFIG_ANDROID
+	/* Invert the output from the prox sensor for Android as 0 should
+	be near and 1 should be far */
+	return !proximity;
+#else
+	return proximity;
+#endif
+}
+
+static void omap_sfh7741prox_init(void)
+{
+	int  error;
+	int  gpio_val;
+
+	error = gpio_request(OMAP4_SFH7741_SENSOR_OUTPUT_GPIO, "sfh7741");
+	if (error < 0) {
+		pr_err("%s: GPIO configuration failed: GPIO %d, error %d\n"
+			, __func__, OMAP4_SFH7741_SENSOR_OUTPUT_GPIO, error);
+		return ;
+	}
+
+	error = gpio_direction_input(OMAP4_SFH7741_SENSOR_OUTPUT_GPIO);
+	if (error < 0) {
+		pr_err("Proximity GPIO input configuration failed\n");
+		goto fail1;
+	}
+
+	error = gpio_request(OMAP4_SFH7741_ENABLE_GPIO, "sfh7741");
+	if (error < 0) {
+		pr_err("failed to request GPIO %d, error %d\n",
+			OMAP4_SFH7741_ENABLE_GPIO, error);
+		goto fail1;
+	}
+
+	error = gpio_direction_output(OMAP4_SFH7741_ENABLE_GPIO , 0);
+	if (error < 0) {
+		pr_err("%s: GPIO configuration failed: GPIO %d,	error %d\n",
+			__func__, OMAP4_SFH7741_ENABLE_GPIO, error);
+		goto fail3;
+	}
+
+	gpio_val = omap_mux_get_gpio(OMAP4_SFH7741_SENSOR_OUTPUT_GPIO);
+	if ((gpio_val & OMAP_WAKEUP_EN) == 0) {
+		gpio_val |= OMAP_WAKEUP_EN;
+		omap_mux_set_gpio(gpio_val, OMAP4_SFH7741_SENSOR_OUTPUT_GPIO);
+	}
+	return;
+
+fail3:
+	gpio_free(OMAP4_SFH7741_ENABLE_GPIO);
+fail1:
+	gpio_free(OMAP4_SFH7741_SENSOR_OUTPUT_GPIO);
+}
+
+static struct sfh7741_platform_data omap_sfh7741_data = {
+	.flags = SFH7741_WAKEABLE_INT,
+	.irq = OMAP_GPIO_IRQ(OMAP4_SFH7741_SENSOR_OUTPUT_GPIO),
+	.prox_enable = 0,
+	.activate_func = omap_prox_activate,
+	.read_prox = omap_prox_read,
+};
+
+static struct platform_device sdp4430_proximity_device = {
+	.name		= SFH7741_NAME,
+	.id		= 1,
+	.dev		= {
+		.platform_data = &omap_sfh7741_data,
+	},
+};
+
 static struct gpio_led sdp4430_gpio_leds[] = {
 	{
 		.name	= "omap4:green:debug0",
@@ -235,16 +316,6 @@ static struct gpio_led sdp4430_gpio_leds[] = {
 
 };
 
-static struct gpio_keys_button sdp4430_gpio_keys[] = {
-	{
-		.desc			= "Proximity Sensor",
-		.type			= EV_SW,
-		.code			= SW_FRONT_PROXIMITY,
-		.gpio			= OMAP4_SFH7741_SENSOR_OUTPUT_GPIO,
-		.active_low		= 0,
-	}
-};
-
 static struct gpio_led_platform_data sdp4430_led_data = {
 	.leds	= sdp4430_gpio_leds,
 	.num_leds	= ARRAY_SIZE(sdp4430_gpio_leds),
@@ -269,32 +340,6 @@ static struct platform_device sdp4430_leds_pwm = {
 	.id	= -1,
 	.dev	= {
 		.platform_data = &sdp4430_pwm_data,
-	},
-};
-
-static int omap_prox_activate(struct device *dev)
-{
-	gpio_set_value(OMAP4_SFH7741_ENABLE_GPIO , 1);
-	return 0;
-}
-
-static void omap_prox_deactivate(struct device *dev)
-{
-	gpio_set_value(OMAP4_SFH7741_ENABLE_GPIO , 0);
-}
-
-static struct gpio_keys_platform_data sdp4430_gpio_keys_data = {
-	.buttons	= sdp4430_gpio_keys,
-	.nbuttons	= ARRAY_SIZE(sdp4430_gpio_keys),
-	.enable		= omap_prox_activate,
-	.disable	= omap_prox_deactivate,
-};
-
-static struct platform_device sdp4430_gpio_keys_device = {
-	.name	= "gpio-keys",
-	.id	= -1,
-	.dev	= {
-		.platform_data	= &sdp4430_gpio_keys_data,
 	},
 };
 
@@ -513,7 +558,7 @@ static struct omap_dss_board_info sdp4430_dss_data = {
 
 static struct platform_device *sdp4430_devices[] __initdata = {
 	&sdp4430_disp_led,
-	&sdp4430_gpio_keys_device,
+	&sdp4430_proximity_device,
 	&sdp4430_leds_gpio,
 	&sdp4430_leds_pwm,
 };
@@ -881,7 +926,7 @@ static struct i2c_board_info __initdata sdp4430_i2c_3_boardinfo[] = {
 	{
 		I2C_BOARD_INFO("tm12xx_ts_secondary", 0x4b),
 		.platform_data = &tm12xx_platform_data[1],
-	},	
+	},
 	{
 		I2C_BOARD_INFO("tmp105", 0x48),
 	},
@@ -909,25 +954,6 @@ static int __init omap4_i2c_init(void)
 	omap_register_i2c_bus(4, 400, sdp4430_i2c_4_boardinfo,
 				ARRAY_SIZE(sdp4430_i2c_4_boardinfo));
 	return 0;
-}
-
-static void __init omap_sfh7741prox_init(void)
-{
-	int  error;
-
-	error = gpio_request(OMAP4_SFH7741_ENABLE_GPIO, "sfh7741");
-	if (error < 0) {
-		pr_err("%s:failed to request GPIO %d, error %d\n",
-			__func__, OMAP4_SFH7741_ENABLE_GPIO, error);
-		return;
-	}
-
-	error = gpio_direction_output(OMAP4_SFH7741_ENABLE_GPIO , 0);
-	if (error < 0) {
-		pr_err("%s: GPIO configuration failed: GPIO %d,error %d\n",
-			 __func__, OMAP4_SFH7741_ENABLE_GPIO, error);
-		gpio_free(OMAP4_SFH7741_ENABLE_GPIO);
-	}
 }
 
 #ifdef CONFIG_OMAP_MUX
