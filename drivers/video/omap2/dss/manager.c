@@ -523,8 +523,11 @@ static int omap_dss_unset_device(struct omap_overlay_manager *mgr)
 
 static int dss_mgr_wait_for_vsync(struct omap_overlay_manager *mgr)
 {
+	struct omap_dss_device *dssdev;
+
 	unsigned long timeout = msecs_to_jiffies(500);
 	u32 irq = 0;
+	dssdev = mgr->device;
 
 	/* If display is not active simply return */
 	if (mgr->device->state != OMAP_DSS_DISPLAY_ACTIVE)
@@ -534,21 +537,25 @@ static int dss_mgr_wait_for_vsync(struct omap_overlay_manager *mgr)
 		irq = DISPC_IRQ_EVSYNC_ODD;
 	else if (mgr->device->type == OMAP_DISPLAY_TYPE_HDMI)
 		irq = DISPC_IRQ_EVSYNC_EVEN;
-	else if ((mgr->device->type == OMAP_DISPLAY_TYPE_DSI)
-			&& (mgr->device->channel == OMAP_DSS_CHANNEL_LCD))
-		irq = DISPC_IRQ_FRAMEDONE;
-	else if ((mgr->device->type == OMAP_DISPLAY_TYPE_DSI)
-			&& (mgr->device->channel == OMAP_DSS_CHANNEL_LCD2))
-		irq = DISPC_IRQ_FRAMEDONE2;
-	else if ((mgr->device->type == OMAP_DISPLAY_TYPE_DPI)
+	else if ((mgr->device->type == OMAP_DISPLAY_TYPE_DSI) &&
+			(mgr->device->channel == OMAP_DSS_CHANNEL_LCD)) {
+		if (dssdev->phy.dsi.xfer_mode == OMAP_DSI_XFER_VIDEO_MODE)
+			irq = DISPC_IRQ_VSYNC;
+		else
+			irq = DISPC_IRQ_FRAMEDONE;
+	} else if ((mgr->device->type == OMAP_DISPLAY_TYPE_DSI) &&
+			(mgr->device->channel == OMAP_DSS_CHANNEL_LCD2)) {
+		if (dssdev->phy.dsi.xfer_mode == OMAP_DSI_XFER_VIDEO_MODE)
+			irq = DISPC_IRQ_VSYNC2;
+		else
+			irq = DISPC_IRQ_FRAMEDONE2;
+	} else if ((mgr->device->type == OMAP_DISPLAY_TYPE_DPI)
 			&& (mgr->device->channel == OMAP_DSS_CHANNEL_LCD))
 			irq = DISPC_IRQ_VSYNC;
 	else if ((mgr->device->type == OMAP_DISPLAY_TYPE_DPI)
 			&& (mgr->device->channel == OMAP_DSS_CHANNEL_LCD2))
 			irq = DISPC_IRQ_VSYNC2;
-	if (machine_is_omap_tabletblaze()) {
-		irq = DISPC_IRQ_VSYNC;
-	}
+
 	return omap_dispc_wait_for_irq_interruptible_timeout(irq, timeout);
 }
 
@@ -575,28 +582,13 @@ static int dss_mgr_wait_for_go(struct omap_overlay_manager *mgr)
 			if (mode != OMAP_DSS_UPDATE_AUTO)
 				return 0;
 
-			if (machine_is_omap_tabletblaze()) {
-				/* Hardcode VSYNC in case it is LCD1 */
-				irq = (channel == OMAP_DSS_CHANNEL_LCD) ?
-					DISPC_IRQ_VSYNC
-					: DISPC_IRQ_FRAMEDONE2;
-			}
-			else {
-				irq = (channel == OMAP_DSS_CHANNEL_LCD) ?
-					DISPC_IRQ_FRAMEDONE
-					: DISPC_IRQ_FRAMEDONE2;
-			}
+			irq = (channel == OMAP_DSS_CHANNEL_LCD) ?
+				DISPC_IRQ_FRAMEDONE
+				: DISPC_IRQ_FRAMEDONE2;
 		} else {
-			if (machine_is_omap_tabletblaze()) {
-				irq = (channel == OMAP_DSS_CHANNEL_LCD) ?
-					DISPC_IRQ_VSYNC
-					: DISPC_IRQ_VSYNC2;
-			}
-			else {
-				irq = (channel == OMAP_DSS_CHANNEL_LCD) ?
-					DISPC_IRQ_VSYNC
-					: DISPC_IRQ_VSYNC2;
-			}
+			irq = (channel == OMAP_DSS_CHANNEL_LCD) ?
+				DISPC_IRQ_VSYNC
+				: DISPC_IRQ_VSYNC2;
 		}
 	}
 
@@ -670,17 +662,9 @@ int dss_mgr_wait_for_go_ovl(struct omap_overlay *ovl)
 			if (mode != OMAP_DSS_UPDATE_AUTO)
 				return 0;
 
-			if (machine_is_omap_tabletblaze()) {
-	            /* Hardcode VSYNC in case it is LCD1 */
-				irq = (channel == OMAP_DSS_CHANNEL_LCD) ?
-					DISPC_IRQ_VSYNC
-					: DISPC_IRQ_FRAMEDONE2;
-			}
-			else {
-				irq = (channel == OMAP_DSS_CHANNEL_LCD) ?
-					DISPC_IRQ_FRAMEDONE
-					: DISPC_IRQ_FRAMEDONE2;
-			}
+			irq = (channel == OMAP_DSS_CHANNEL_LCD) ?
+				DISPC_IRQ_FRAMEDONE
+				: DISPC_IRQ_FRAMEDONE2;
 		} else {
 			irq = (channel == OMAP_DSS_CHANNEL_LCD) ?
 				DISPC_IRQ_VSYNC
@@ -1063,7 +1047,8 @@ static int configure_dispc(void)
 	}
 	if (cpu_is_omap44xx()) {
 		/* Enable WB plane and source plane */
-		DSSDBG("configure manager wb->shadow_dirty = %d", wb->shadow_dirty);
+		DSSDBG("configure manager wb->shadow_dirty = %d",
+				wb->shadow_dirty);
 		if (wb->shadow_dirty && wb->enabled) {
 			switch (wb->source) {
 			case OMAP_WB_OVERLAY0:
@@ -1100,16 +1085,17 @@ static int configure_dispc(void)
 			continue;
 
 		if (machine_is_omap_tabletblaze()) {
-			/* We need this to be called for manager changes to be applied
-			 * on hardware. Since in DSI Video Mode we don't
-			 * disable->re-enable lcd on each frame, we have this
-			 * REQUIREMENT. We still need to investigate further on this */
+			/* We need this to be called for manager changes
+			 * to be applied on hardware. Since in DSI Video Mode
+			 * we don't disable->re-enable lcd on each frame,
+			 * we have this REQUIREMENT. We still need to
+			 * investigate further on this */
 			dispc_go(i);
-		}
-		else {
-			/* We don't need GO with manual update display. LCD iface will
-			 * always be turned off after frame, and new settings will be
-			 * taken in to use at next update */
+		} else {
+			/* We don't need GO with manual update display.
+			 * LCD iface will always be turned off after frame,
+			 * and new settings will be taken in to use at next
+			 * update */
 			if (!mc->manual_upd_display)
 				dispc_go(i);
 		}
@@ -1586,7 +1572,8 @@ static int omap_dss_mgr_apply(struct omap_overlay_manager *mgr)
 	return r;
 }
 
-int omap_dss_wb_apply(struct omap_overlay_manager *mgr, struct omap_writeback *wb)
+int omap_dss_wb_apply(struct omap_overlay_manager *mgr,
+		struct omap_writeback *wb)
 {
 	struct overlay_cache_data *oc;
 	struct omap_overlay *ovl;
@@ -1701,7 +1688,8 @@ int omap_dss_wb_apply(struct omap_overlay_manager *mgr, struct omap_writeback *w
 		wbc->puv_addr = wb->info.puv_addr;
 
 		wbc->capturemode = wb->info.capturemode;
-		wbc->burst_size = OMAP_DSS_BURST_16x32;/* 8x128 - min. for OMAP4 */
+		/* 8x128 - min. for OMAP4 */
+		wbc->burst_size = OMAP_DSS_BURST_16x32;
 
 		/* TODO: Set fifo high, fifo low values ? */
 		wbc->fifo_high = 0x28A;
@@ -1742,7 +1730,6 @@ int omap_dss_wb_apply(struct omap_overlay_manager *mgr, struct omap_writeback *w
 
 	return 0;
 }
-
 EXPORT_SYMBOL(omap_dss_wb_apply);
 
 int omap_dss_wb_flush(void)
@@ -1957,7 +1944,6 @@ int omap_dss_get_num_overlay_managers(void)
 {
 	return num_managers;
 }
-
 EXPORT_SYMBOL(omap_dss_get_num_overlay_managers);
 
 struct omap_overlay_manager *omap_dss_get_overlay_manager(int num)

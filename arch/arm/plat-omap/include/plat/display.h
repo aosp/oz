@@ -55,6 +55,13 @@
 #define DISPC_IRQ_FRAMEDONE_DIG		(1 << 24)
 #define DISPC_IRQ_WB_BUF_OVERFLOW	(1 << 25)
 
+enum omap_dsi_data_type {
+	DSI_DT_PXLSTREAM_16BPP_PACKED = 0x0E,
+	DSI_DT_PXLSTREAM_18BPP_PACKED = 0x1E,
+	DSI_DT_PXLSTREAM_18BPP_LOOSE  = 0x2E,
+	DSI_DT_PXLSTREAM_24BPP_PACKED = 0x3E,
+};
+
 struct omap_dss_device;
 struct omap_overlay_manager;
 
@@ -68,12 +75,30 @@ enum omap_display_type {
 	OMAP_DISPLAY_TYPE_HDMI		= 1 << 5,
 };
 
+/**
+ * DSI mode
+ */
+enum omap_dsi_xfer_mode {
+	OMAP_DSI_XFER_CMD_MODE = 0,	/* default */
+	OMAP_DSI_XFER_VIDEO_MODE,
+};
+
+/**
+ * DSI virtual channels
+ */
+enum dsi_virtual_channels {
+	DSI_VC_0 = 0,
+	DSI_VC_1,
+	DSI_VC_2,
+	DSI_VC_3,
+};
+
 enum omap_plane {
 	OMAP_DSS_GFX	= 0,
 	OMAP_DSS_VIDEO1	= 1,
 	OMAP_DSS_VIDEO2	= 2,
 	OMAP_DSS_VIDEO3	= 3,
-	OMAP_DSS_WB 	= 4,
+	OMAP_DSS_WB		= 4,
 };
 
 enum omap_channel {
@@ -429,9 +454,9 @@ int dsi_vc_send_bta_sync(enum omap_dsi_index ix, int channel);
 int dsi_vc_send_long(enum omap_dsi_index ix, int channel,
 	u8 data_type, u8 *data, u16 len, u8 ecc);
 void dsi_set_stop_mode(bool stop);
-void dsi_videomode_panel_preinit(void);
-void dsi_videomode_panel_postinit(void);
-
+void dsi_videomode_panel_preinit(struct omap_dss_device *dssdev);
+void dsi_videomode_panel_postinit(struct omap_dss_device *dssdev);
+void d2l_config(void);
 
 /* Board specific data */
 #define PWM2ON			0x03
@@ -484,6 +509,56 @@ struct omap_video_timings {
 	u16 vfp;	/* Vertical front porch */
 	/* Unit: line clocks */
 	u16 vbp;	/* Vertical back porch */
+};
+
+/**
+ * struct omap_dsi_video_timings - timing values for DSI panels
+ * @hsa: Horizontal sync active - Unit: pixel clocks
+ * @hfp: Horizontal front porch - Unit: pixel clocks
+ * @hbp: Horizontal back porch - Unit: pixel clocks
+ * @vsa: Vertical synch active - Unit: line clocks
+ * @vfp: Vertical front porch - Unit: line clocks
+ * @vbp: Vertical back porch - Unit: line clocks
+ *
+ * Timing values for DSI panels in video mode.
+ */
+struct omap_dsi_video_timings {
+	u16 hsa;
+	u16 hfp;
+	u16 hbp;
+	u16 vsa;
+	u16 vfp;
+	u16 vbp;
+};
+
+/**
+ * struct omap_dsi_hs_mode_timing - timing values for the transition from
+ *				     low-power to high-speed mode
+ * @ths_prepare: Time to drive the data lane to LP-00 state, to prepare for HS
+ *  packet transmission
+ * @ths_prepare_ths_zero: Time to drive the data lane to HS-0 state before the
+ *  synchronous sequence
+ * @ths_trail: Time to drive flipped differential state after last payload data
+ *  bit of a HS transmission burst
+ * @ths_exit: Time to drive data lane to LP-11 state, after HS burst
+ * @tlpx_half: Half of the length of any LPS period
+ * @tclk_trail: Time to drive HS differential state after last payload clock bit
+ *  of a HS transmission burst
+ * @tclk_prepare: Time to drive the CLK lane to LP-00 state, to prepare for HS
+ *  clock transmission
+ * @tclk_zero: Time to drive the CLK lane to HS-0 state before starting clock
+ *
+ * Time in nsec
+ */
+struct omap_dsi_hs_mode_timing {
+	u32 ths_prepare;
+	u32 ths_prepare_ths_zero;
+	u32 ths_trail;
+	u32 ths_exit;
+	u32 tlpx_half;
+	u32 tclk_trail;
+	u32 tclk_prepare;
+	u32 tclk_zero;
 };
 
 /* Weight coef are set as value * 1000 (if coef = 1 it is set to 1000) */
@@ -718,6 +793,10 @@ struct omap_dss_device {
 				u16 lck_div;
 				u16 pck_div;
 			} div;
+
+			u8 xfer_mode; /* DSI command or video mode */
+			struct omap_dsi_video_timings vm_timing;
+			struct omap_dsi_hs_mode_timing hs_timing;
 		} dsi;
 
 		struct {
@@ -737,6 +816,7 @@ struct omap_dss_device {
 		struct s3d_disp_info s3d_info;
 		u32 width_in_mm;
 		u32 height_in_mm;
+		enum omap_dsi_data_type data_type;
 	} panel;
 
 	struct {
@@ -797,6 +877,7 @@ struct omap_dss_driver {
 
 	int (*set_update_mode)(struct omap_dss_device *dssdev,
 			enum omap_dss_update_mode);
+	void (*hs_mode_timing)(struct omap_dss_device *dssdev);
 	enum omap_dss_update_mode (*get_update_mode)(
 			struct omap_dss_device *dssdev);
 
@@ -860,11 +941,13 @@ struct omap_dss_driver {
 	/* 3D only panels should return true always */
 	bool (*get_s3d_enabled)(struct omap_dss_device *dssdev);
 	/* Only used for frame sequential displays*/
-	int (*set_s3d_view)(struct omap_dss_device *dssdev, enum s3d_disp_view view);
+	int (*set_s3d_view)(struct omap_dss_device *dssdev,
+					enum s3d_disp_view view);
 	/*Some displays may accept multiple 3D packing formats (like HDMI)
 	 *hence we add capability to choose the most optimal one given a source
 	 *Returns non-zero if the type was not supported*/
-	int (*set_s3d_disp_type)(struct omap_dss_device *dssdev, struct s3d_disp_info *info);
+	int (*set_s3d_disp_type)(struct omap_dss_device *dssdev,
+					struct s3d_disp_info *info);
 };
 
 struct pico_platform_data {

@@ -111,7 +111,8 @@ enum omap_burst_size {
 enum omap_parallel_interface_mode {
 	OMAP_DSS_PARALLELMODE_BYPASS,		/* MIPI DPI */
 	OMAP_DSS_PARALLELMODE_RFBI,		/* MIPI DBI */
-	OMAP_DSS_PARALLELMODE_DSI,
+	OMAP_DSS_DSI_VIDEO_MODE,
+	OMAP_DSS_DSI_COMMAND_MODE,
 };
 
 enum dss_clock {
@@ -365,6 +366,7 @@ int dsi_calc_clock_rates(enum omap_channel channel,
 		struct dsi_clock_info *cinfo);
 void dsi_wait_pll_dispc_active(enum omap_dsi_index ix);
 void dsi_wait_pll_dsi_active(enum omap_dsi_index ix);
+void dsi_config_video_mode(struct omap_dss_device *dssdev);
 #else
 static inline int dsi_init(struct platform_device *pdev)
 {

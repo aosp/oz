@@ -285,7 +285,8 @@ static void omap_sfh7741prox_init(void)
 	error = gpio_direction_output(OMAP4_SFH7741_ENABLE_GPIO , 0);
 	if (error < 0) {
 		pr_err("%s: GPIO configuration failed: GPIO %d,\
-			error %d\n",__func__, OMAP4_SFH7741_ENABLE_GPIO, error);
+			error %d\n", __func__, OMAP4_SFH7741_ENABLE_GPIO,
+			error);
 		goto fail3;
 	}
 	return;
@@ -611,6 +612,7 @@ static struct omap_dss_device sdp4430_lcd_device = {
 			.regm_dsi	= 4,
 			.lp_clk_div	= 8,
 		},
+		.xfer_mode = OMAP_DSI_XFER_CMD_MODE,
 	},
 	.panel			= {
 		.width_in_mm = 84,
@@ -640,6 +642,7 @@ static struct omap_dss_device sdp4430_lcd2_device = {
 			.regm_dsi	= 4,
 			.lp_clk_div	= 8,
 		},
+		.xfer_mode = OMAP_DSI_XFER_CMD_MODE,
 	},
 	.panel			= {
 		.width_in_mm = 84,

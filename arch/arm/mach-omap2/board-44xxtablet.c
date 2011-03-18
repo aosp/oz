@@ -520,6 +520,7 @@ static struct omap_dss_device blazetablet_lcd_device = {
 			.regm_dsi	= 9,	/* PLL_CLK2 (M5) */
 			.lp_clk_div	= 5,	/* LPDIV */
 		},
+		.xfer_mode = OMAP_DSI_XFER_VIDEO_MODE,
 	},
 	.panel			= {
 		.width_in_mm = 210,

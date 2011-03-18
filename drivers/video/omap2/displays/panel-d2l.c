@@ -136,6 +136,7 @@ struct panel_config {
 	int type;
 
 	struct omap_video_timings timings;
+	struct omap_dsi_video_timings dsi_video_timings;
 
 	struct {
 		unsigned int sleep_in;
@@ -171,6 +172,14 @@ static struct panel_config panel_configs[] = {
 		     .vfp = D2L_VFP,
 		     .vsw = D2L_VSW,
 		     .vbp = D2L_VBP,
+		     },
+	 .dsi_video_timings = {
+		     .hsa = 1,
+		     .hfp = 211,
+		     .hbp = 26,
+		     .vsa = 8,
+		     .vfp = 15,
+		     .vbp = 15,
 		     },
 	 },
 };
@@ -589,6 +598,8 @@ static int d2l_probe(struct omap_dss_device *dssdev)
 
 	dssdev->panel.config = OMAP_DSS_LCD_TFT;
 	dssdev->panel.timings = panel_config->timings;
+	dssdev->panel.data_type = DSI_DT_PXLSTREAM_24BPP_PACKED;
+	dssdev->phy.dsi.vm_timing = panel_config->dsi_video_timings;
 	dssdev->ctrl.pixel_size = 24;
 	dssdev->panel.acbi = 0;
 	dssdev->panel.acb = 40;
@@ -649,56 +660,22 @@ static int d2l_power_on(struct omap_dss_device *dssdev)
 
 		/* reset d2l bridge */
 		d2l_hw_reset(dssdev);
-
 		msleep(10);
 
+		ret = omapdss_dsi_display_enable(dssdev);
+		if (ret) {
+			dev_err(&dssdev->dev, "failed to enable DSI\n");
+			goto err;
+		}
+
 		/* do extra job to match kozio registers */
-		dsi_videomode_panel_preinit();
+		dsi_videomode_panel_preinit(dssdev);
 
-		/* Need to wait a certain time - Toshiba Bridge Constraint */
+		/* Toshiba Bridge Constraint */
 		msleep(100);
+		d2l_config();
 
-#ifdef DEB
-		d2l_dump_regs();
-#endif
-
-		/* configure D2L chip DSI-RX configuration registers */
-		/* SYSLPTX Timing Generation Counter */
-		d2l_write_register(PPI_LPTXTIMECNT, 0x00000004);
-		/* D*S_CLRSIPOCOUNT = [(THS-SETTLE + THS-ZERO) /
-		   HS_byte_clock_period ] */
-		d2l_write_register(PPI_D0S_CLRSIPOCOUNT, 0x00000003);
-		d2l_write_register(PPI_D1S_CLRSIPOCOUNT, 0x00000003);
-		d2l_write_register(PPI_D2S_CLRSIPOCOUNT, 0x00000003);
-		d2l_write_register(PPI_D3S_CLRSIPOCOUNT, 0x00000003);
-		/* SpeedLaneSel == HS4L */
-		d2l_write_register(DSI_LANEENABLE, 0x0000001F);
-		d2l_write_register(PPI_LANEENABLE, 0x0000001F);
-		d2l_write_register(PPI_STARTPPI, 0x00000001);
-		d2l_write_register(DSI_STARTDSI, 0x00000001);
-
-		/* configure D2L on-chip PLL. */
-		d2l_write_register(LVPHY1, 0x00000000);
-		/*set frequency range allowed and clock/data lanes. */
-		d2l_write_register(LVPHY0, 0x00044006);
-
-		/* configure D2L chip LCD Controller configuration registers */
-		d2l_write_register(VPCTRL, 0x00F00110);
-		d2l_write_register(HTIM1, 0x00200006);
-		d2l_write_register(HTIM2, 0x011A0400);
-		d2l_write_register(VTIM1, 0x000F0008);
-		d2l_write_register(VTIM2, 0x000F0300);
-		d2l_write_register(LVCFG, 0x00000001);
-
-		/* Issue a soft reset to LCD Controller for a clean start */
-		d2l_write_register(SYSRST, 0x00000004);
-		d2l_write_register(VFUEN, 0x00000001);
-
-#ifdef DEB
-		d2l_dump_regs();
-#endif
-
-		dsi_videomode_panel_postinit();
+		dsi_videomode_panel_postinit(dssdev);
 
 		d2d->enabled = 1;
 	}
@@ -706,6 +683,47 @@ static int d2l_power_on(struct omap_dss_device *dssdev)
 err:
 	return ret;
 }
+
+/**
+ * d2l_config - Configure D2L
+ *
+ * Initial configuration for D2L configuration registers, PLL...
+ */
+void d2l_config(void)
+{
+	/* configure D2L chip DSI-RX configuration registers */
+	/* SYSLPTX Timing Generation Counter */
+	d2l_write_register(PPI_LPTXTIMECNT, 0x00000004);
+	/* D*S_CLRSIPOCOUNT = (THS-SETTLE + THS-ZERO) / HS_byte_clock_period */
+	d2l_write_register(PPI_D0S_CLRSIPOCOUNT, 0x00000003);
+	d2l_write_register(PPI_D1S_CLRSIPOCOUNT, 0x00000003);
+	d2l_write_register(PPI_D2S_CLRSIPOCOUNT, 0x00000003);
+	d2l_write_register(PPI_D3S_CLRSIPOCOUNT, 0x00000003);
+	/* SpeedLaneSel == HS4L */
+	d2l_write_register(DSI_LANEENABLE, 0x0000001F);
+	/* SpeedLaneSel == HS4L */
+	d2l_write_register(PPI_LANEENABLE, 0x0000001F);
+	d2l_write_register(PPI_STARTPPI, 0x00000001); /* Changed to 1 */
+	d2l_write_register(DSI_STARTDSI, 0x00000001); /* Changed to 1 */
+
+	/* configure D2L on-chip PLL */
+	d2l_write_register(LVPHY1, 0x00000000);
+	/* set frequency range allowed and clock/data lanes */
+	d2l_write_register(LVPHY0, 0x00044006);
+
+	/* configure D2L chip LCD Controller configuration registers */
+	d2l_write_register(VPCTRL, 0x00F00110); /* vtgen on */
+	d2l_write_register(HTIM1, 0x00200006);
+	d2l_write_register(HTIM2, 0x011A0400);
+	d2l_write_register(VTIM1, 0x000F0008);
+	d2l_write_register(VTIM2, 0x000F0300);
+	d2l_write_register(LVCFG, 0x00000001);
+
+	/* Issue a soft reset to LCD Controller for a clean start */
+	d2l_write_register(SYSRST, 0x00000004);
+	d2l_write_register(VFUEN, 0x00000001);
+}
+EXPORT_SYMBOL(d2l_config);
 
 static void d2l_power_off(struct omap_dss_device *dssdev)
 {
@@ -868,6 +886,38 @@ static enum omap_dss_update_mode d2l_get_update_mode(struct omap_dss_device
 		return OMAP_DSS_UPDATE_MANUAL;
 }
 
+/**
+ * d2l_panel_get_hs_mode_timing - sets timing for panel
+ * @dssdev: Pointer to the dss device
+ *
+ * Timing values for the transition from low-power to high-speed mode.
+ */
+static void d2l_panel_get_hs_mode_timing(struct omap_dss_device *dssdev)
+{
+	/* The following time values are required for MIPI timing
+	* per OMAP spec */
+	dssdev->phy.dsi.hs_timing.ths_prepare = 70;
+	dssdev->phy.dsi.hs_timing.ths_prepare_ths_zero = 175;
+	dssdev->phy.dsi.hs_timing.ths_trail = 60;
+	dssdev->phy.dsi.hs_timing.ths_exit = 145;
+	dssdev->phy.dsi.hs_timing.tlpx_half = 25;
+	dssdev->phy.dsi.hs_timing.tclk_trail = 60;
+	dssdev->phy.dsi.hs_timing.tclk_prepare = 65;
+	dssdev->phy.dsi.hs_timing.tclk_zero = 260;
+
+	dev_dbg(&dssdev->dev, "Programmed values: ths_prepare=%u "
+		"ths_prepare_ths_zero=%u\n ths_trail=%u ths_exit=%u "
+		"tlpx_half=%u\n tclk_trail =%u tclk_prepare=%u tclk_zero=%u\n",
+		dssdev->phy.dsi.hs_timing.ths_prepare,
+		dssdev->phy.dsi.hs_timing.ths_prepare_ths_zero,
+		dssdev->phy.dsi.hs_timing.ths_trail,
+		dssdev->phy.dsi.hs_timing.ths_exit,
+		dssdev->phy.dsi.hs_timing.tlpx_half,
+		dssdev->phy.dsi.hs_timing.tclk_trail,
+		dssdev->phy.dsi.hs_timing.tclk_prepare,
+		dssdev->phy.dsi.hs_timing.tclk_zero);
+}
+
 #ifdef CONFIG_PM
 static int d2l_resume(struct omap_dss_device *dssdev)
 {
@@ -907,6 +957,8 @@ static struct omap_dss_driver d2l_driver = {
 
 	.set_update_mode = d2l_set_update_mode,
 	.get_update_mode = d2l_get_update_mode,
+
+	.hs_mode_timing = d2l_panel_get_hs_mode_timing,
 
 	.update = d2l_update,
 	.sync = d2l_sync,

@@ -337,6 +337,11 @@ static const struct omap_dss_color_conv color_conv[] = {
 	},
 };
 
+static enum omap_parallel_interface_mode omap_dss_channel_interface_mode[] = {
+	OMAP_DSS_DSI_COMMAND_MODE,
+	OMAP_DSS_DSI_COMMAND_MODE
+};
+
 static struct {
 	void __iomem    *base;
 
@@ -2863,12 +2868,12 @@ int dispc_scaling_decision(u16 width, u16 height,
 	int x, y;			/* decimation search variables */
 	unsigned long fclk_max = dispc_fclk_rate();
 
-        if (bpp < 16) {
-                *x_decim = 1;
-                *y_decim = 1;
-                *three_tap = 0;
-                return 0;
-        }
+	if (bpp < 16) {
+		*x_decim = 1;
+		*y_decim = 1;
+		*three_tap = 0;
+		return 0;
+	}
 
 	/* restrict search region based on whether we can decimate */
 	if (!can_decimate_x) {
@@ -3336,17 +3341,21 @@ static void dispc_enable_lcd_out(enum omap_channel channel, bool enable)
 	/* When we disable LCD output, we need to wait until frame is done.
 	 * Otherwise the DSS is still working, and turning off the clocks
 	 * prevents DSS from going to OFF mode */
+
 	if (OMAP_DSS_CHANNEL_LCD2 == channel) {
 		is_on = REG_GET(DISPC_CONTROL2, 0, 0);
-		irq = DISPC_IRQ_FRAMEDONE2;
+		if (omap_dss_channel_interface_mode[1] ==
+			OMAP_DSS_DSI_VIDEO_MODE)
+				irq = DISPC_IRQ_VSYNC2;
+		else
+				irq = DISPC_IRQ_FRAMEDONE2;
 	} else {
 		is_on = REG_GET(DISPC_CONTROL, 0, 0);
-		irq = DISPC_IRQ_FRAMEDONE;
-	}
-
-	if (machine_is_omap_tabletblaze()) {
-		/* another change */
-		irq = DISPC_IRQ_VSYNC;
+		if (omap_dss_channel_interface_mode[0] ==
+			OMAP_DSS_DSI_VIDEO_MODE)
+				irq = DISPC_IRQ_VSYNC;
+		else
+				irq = DISPC_IRQ_FRAMEDONE;
 	}
 
 	if (!enable && is_on) {
@@ -3360,12 +3369,7 @@ static void dispc_enable_lcd_out(enum omap_channel channel, bool enable)
 			DSSERR("failed to register FRAMEDONE isr\n");
 	}
 
-	if (machine_is_omap_tabletblaze()) {
-		if ((is_on && !enable) | (!is_on && enable))
-	    	_enable_lcd_out(channel, enable);
-	} else {
-		_enable_lcd_out(channel, enable);
-	}
+	_enable_lcd_out(channel, enable);
 
 	if (!enable && is_on) {
 		if (!wait_for_completion_timeout(&frame_done_completion,
@@ -3747,14 +3751,13 @@ void dispc_set_parallel_interface_mode(enum omap_channel channel,
 		gpout1 = 0;
 		break;
 
-	case OMAP_DSS_PARALLELMODE_DSI:
-		if (machine_is_omap_tabletblaze()) {
-			//seems like nobody thought about DSI videomode where stallmode needs to be off, so turning it off here.
-			stallmode = 0;
-		}
-		else {
-			stallmode = 1;
-		}
+	case OMAP_DSS_DSI_COMMAND_MODE:
+		stallmode = 1;
+		gpout1 = 1;
+		break;
+
+	case OMAP_DSS_DSI_VIDEO_MODE:
+		stallmode = 0;
 		gpout1 = 1;
 		break;
 
@@ -3762,6 +3765,10 @@ void dispc_set_parallel_interface_mode(enum omap_channel channel,
 		BUG();
 		return;
 	}
+	if (OMAP_DSS_CHANNEL_LCD == channel)
+		omap_dss_channel_interface_mode[0] = mode;
+	if (OMAP_DSS_CHANNEL_LCD2 == channel)
+		omap_dss_channel_interface_mode[1] = mode;
 
 	enable_clocks(1);
 
@@ -4790,10 +4797,11 @@ static void dispc_error_worker(struct work_struct *work)
 		DSSERR("SYNC_LOST_DIGIT\n");
 		DSSERR("SYNC_LOST_DIGIT, disabling TV\n");
 
-		/* WORKAROUND: Currently on OMAP4 if we get digital underflow we are
-		putting the panel size to be zero. This is causing V4L2 overlay to
-		fail. Temporarily disabling underflow handing till actual fix is found.
-		No side effects found on the functionality of HDMI module */
+		/* WORKAROUND: Currently on OMAP4 if we get digital underflow
+		we are putting the panel size to be zero. This is causing V4L2
+		overlay to fail. Temporarily disabling underflow handing till
+		actual fix is found. No side effects found on the functionality
+		of HDMI module */
 		if (!cpu_is_omap44xx())
 			omapdss_channel_reset(OMAP_DSS_CHANNEL_DIGIT);
 	}
@@ -5208,7 +5216,8 @@ int dispc_setup_wb(struct writeback_cache_data *wb)
 		u8 mirror = 0;
 		unsigned offset1 = 0;
 		enum device_n_buffer_type ilace = PBUF_PDEV;
-		u16 pic_height = 0; /* not required in case of progressive cases */
+		/* not required in case of progressive cases */
+		u16 pic_height = 0;
 		u8 mir_x = 0, mir_y = 0;
 		tiler_width = out_width, tiler_height = out_height;
 
