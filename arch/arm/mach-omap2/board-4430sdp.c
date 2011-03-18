@@ -27,6 +27,7 @@
 #include <linux/leds-omap4430sdp-display.h>
 #include <linux/delay.h>
 #include <linux/input/sfh7741.h>
+#include <linux/i2c/cma3000.h>
 
 #include <mach/hardware.h>
 #include <mach/omap4-common.h>
@@ -55,6 +56,7 @@
 #define OMAP4SDP_MDM_PWR_EN_GPIO	157
 #define OMAP4_SFH7741_SENSOR_OUTPUT_GPIO	184
 #define OMAP4_SFH7741_ENABLE_GPIO		188
+#define OMAP4_CMA3000ACCL_GPIO		186
 
 #define LED_SEC_DISP_GPIO 27
 #define DSI2_GPIO_59	59
@@ -279,6 +281,28 @@ static struct platform_device sdp4430_proximity_device = {
 		.platform_data = &omap_sfh7741_data,
 	},
 };
+
+static struct cma3000_platform_data cma3000_platform_data = {
+	.def_poll_rate = 200,
+	.fuzz_x = 25,
+	.fuzz_y = 25,
+	.fuzz_z = 25,
+	.g_range = CMARANGE_8G,
+	.mode = CMAMODE_MEAS400,
+	.mdthr = 0x8,
+	.mdfftmr = 0x33,
+	.ffthr = 0x8,
+	.irqflags = IRQF_TRIGGER_HIGH,
+};
+
+static void omap_cma3000accl_init(void)
+{
+	if (gpio_request(OMAP4_CMA3000ACCL_GPIO, "Accelerometer") < 0) {
+		pr_err("Accelerometer GPIO request failed\n");
+		return;
+	}
+	gpio_direction_input(OMAP4_CMA3000ACCL_GPIO);
+}
 
 static struct gpio_led sdp4430_gpio_leds[] = {
 	{
@@ -941,6 +965,10 @@ static struct i2c_board_info __initdata sdp4430_i2c_4_boardinfo[] = {
 	{
 		I2C_BOARD_INFO("hmc5843", 0x1e),
 	},
+	{
+		I2C_BOARD_INFO("cma3000_accl", 0x1c),
+		.platform_data = &cma3000_platform_data,
+	},
 };
 static int __init omap4_i2c_init(void)
 {
@@ -1010,6 +1038,7 @@ static void __init omap_4430sdp_init(void)
 	omap4_display_init();
 	omap_disp_led_init();
 	omap_sfh7741prox_init();
+	omap_cma3000accl_init();
 	platform_add_devices(sdp4430_devices, ARRAY_SIZE(sdp4430_devices));
 	omap_serial_init();
 	omap4_twl6030_hsmmc_init(mmc);
