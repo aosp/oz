@@ -651,8 +651,9 @@ int __init hsi_mpu_init(struct hsi_port *hsi_p, const char *irq_name)
 
 	dev_info(hsi_p->hsi_controller->dev, "Registering IRQ %s (%d)\n",
 						irq_name, hsi_p->irq);
-	err = request_irq(hsi_p->irq, hsi_mpu_handler, IRQF_NO_SUSPEND,
-			  irq_name, hsi_p);
+	err = request_irq(hsi_p->irq, hsi_mpu_handler,
+				IRQF_NO_SUSPEND | IRQF_TRIGGER_HIGH,
+				irq_name, hsi_p);
 	if (err < 0) {
 		dev_err(hsi_p->hsi_controller->dev, "FAILED to MPU request"
 			" IRQ (%d) on port %d", hsi_p->irq, hsi_p->port_number);

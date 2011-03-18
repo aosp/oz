@@ -624,7 +624,8 @@ int __init hsi_gdd_init(struct hsi_dev *hsi_ctrl, const char *irq_name)
 	dev_info(hsi_ctrl->dev, "Registering IRQ %s (%d)\n",
 					irq_name, hsi_ctrl->gdd_irq);
 
-	if (request_irq(hsi_ctrl->gdd_irq, hsi_gdd_mpu_handler, IRQF_DISABLED,
+	if (request_irq(hsi_ctrl->gdd_irq, hsi_gdd_mpu_handler,
+			IRQF_NO_SUSPEND | IRQF_TRIGGER_HIGH,
 			irq_name, hsi_ctrl) < 0) {
 		dev_err(hsi_ctrl->dev, "FAILED to request GDD IRQ %d\n",
 			hsi_ctrl->gdd_irq);
