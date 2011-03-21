@@ -55,7 +55,7 @@
 #include <linux/wakelock.h>
 #include <plat/opp_twl_tps.h>
 #include <plat/mmc.h>
-#include <plat/syntm12xx.h>
+#include <linux/i2c/atmel_mxt224.h>
 #include <plat/omap4-keypad.h>
 #include <plat/hwspinlock.h>
 #include <plat/nokia-dsi-panel.h>
@@ -275,6 +275,20 @@ static struct platform_device sdp4430_disp_led = {
 		.platform_data = &sdp4430_disp_led_data,
 	},
 };
+
+/* Atmel MXT224 TouchScreen Begin */
+static struct atmel_mxt224_platform_data atmel_mxt224_ts_platform_data[] = {
+	{
+		.x_line = 17,
+		.y_line = 13,
+		.x_size = 1023,
+		.y_size = 767,
+		.blen = 1,
+		.threshold = 30,
+		.orient = 4,
+	},
+};
+/* End Atmel Touch screen */
 
 static struct toshiba_dsi_panel_data blazetablet_dsi_panel = {
 	.name	= "d2l",
@@ -911,6 +925,11 @@ static struct i2c_board_info __initdata tablet_i2c_3_boardinfo[] = {
 };
 
 static struct i2c_board_info __initdata tablet_i2c_4_boardinfo[] = {
+	{
+		I2C_BOARD_INFO("atmel_mxt224", 0x4b),
+		.platform_data = &atmel_mxt224_ts_platform_data[0],
+		.irq = 35,
+	},
 	{
 		I2C_BOARD_INFO("bmp085", 0x77),
 	},
