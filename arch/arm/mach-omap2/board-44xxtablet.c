@@ -59,6 +59,7 @@
 #include <plat/omap4-keypad.h>
 #include <plat/hwspinlock.h>
 #include <plat/nokia-dsi-panel.h>
+#include <plat/toshiba-dsi-panel.h>
 #include "mux.h"
 #include "hsmmc.h"
 #include "smartreflex-class3.h"
@@ -275,22 +276,42 @@ static struct platform_device sdp4430_disp_led = {
 	},
 };
 
-static struct nokia_dsi_panel_data dsi_panel = {
-		.name	= "taal",
-		.reset_gpio	= 102,
-		.use_ext_te	= false,
-		.ext_te_gpio	= 101,
-		.use_esd_check	= false,
-		.set_backlight	= NULL,
+static struct toshiba_dsi_panel_data blazetablet_dsi_panel = {
+	.name	= "d2l",
+	.reset_gpio	= 102,
+	.use_ext_te	= false,
+	.ext_te_gpio	= 101,
+	.use_esd_check	= false,
+	.set_backlight	= NULL,
 };
 
-static struct nokia_dsi_panel_data dsi2_panel = {
-		.name   = "taal2",
-		.reset_gpio     = 104,
-		.use_ext_te     = false,
-		.ext_te_gpio    = 103,
-		.use_esd_check  = false,
-		.set_backlight  = NULL,
+static struct omap_dss_device blazetablet_lcd_device = {
+	.name			= "lcd",
+	.driver_name		= "d2l",
+	.type			= OMAP_DISPLAY_TYPE_DSI,
+	.data			= &blazetablet_dsi_panel,
+	.phy.dsi		= {
+		.clk_lane	= 1,
+		.clk_pol	= 0,
+		.data1_lane	= 2,
+		.data1_pol	= 0,
+		.data2_lane	= 3,
+		.data2_pol	= 0,
+		.data3_lane	= 4,
+		.data3_pol	= 0,
+		.data4_lane	= 5,
+		.data4_pol	= 0,
+		.div		= {
+			.lck_div	= 1,	/* LCD */
+			.pck_div	= 2,	/* PCD */
+			.regm		= 394,	/* DSI_PLL_REGM */
+			.regn		= 38,	/* DSI_PLL_REGN */
+			.regm_dispc	= 6,	/* PLL_CLK1 (M4) */
+			.regm_dsi	= 9,	/* PLL_CLK2 (M5) */
+			.lp_clk_div	= 5,	/* LPDIV */
+		},
+	},
+	.channel		= OMAP_DSS_CHANNEL_LCD,
 };
 
 #ifdef CONFIG_OMAP2_DSS_HDMI
@@ -379,6 +400,7 @@ static struct omap_dss_device sdp4430_picoDLP_device = {
 #endif /* CONFIG_PANEL_PICO_DLP */
 
 static struct omap_dss_device *blazetablet_dss_devices[] = {
+	&blazetablet_lcd_device,
 #ifdef CONFIG_PANEL_DISPLAYPORT
 	&sdp4430_displayport_device,
 #endif
@@ -393,6 +415,7 @@ static struct omap_dss_device *blazetablet_dss_devices[] = {
 static struct omap_dss_board_info blazetablet_dss_data = {
 	.num_devices	=	ARRAY_SIZE(blazetablet_dss_devices),
 	.devices	=	blazetablet_dss_devices,
+	.default_device =	&blazetablet_lcd_device,
 };
 
 static int plat_kim_suspend(struct platform_device *pdev, pm_message_t state)
@@ -873,6 +896,9 @@ static struct i2c_board_info __initdata tablet_i2c_2_boardinfo[] = {
 		I2C_BOARD_INFO("picoDLP_i2c_driver", 0x1b),
 		.platform_data = &picodlp_platform_data[0],
 	},
+	{
+		I2C_BOARD_INFO("d2l_i2c_driver", 0x0f),
+	},
 };
 
 static struct i2c_board_info __initdata tablet_i2c_3_boardinfo[] = {
@@ -979,12 +1005,10 @@ static void __init omap4_display_init(void)
 
 	iounmap(phymux_base);
 
-	/* Panel Taal reset and backlight GPIO init */
-	gpio_request(dsi_panel.reset_gpio, "dsi1_en_gpio");
-	gpio_direction_output(dsi_panel.reset_gpio, 0);
+	/* Panel D2L reset and backlight GPIO init */
+	gpio_request(blazetablet_dsi_panel.reset_gpio, "dsi1_en_gpio");
+	gpio_direction_output(blazetablet_dsi_panel.reset_gpio, 0);
 
-	gpio_request(dsi2_panel.reset_gpio, "dsi2_en_gpio");
-	gpio_direction_output(dsi2_panel.reset_gpio, 0);
 }
 
 
