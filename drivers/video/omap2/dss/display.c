@@ -647,3 +647,222 @@ void omap_dss_stop_device(struct omap_dss_device *dssdev)
 }
 EXPORT_SYMBOL(omap_dss_stop_device);
 
+int dss_hybrid_update(struct omap_dss_device *dssdev,
+					u16 x, u16 y, u16 w, u16 h)
+{
+	/* get hybrid update state */
+	struct dss_hybrid_updater *hu = &dssdev->hybrid_update;
+	unsigned long flags;
+	enum dss_hybrid_update_state state;
+	int i, num_planes, oldstate;
+
+	/* fallback to regular update */
+	if (!hu->thread) {
+		BUG_ON(dssdev->driver->update == dss_hybrid_update);
+		return dssdev->driver->update(dssdev, x, y, w, h);
+	}
+
+	spin_lock_irqsave(&hu->lock, flags);
+	state = hu->state;
+	oldstate = state;
+
+	/* count how many panels are enabled on this device */
+	for (i = num_planes = 0; i < omap_dss_get_num_overlays(); ++i) {
+		struct omap_overlay *ovl = omap_dss_get_overlay(i);
+
+		if ((ovl->caps & OMAP_DSS_OVL_CAP_DISPC) &&
+		    ovl->info.enabled && ovl->manager &&
+		    ovl->manager->device == dssdev)
+			num_planes++;
+	}
+
+	switch (state) {
+	case HYBRID_UPDATE_STATE_MANUAL:
+		if (num_planes > 1) {
+			/* multiple enabled planes initiate auto update */
+			state = HYBRID_UPDATE_STATE_IDLE;
+			hu->state = HYBRID_UPDATE_STATE_PREPARING;
+		}
+		break;
+
+	case HYBRID_UPDATE_STATE_IDLE:
+		if (num_planes == 1)
+			state = hu->state = HYBRID_UPDATE_STATE_MANUAL;
+		else
+			hu->state = HYBRID_UPDATE_STATE_PREPARING;
+		break;
+
+	case HYBRID_UPDATE_STATE_PREPARING:
+	case HYBRID_UPDATE_STATE_UPDATING:
+		/* expand update window */
+		hu->w = max(x + w, hu->x + hu->w) + max(x, hu->x) - x - hu->x;
+		hu->x = min(x, hu->x);
+
+		hu->h = max(y + h, hu->y + hu->h) + max(y, hu->y) - y - hu->y;
+		hu->y = min(y, hu->y);
+		break;
+
+	case HYBRID_UPDATE_STATE_DEFINED:
+		/*
+		 * If update is within the same window, we can still apply the
+		 * changes, but we can no longer update a larger region.
+		 */
+		if (x >= hu->x && x + w <= hu->x + hu->w &&
+		    y >= hu->y && y + h <= hu->y + hu->h) {
+			/* nothing to do */
+
+			/* manager apply is called already outside */
+		} else {
+			/* schedule another update */
+			state = HYBRID_UPDATE_STATE_IDLE;
+			hu->state = HYBRID_UPDATE_STATE_PREPARING;
+		}
+
+		break;
+
+	case HYBRID_UPDATE_STATE_PROGRAMMED:
+		/* schedule another update */
+		hu->state = HYBRID_UPDATE_STATE_PREPARING;
+		break;
+	}
+
+	if (state != HYBRID_UPDATE_STATE_PREPARING &&
+	    state != HYBRID_UPDATE_STATE_UPDATING) {
+		hu->x = x;
+		hu->y = y;
+		hu->w = w;
+		hu->h = h;
+	}
+
+	spin_unlock_irqrestore(&hu->lock, flags);
+
+	/* do manual update if not in interrupt context */
+	if (state == HYBRID_UPDATE_STATE_MANUAL && !in_irq())
+		return hu->update(dssdev, x, y, w, h);
+
+	/* unblock auto update */
+	if (state != HYBRID_UPDATE_STATE_PREPARING &&
+	    state != HYBRID_UPDATE_STATE_UPDATING &&
+	    state != HYBRID_UPDATE_STATE_DEFINED)
+		up(&hu->semaphore);
+	return 0;
+}
+EXPORT_SYMBOL(dss_hybrid_update);
+
+#include <linux/kthread.h>
+static int dss_hybrid_update_thread(void *arg)
+{
+	struct dss_hybrid_updater *hu = arg;
+	struct omap_dss_device *dssdev =
+		container_of(hu, struct omap_dss_device, hybrid_update);
+	u16 x, y, w, h;
+	unsigned long flags;
+	struct omap_dss_driver *dssdrv = dssdev->driver;
+	if (dssdrv == NULL)
+		dssdrv = (struct omap_dss_driver *) dssdev->dev.driver;
+
+	while (true) {
+		int i = down_timeout(&hu->semaphore, msecs_to_jiffies(10000));
+		if (kthread_should_stop() || !hu->thread)
+			break;
+		if (i)
+			continue;
+
+		spin_lock_irqsave(&hu->lock, flags);
+		x = hu->x;
+		y = hu->y;
+		w = hu->w;
+		h = hu->h;
+		hu->state = HYBRID_UPDATE_STATE_UPDATING;
+		spin_unlock_irqrestore(&hu->lock, flags);
+
+		hu->update(dssdev, x, y, w, h);
+
+		spin_lock_irqsave(&hu->lock, flags);
+		if (hu->state == HYBRID_UPDATE_STATE_UPDATING)
+			hu->state = HYBRID_UPDATE_STATE_IDLE;
+		spin_unlock_irqrestore(&hu->lock, flags);
+	}
+
+	dssdrv->update = hu->update;
+	hu->update = 0;
+
+	do_exit(0);
+	return 0;
+}
+
+int dss_hybrid_update_init(struct omap_dss_device *dssdev)
+{
+	struct omap_dss_driver *dssdrv = dssdev->driver;
+	struct dss_hybrid_updater *hu = &dssdev->hybrid_update;
+	if (hu->update)
+		return -EINVAL;
+	if (dssdrv == NULL)
+		dssdrv = (struct omap_dss_driver *) dssdev->dev.driver;
+
+	printk(KERN_ERR "in %s(%s)\n", __func__, dssdev->name);
+	sema_init(&hu->semaphore, 0);
+	spin_lock_init(&hu->lock);
+	hu->state = HYBRID_UPDATE_STATE_MANUAL;
+	hu->update = dssdrv->update;
+	dssdrv->update = dss_hybrid_update;
+	hu->thread = kthread_create(dss_hybrid_update_thread, hu,
+						"dss_hud_%s", dssdev->name);
+	if (!IS_ERR(hu->thread))
+		wake_up_process(hu->thread);
+	else
+		return -ENOMEM;
+	return 0;
+}
+EXPORT_SYMBOL(dss_hybrid_update_init);
+
+void dss_hybrid_update_exit(struct omap_dss_device *dssdev)
+{
+	if (!dssdev->hybrid_update.update)
+		return;
+	/* route back updates */
+	dssdev->hybrid_update.thread = 0;
+	up(&dssdev->hybrid_update.semaphore);
+}
+EXPORT_SYMBOL(dss_hybrid_update_exit);
+
+void dss_hybrid_update_defined(struct omap_dss_device *dssdev,
+					u16 *x, u16 *y, u16 *w, u16 *h)
+{
+	struct dss_hybrid_updater *hu = &dssdev->hybrid_update;
+	unsigned long flags;
+
+	if (!hu->update)
+		return;
+
+	spin_lock_irqsave(&hu->lock, flags);
+	/* only transition if we are still updating */
+	if (hu->state == HYBRID_UPDATE_STATE_UPDATING) {
+		/* use latest update region */
+		hu->state = HYBRID_UPDATE_STATE_DEFINED;
+		*x = hu->x;
+		*y = hu->y;
+		*w = hu->w;
+		*h = hu->h;
+	}
+	spin_unlock_irqrestore(&hu->lock, flags);
+}
+EXPORT_SYMBOL(dss_hybrid_update_defined);
+
+void dss_hybrid_update_programmed(struct omap_dss_device *dssdev)
+{
+	struct dss_hybrid_updater *hu = &dssdev->hybrid_update;
+	unsigned long flags;
+
+	if (!hu->update)
+		return;
+
+	spin_lock_irqsave(&hu->lock, flags);
+	/* only transition if we are still updating */
+	if (hu->state == HYBRID_UPDATE_STATE_UPDATING ||
+	    hu->state == HYBRID_UPDATE_STATE_DEFINED)
+		hu->state = HYBRID_UPDATE_STATE_PROGRAMMED;
+	spin_unlock_irqrestore(&hu->lock, flags);
+}
+EXPORT_SYMBOL(dss_hybrid_update_programmed);
+

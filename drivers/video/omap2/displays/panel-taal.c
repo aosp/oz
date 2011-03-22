@@ -738,6 +738,8 @@ static int taal_probe(struct omap_dss_device *dssdev)
 
 	dev_set_drvdata(&dssdev->dev, td);
 
+	dss_hybrid_update_init(dssdev);
+
 	taal_hw_reset(dssdev);
 
 	/* if no platform set_backlight() defined, presume DSI backlight
@@ -846,6 +848,8 @@ static void taal_remove(struct omap_dss_device *dssdev)
 
 	cancel_delayed_work(&td->esd_work);
 	destroy_workqueue(td->esd_wq);
+
+	dss_hybrid_update_exit(dssdev);
 
 	/* reset, to be sure that the panel is in a valid state */
 	taal_hw_reset(dssdev);

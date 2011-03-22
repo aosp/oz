@@ -1021,6 +1021,7 @@ int omapvid_apply_changes(struct omap_vout_device *vout)
 	int i;
 	struct omap_overlay *ovl;
 	struct omapvideo_info *ovid = &vout->vid_info;
+	struct omap_dss_device *display = ovid->overlays[0]->manager->device;
 
 	for (i = 0; i < ovid->num_overlays; i++) {
 		ovl = ovid->overlays[i];
@@ -1028,6 +1029,12 @@ int omapvid_apply_changes(struct omap_vout_device *vout)
 			return -EINVAL;
 		ovl->manager->apply(ovl->manager);
 	}
+
+	if (display->caps & OMAP_DSS_DISPLAY_CAP_MANUAL_UPDATE &&
+	    display->driver->get_update_mode(display) != OMAP_DSS_UPDATE_AUTO)
+		dss_hybrid_update(display, 0, 0,
+				  display->panel.timings.x_res,
+				  display->panel.timings.y_res);
 
 	return 0;
 }

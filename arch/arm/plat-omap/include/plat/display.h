@@ -23,6 +23,7 @@
 #include <linux/list.h>
 #include <linux/kobject.h>
 #include <linux/device.h>
+#include <linux/semaphore.h>
 #include <asm/atomic.h>
 #include <plat/omap_hwmod.h>
 #include <plat/omap_device.h>
@@ -199,6 +200,29 @@ enum omap_overlay_zorder {
 	OMAP_DSS_OVL_ZORDER_1	= 1,
 	OMAP_DSS_OVL_ZORDER_2	= 2,
 	OMAP_DSS_OVL_ZORDER_3	= 3,
+};
+
+enum dss_hybrid_update_state {
+	/* manual update mode */
+	HYBRID_UPDATE_STATE_MANUAL,
+	/* auto update mode */
+	HYBRID_UPDATE_STATE_IDLE,	/* waiting for update request */
+	HYBRID_UPDATE_STATE_PREPARING,	/* request has been made */
+	HYBRID_UPDATE_STATE_UPDATING,	/* update is in progress */
+	HYBRID_UPDATE_STATE_DEFINED,	/* update region defined */
+	HYBRID_UPDATE_STATE_PROGRAMMED,	/* shadow registers programmed */
+};
+
+struct dss_hybrid_updater {
+	spinlock_t lock;
+	struct semaphore semaphore;
+	u16 x, y, w, h;
+	enum dss_hybrid_update_state state;
+	int (*update)(struct omap_dss_device *dssdev,
+			       u16 x, u16 y, u16 w, u16 h);
+	bool quit;
+	struct task_struct *thread;
+	ktime_t stamp;
 };
 
 /* RFBI */
@@ -491,6 +515,8 @@ struct omap_dss_device {
 
 	enum omap_dss_display_state state;
 
+	struct dss_hybrid_updater hybrid_update;
+
 	/* platform specific  */
 	int (*platform_enable)(struct omap_dss_device *dssdev);
 	void (*platform_disable)(struct omap_dss_device *dssdev);
@@ -619,5 +645,13 @@ int omap_rfbi_update(struct omap_dss_device *dssdev,
 /* dss features used by v4l2 */
 bool dss_feat_color_mode_supported(enum omap_plane plane,
 		enum omap_color_mode color_mode);
+
+int dss_hybrid_update_init(struct omap_dss_device *dssdev);
+void dss_hybrid_update_exit(struct omap_dss_device *dssdev);
+void dss_hybrid_update_defined(struct omap_dss_device *dssdev,
+					u16 *x, u16 *y, u16 *w, u16 *h);
+void dss_hybrid_update_programmed(struct omap_dss_device *dssdev);
+int dss_hybrid_update(struct omap_dss_device *dssdev,
+					u16 x, u16 y, u16 w, u16 h);
 
 #endif

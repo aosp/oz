@@ -1149,6 +1149,8 @@ void dss_start_update(struct omap_dss_device *dssdev)
 	struct omap_overlay_manager *mgr;
 	int i;
 
+	dss_hybrid_update_programmed(dssdev);
+
 	mgr = dssdev->manager;
 
 	for (i = 0; i < num_ovls; ++i) {
