@@ -352,6 +352,13 @@ static struct regulator_init_data omap4_panda_vusb = {
 	},
 };
 
+static void omap4_audio_conf(void)
+{
+	/* twl6040 naudint */
+	omap_mux_init_signal("sys_nirq2.sys_nirq2", \
+			     OMAP_PIN_INPUT_PULLUP);
+}
+
 static struct twl4030_codec_audio_data twl6040_audio = {
 	/* Add audio only data */
 };
@@ -424,6 +431,7 @@ static void __init omap4_panda_init(void)
 		package = OMAP_PACKAGE_CBL;
 	omap4_mux_init(board_mux, package);
 
+	omap4_audio_conf();
 	omap4_panda_i2c_init();
 	platform_add_devices(panda_devices, ARRAY_SIZE(panda_devices));
 	omap_serial_init();

@@ -839,6 +839,13 @@ static struct regulator_init_data sdp4430_vusb = {
 	},
 };
 
+static void omap4_audio_conf(void)
+{
+	/* twl6040 naudint */
+	omap_mux_init_signal("sys_nirq2.sys_nirq2", \
+			     OMAP_PIN_INPUT_PULLUP);
+}
+
 static struct twl4030_codec_audio_data twl6040_audio = {
 	/* single-step ramp for headset and handsfree */
 	.left_step_hs	= 0x0f,
@@ -1066,6 +1073,7 @@ static void __init omap_4430sdp_init(void)
 		package = OMAP_PACKAGE_CBL;
 	omap4_mux_init(board_mux, package);
 
+	omap4_audio_conf();
 	omap4_i2c_init();
 	omap4_display_init();
 	omap_disp_led_init();
