@@ -152,8 +152,24 @@ const static struct v4l2_fmtdesc omap_formats[] = {
 		.pixelformat = V4L2_PIX_FMT_RGB565,
 	},
 	{
-		/* Note:  V4L2 defines RGB32 as: ARGB-8-8-8-8  we use
-		 *  this for RGB24 unpack mode, the last 8 bits are ignored
+		/* Note:  V4L2 defines RGB555 as:
+		 *
+		 *      Byte 0                    Byte 1
+		 *      g2 g1 g0 r4 r3 r2 r1 r0   a b4 b3 b2 b1 b0 g4 g3
+		 *
+		 * We interpret RGB555 as:
+		 *
+		 *      Byte 0                    Byte 1
+		 *      g2 g1 g0 b4 b3 b2 b1 b0   a r4 r3 r2 r1 r0 g4 g3
+		 */
+		.description = "RGB555, le",
+		.pixelformat = V4L2_PIX_FMT_RGB555,
+	},
+	{
+		/* Note:  V4L2 defines RGB32 as: ABGR-8-8-8-8  we use
+		 *  this for RGB24 unpack mode (xRGB-8888), the last 8
+                 *  bits are ignored
+                 *
 		 * */
 		.description = "RGB32, le",
 		.pixelformat = V4L2_PIX_FMT_RGB32,
@@ -165,6 +181,16 @@ const static struct v4l2_fmtdesc omap_formats[] = {
 		 */
 		.description = "RGB24, le",
 		.pixelformat = V4L2_PIX_FMT_RGB24,
+	},
+	{
+		/* Note:  V4L2 defines BGR32 exactly as DSS ARGB-8888 mode */
+		.description = "RGB32, le",
+		.pixelformat = V4L2_PIX_FMT_BGR32,
+	},
+	{
+		/* Note:  V4L2 defines BGR24 exactly as DSS RGB-888 mode */
+		.description = "RGB24, le",
+		.pixelformat = V4L2_PIX_FMT_BGR24,
 	},
 	{
 		.description = "YUYV (YUV 4:2:2), packed",
@@ -208,24 +234,32 @@ static int video_mode_to_dss_mode(struct omap_vout_device *vout)
 	case V4L2_PIX_FMT_UYVY:
 		mode = OMAP_DSS_COLOR_UYVY;
 		break;
+	case V4L2_PIX_FMT_RGB444:
+		mode = OMAP_DSS_COLOR_ARGB16;
+		break;
+	case V4L2_PIX_FMT_RGB555:
+		mode = OMAP_DSS_COLOR_ARGB16_1555;
+		break;
 	case V4L2_PIX_FMT_RGB565:
 		mode = OMAP_DSS_COLOR_RGB16;
 		break;
 	case V4L2_PIX_FMT_RGB24:
+	case V4L2_PIX_FMT_BGR24:
 		mode = OMAP_DSS_COLOR_RGB24P;
 		break;
 	case V4L2_PIX_FMT_RGB32:
-		mode = OMAP_DSS_COLOR_ARGB32;
-		/* fallback to RGB24U */
-		if (!dss_feat_color_mode_supported(ovl->id, mode))
-			mode = OMAP_DSS_COLOR_RGB24U;
+		mode = OMAP_DSS_COLOR_RGB24U;
 		break;
 	case V4L2_PIX_FMT_BGR32:
-		mode = OMAP_DSS_COLOR_RGBX24;
+		mode = OMAP_DSS_COLOR_ARGB32;
+		/* fallback to XRGB24 */
+		if (!dss_feat_color_mode_supported(ovl->id, mode))
+			mode = OMAP_DSS_COLOR_RGB24U;
 		break;
 	default:
 		mode = -EINVAL;
 	}
+
 	return mode;
 }
 
