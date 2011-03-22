@@ -262,7 +262,7 @@ static struct omapfb_colormode omapfb_colormodes[] = {
 		.blue	= { .length = 8, .offset = 8, .msb_right = 0 },
 		.transp	= { .length = 8, .offset = 0, .msb_right = 0 },
 	}, {
-		.dssmode = OMAP_DSS_COLOR_RGBX32,
+		.dssmode = OMAP_DSS_COLOR_RGBX24,
 		.bits_per_pixel = 32,
 		.red	= { .length = 8, .offset = 24, .msb_right = 0 },
 		.green	= { .length = 8, .offset = 16, .msb_right = 0 },
@@ -1627,7 +1627,7 @@ static enum omap_color_mode fb_format_to_dss_mode(enum omapfb_color_format fmt)
 		mode = OMAP_DSS_COLOR_RGBA32;
 		break;
 	case OMAPFB_COLOR_RGBX32:
-		mode = OMAP_DSS_COLOR_RGBX32;
+		mode = OMAP_DSS_COLOR_RGBX24;
 		break;
 	default:
 		mode = -EINVAL;

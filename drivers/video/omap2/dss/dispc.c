@@ -1349,20 +1349,26 @@ static void _dispc_set_color_mode(enum omap_plane plane,
 			m = 0x5; break;
 		case OMAP_DSS_COLOR_RGB16:
 			m = 0x6; break;
+		case OMAP_DSS_COLOR_ARGB16_1555:
+			m = 0x7; break;
 		case OMAP_DSS_COLOR_RGB24U:
 			m = 0x8; break;
 		case OMAP_DSS_COLOR_RGB24P:
 			m = 0x9; break;
 		case OMAP_DSS_COLOR_YUV2:
+		case OMAP_DSS_COLOR_RGBX12:
 			m = 0xa; break;
 		case OMAP_DSS_COLOR_UYVY:
+		case OMAP_DSS_COLOR_RGBA16:
 			m = 0xb; break;
 		case OMAP_DSS_COLOR_ARGB32:
 			m = 0xc; break;
 		case OMAP_DSS_COLOR_RGBA32:
 			m = 0xd; break;
-		case OMAP_DSS_COLOR_RGBX32:
+		case OMAP_DSS_COLOR_RGBX24:
 			m = 0xe; break;
+		case OMAP_DSS_COLOR_XRGB15:
+			m = 0xf; break;
 		default:
 			BUG(); break;
 		}
@@ -1370,11 +1376,11 @@ static void _dispc_set_color_mode(enum omap_plane plane,
 		switch (color_mode) {
 		case OMAP_DSS_COLOR_NV12:
 			m = 0x0; break;
-		case OMAP_DSS_COLOR_RGB12U:
+		case OMAP_DSS_COLOR_RGBX12:
 			m = 0x1; break;
-		case OMAP_DSS_COLOR_RGBA12:
+		case OMAP_DSS_COLOR_RGBA16:
 			m = 0x2; break;
-		case OMAP_DSS_COLOR_XRGB12:
+		case OMAP_DSS_COLOR_RGB12U:
 			m = 0x4; break;
 		case OMAP_DSS_COLOR_ARGB16:
 			m = 0x5; break;
@@ -1394,7 +1400,7 @@ static void _dispc_set_color_mode(enum omap_plane plane,
 			m = 0xC; break;
 		case OMAP_DSS_COLOR_RGBA32:
 			m = 0xD; break;
-		case OMAP_DSS_COLOR_RGBX24_32_ALGN:
+		case OMAP_DSS_COLOR_RGBX24:
 			m = 0xE; break;
 		case OMAP_DSS_COLOR_XRGB15:
 			m = 0xF; break;
@@ -2098,8 +2104,12 @@ static int color_mode_to_bpp(enum omap_color_mode color_mode)
 	case OMAP_DSS_COLOR_NV12:
 		return 8;
 	case OMAP_DSS_COLOR_RGB12U:
+	case OMAP_DSS_COLOR_RGBX12:
 	case OMAP_DSS_COLOR_RGB16:
+	case OMAP_DSS_COLOR_ARGB16_1555:
 	case OMAP_DSS_COLOR_ARGB16:
+	case OMAP_DSS_COLOR_RGBA16:
+	case OMAP_DSS_COLOR_XRGB15:
 	case OMAP_DSS_COLOR_YUV2:
 	case OMAP_DSS_COLOR_UYVY:
 		return 16;
@@ -2108,7 +2118,7 @@ static int color_mode_to_bpp(enum omap_color_mode color_mode)
 	case OMAP_DSS_COLOR_RGB24U:
 	case OMAP_DSS_COLOR_ARGB32:
 	case OMAP_DSS_COLOR_RGBA32:
-	case OMAP_DSS_COLOR_RGBX32:
+	case OMAP_DSS_COLOR_RGBX24:
 		return 32;
 	default:
 		BUG();

@@ -152,7 +152,7 @@ const static struct v4l2_fmtdesc omap_formats[] = {
 		.pixelformat = V4L2_PIX_FMT_RGB565,
 	},
 	{
-		/* Note:  V4L2 defines RGB32 as: RGB-8-8-8-8  we use
+		/* Note:  V4L2 defines RGB32 as: ARGB-8-8-8-8  we use
 		 *  this for RGB24 unpack mode, the last 8 bits are ignored
 		 * */
 		.description = "RGB32, le",
@@ -221,7 +221,7 @@ static int video_mode_to_dss_mode(struct omap_vout_device *vout)
 			mode = OMAP_DSS_COLOR_RGB24U;
 		break;
 	case V4L2_PIX_FMT_BGR32:
-		mode = OMAP_DSS_COLOR_RGBX32;
+		mode = OMAP_DSS_COLOR_RGBX24;
 		break;
 	default:
 		mode = -EINVAL;

@@ -77,26 +77,36 @@ enum omap_channel {
 };
 
 enum omap_color_mode {
-	OMAP_DSS_COLOR_CLUT1	= 1 << 0,  /* BITMAP 1 */
-	OMAP_DSS_COLOR_CLUT2	= 1 << 1,  /* BITMAP 2 */
-	OMAP_DSS_COLOR_CLUT4	= 1 << 2,  /* BITMAP 4 */
-	OMAP_DSS_COLOR_CLUT8	= 1 << 3,  /* BITMAP 8 */
-	OMAP_DSS_COLOR_RGB12U	= 1 << 4,  /* RGB12, 16-bit container */
-	OMAP_DSS_COLOR_ARGB16	= 1 << 5,  /* ARGB16 */
-	OMAP_DSS_COLOR_RGB16	= 1 << 6,  /* RGB16 */
-	OMAP_DSS_COLOR_RGB24U	= 1 << 7,  /* RGB24, 32-bit container */
-	OMAP_DSS_COLOR_RGB24P	= 1 << 8,  /* RGB24, 24-bit container */
-	OMAP_DSS_COLOR_YUV2	= 1 << 9,  /* YUV2 4:2:2 co-sited */
-	OMAP_DSS_COLOR_UYVY	= 1 << 10, /* UYVY 4:2:2 co-sited */
-	OMAP_DSS_COLOR_ARGB32	= 1 << 11, /* ARGB32 */
-	OMAP_DSS_COLOR_RGBA32	= 1 << 12, /* RGBA32 */
-	OMAP_DSS_COLOR_RGBX32	= 1 << 13, /* RGBx32 */
+	OMAP_DSS_COLOR_CLUT1		= 1 << 0,  /* BITMAP 1 */
+	OMAP_DSS_COLOR_CLUT2		= 1 << 1,  /* BITMAP 2 */
+	OMAP_DSS_COLOR_CLUT4		= 1 << 2,  /* BITMAP 4 */
+	OMAP_DSS_COLOR_CLUT8		= 1 << 3,  /* BITMAP 8 */
+
+	/* also referred to as RGB 12-BPP, 16-bit container  */
+	OMAP_DSS_COLOR_RGB12U		= 1 << 4,  /* xRGB12-4444 */
+	OMAP_DSS_COLOR_ARGB16		= 1 << 5,  /* ARGB16-4444 */
+	OMAP_DSS_COLOR_RGB16		= 1 << 6,  /* RGB16-565 */
+
+	/* also referred to as RGB 24-BPP, 32-bit container */
+	OMAP_DSS_COLOR_RGB24U		= 1 << 7,  /* xRGB24-8888 */
+	OMAP_DSS_COLOR_RGB24P		= 1 << 8,  /* RGB24-888 */
+	OMAP_DSS_COLOR_YUV2		= 1 << 9,  /* YUV2 4:2:2 co-sited */
+	OMAP_DSS_COLOR_UYVY		= 1 << 10, /* UYVY 4:2:2 co-sited */
+	OMAP_DSS_COLOR_ARGB32		= 1 << 11, /* ARGB32-8888 */
+	OMAP_DSS_COLOR_RGBA32		= 1 << 12, /* RGBA32-8888 */
+
+	/* also referred to as RGBx 32 in TRM */
+	OMAP_DSS_COLOR_RGBX24		= 1 << 13, /* RGBx24-8888 */
 	OMAP_DSS_COLOR_NV12		= 1 << 14, /* NV12 format: YUV 4:2:0 */
-	OMAP_DSS_COLOR_RGBA12		= 1 << 15, /* RGBA12 - 4444 */
-	OMAP_DSS_COLOR_XRGB12		= 1 << 16, /* xRGB12, 16-bit cont. */
+
+	/* also referred to as RGBA12-4444 in TRM */
+	OMAP_DSS_COLOR_RGBA16		= 1 << 15, /* RGBA16-4444 */
+
+	OMAP_DSS_COLOR_RGBX12		= 1 << 16, /* RGBx12-4444 */
 	OMAP_DSS_COLOR_ARGB16_1555	= 1 << 17, /* ARGB16-1555 */
-	OMAP_DSS_COLOR_RGBX24_32_ALGN	= 1 << 18, /* 32-msb aligned 24bit */
-	OMAP_DSS_COLOR_XRGB15		= 1 << 19, /* xRGB15: 1555*/
+
+	/* also referred to as xRGB16-555 in TRM */
+	OMAP_DSS_COLOR_XRGB15		= 1 << 18, /* xRGB15-1555 */
 };
 
 enum omap_lcd_display_type {
