@@ -33,6 +33,12 @@ config PANEL_TAAL
 	help
 	  Taal DSI command mode panel from TPO.
 
+config PANEL_D2L
+        tristate "Toshiba D2L DSI Panel"
+        depends on OMAP2_DSS_DSI
+        help
+          Toshiba D2L DSI video mode panel.
+
 config PANEL_TPO_TD043MTEA1
 	tristate "TPO TD043MTEA1 LCD Panel"
 	depends on OMAP2_DSS && SPI

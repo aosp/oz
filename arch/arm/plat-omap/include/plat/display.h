@@ -244,6 +244,8 @@ int dsi_vc_set_max_rx_packet_size(struct omap_dss_device *dssdev,
 int dsi_vc_send_null(struct omap_dss_device *dssdev, int channel);
 int dsi_vc_send_bta_sync(struct omap_dss_device *dssdev, int channel);
 
+void dsi_set_stop_mode(bool stop);
+
 /* Board specific data */
 struct omap_dss_board_info {
 	int (*get_last_off_on_transaction_id)(struct device *dev);
@@ -419,6 +421,10 @@ struct omap_dss_device {
 			u8 data1_pol;
 			u8 data2_lane;
 			u8 data2_pol;
+			u8 data3_lane;
+			u8 data3_pol;
+			u8 data4_lane;
+			u8 data4_pol;
 
 			struct {
 				u16 regn;
@@ -533,6 +539,10 @@ struct omap_dss_driver {
 
 	int (*set_wss)(struct omap_dss_device *dssdev, u32 wss);
 	u32 (*get_wss)(struct omap_dss_device *dssdev);
+};
+
+struct d2l_platform_data {
+	u8 gpio_intr;
 };
 
 int omap_dss_register_driver(struct omap_dss_driver *);

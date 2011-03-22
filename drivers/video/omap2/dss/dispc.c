@@ -35,7 +35,7 @@
 
 #include <plat/sram.h>
 #include <plat/clock.h>
-
+#include <plat/board.h>
 #include <plat/display.h>
 
 #include "dss.h"
@@ -2080,6 +2080,9 @@ static void dispc_enable_lcd_out(enum omap_channel channel, bool enable)
 	irq = channel == OMAP_DSS_CHANNEL_LCD2 ? DISPC_IRQ_FRAMEDONE2 :
 			DISPC_IRQ_FRAMEDONE;
 
+	if (omap4_board_rev() == OMAP4_BLAZETABLET_BOARD)
+		irq = DISPC_IRQ_VSYNC;
+
 	if (!enable && is_on) {
 		init_completion(&frame_done_completion);
 
@@ -2455,6 +2458,8 @@ void dispc_set_parallel_interface_mode(enum omap_channel channel,
 
 	case OMAP_DSS_PARALLELMODE_DSI:
 		stallmode = 1;
+		if (omap4_board_rev() == OMAP4_BLAZETABLET_BOARD)
+			stallmode = 0;
 		gpout1 = 1;
 		break;
 
