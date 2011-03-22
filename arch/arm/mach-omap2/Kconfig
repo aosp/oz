@@ -304,6 +304,15 @@ config MACH_OMAP_4430SDP
 	select OMAP_PACKAGE_CBL
 	select OMAP_PACKAGE_CBS
 
+config MACH_OMAP_44xxTABLET
+	bool "OMAP 44XX Tablet"
+	default y
+	depends on ARCH_OMAP4
+	select NEW_LEDS
+	select LEDS_CLASS
+	select OMAP_PACKAGE_CBL
+	select OMAP_PACKAGE_CBS
+
 config MACH_OMAP4_PANDA
 	bool "OMAP4 Panda Board"
 	default y

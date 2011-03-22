@@ -45,7 +45,6 @@
 #include <plat/syntm12xx.h>
 #include <plat/mmc.h>
 #include <plat/nokia-dsi-panel.h>
-#include "board-44xxtablet.h"
 
 #include "mux.h"
 #include "timer-gp.h"
@@ -55,9 +54,6 @@
 #define ETH_KS8851_POWER_ON		48
 #define ETH_KS8851_QUART		138
 #define OMAP4SDP_MDM_PWR_EN_GPIO	157
-#define OMAP4_SFH7741_SENSOR_OUTPUT_GPIO	184
-#define OMAP4_SFH7741_ENABLE_GPIO		188
-#define OMAP4_CMA3000ACCL_GPIO		186
 
 #define LED_SEC_DISP_GPIO 27
 #define DSI2_GPIO_59	59
@@ -65,245 +61,6 @@
 #define LED_PWM2ON		0x03
 #define LED_PWM2OFF		0x04
 #define LED_TOGGLE3		0x92
-
-static int sdp4430_keymap[] = {
-	KEY(0, 0, KEY_E),
-	KEY(0, 1, KEY_R),
-	KEY(0, 2, KEY_T),
-	KEY(0, 3, KEY_HOME),
-	KEY(0, 4, KEY_F5),
-	KEY(0, 5, KEY_UNKNOWN),
-	KEY(0, 6, KEY_I),
-	KEY(0, 7, KEY_LEFTSHIFT),
-
-	KEY(1, 0, KEY_D),
-	KEY(1, 1, KEY_F),
-	KEY(1, 2, KEY_G),
-	KEY(1, 3, KEY_SEND),
-	KEY(1, 4, KEY_F6),
-	KEY(1, 5, KEY_UNKNOWN),
-	KEY(1, 6, KEY_K),
-	KEY(1, 7, KEY_ENTER),
-
-	KEY(2, 0, KEY_X),
-	KEY(2, 1, KEY_C),
-	KEY(2, 2, KEY_V),
-	KEY(2, 3, KEY_END),
-	KEY(2, 4, KEY_F7),
-	KEY(2, 5, KEY_UNKNOWN),
-	KEY(2, 6, KEY_DOT),
-	KEY(2, 7, KEY_CAPSLOCK),
-
-	KEY(3, 0, KEY_Z),
-	KEY(3, 1, KEY_KPPLUS),
-	KEY(3, 2, KEY_B),
-	KEY(3, 3, KEY_F1),
-	KEY(3, 4, KEY_F8),
-	KEY(3, 5, KEY_UNKNOWN),
-	KEY(3, 6, KEY_O),
-	KEY(3, 7, KEY_SPACE),
-
-	KEY(4, 0, KEY_W),
-	KEY(4, 1, KEY_Y),
-	KEY(4, 2, KEY_U),
-	KEY(4, 3, KEY_F2),
-	KEY(4, 4, KEY_VOLUMEUP),
-	KEY(4, 5, KEY_UNKNOWN),
-	KEY(4, 6, KEY_L),
-	KEY(4, 7, KEY_LEFT),
-
-	KEY(5, 0, KEY_S),
-	KEY(5, 1, KEY_H),
-	KEY(5, 2, KEY_J),
-	KEY(5, 3, KEY_F3),
-	KEY(5, 4, KEY_F9),
-	KEY(5, 5, KEY_VOLUMEDOWN),
-	KEY(5, 6, KEY_M),
-	KEY(5, 7, KEY_RIGHT),
-
-	KEY(6, 0, KEY_Q),
-	KEY(6, 1, KEY_A),
-	KEY(6, 2, KEY_N),
-	KEY(6, 3, KEY_BACK),
-	KEY(6, 4, KEY_BACKSPACE),
-	KEY(6, 5, KEY_UNKNOWN),
-	KEY(6, 6, KEY_P),
-	KEY(6, 7, KEY_UP),
-
-	KEY(7, 0, KEY_PROG1),
-	KEY(7, 1, KEY_PROG2),
-	KEY(7, 2, KEY_PROG3),
-	KEY(7, 3, KEY_PROG4),
-	KEY(7, 4, KEY_F4),
-	KEY(7, 5, KEY_UNKNOWN),
-	KEY(7, 6, KEY_OK),
-	KEY(7, 7, KEY_DOWN),
-};
-
-static struct matrix_keymap_data sdp4430_keymap_data = {
-	.keymap			= sdp4430_keymap,
-	.keymap_size		= ARRAY_SIZE(sdp4430_keymap),
-};
-
-static struct omap4_keypad_platform_data sdp4430_keypad_data = {
-	.keymap_data		= &sdp4430_keymap_data,
-	.rows			= 8,
-	.cols			= 8,
-};
-
-void keyboard_mux_init(void)
-{
-	omap_mux_init_signal("kpd_col0.kpd_col0",
-				OMAP_WAKEUP_EN | OMAP_MUX_MODE1);
-	omap_mux_init_signal("kpd_col1.kpd_col1",
-				OMAP_WAKEUP_EN | OMAP_MUX_MODE1);
-	omap_mux_init_signal("kpd_col2.kpd_col2",
-				OMAP_WAKEUP_EN | OMAP_MUX_MODE1);
-	omap_mux_init_signal("kpd_col3.kpd_col3",
-				OMAP_WAKEUP_EN | OMAP_MUX_MODE1);
-	omap_mux_init_signal("kpd_col4.kpd_col4",
-				OMAP_WAKEUP_EN | OMAP_MUX_MODE1);
-	omap_mux_init_signal("kpd_col5.kpd_col5",
-				OMAP_WAKEUP_EN | OMAP_MUX_MODE1);
-	omap_mux_init_signal("gpmc_a23.kpd_col7",
-				OMAP_WAKEUP_EN | OMAP_MUX_MODE1);
-	omap_mux_init_signal("gpmc_a22.kpd_col6",
-				OMAP_WAKEUP_EN | OMAP_MUX_MODE1);
-	omap_mux_init_signal("kpd_row0.kpd_row0",
-				OMAP_PULL_ENA | OMAP_PULL_UP |
-				OMAP_WAKEUP_EN | OMAP_MUX_MODE1 |
-				OMAP_INPUT_EN);
-	omap_mux_init_signal("kpd_row1.kpd_row1",
-				OMAP_PULL_ENA | OMAP_PULL_UP |
-				OMAP_WAKEUP_EN | OMAP_MUX_MODE1 |
-				OMAP_INPUT_EN);
-	omap_mux_init_signal("kpd_row2.kpd_row2",
-				OMAP_PULL_ENA | OMAP_PULL_UP |
-				OMAP_WAKEUP_EN | OMAP_MUX_MODE1 |
-				OMAP_INPUT_EN);
-	omap_mux_init_signal("kpd_row3.kpd_row3",
-				OMAP_PULL_ENA | OMAP_PULL_UP |
-				OMAP_WAKEUP_EN | OMAP_MUX_MODE1 |
-				OMAP_INPUT_EN);
-	omap_mux_init_signal("kpd_row4.kpd_row4",
-				OMAP_PULL_ENA | OMAP_PULL_UP |
-				OMAP_WAKEUP_EN | OMAP_MUX_MODE1 |
-				OMAP_INPUT_EN);
-	omap_mux_init_signal("kpd_row5.kpd_row5",
-				OMAP_PULL_ENA | OMAP_PULL_UP |
-				OMAP_WAKEUP_EN | OMAP_MUX_MODE1 |
-				OMAP_INPUT_EN);
-	omap_mux_init_signal("gpmc_a18.kpd_row6",
-				OMAP_PULL_ENA | OMAP_PULL_UP |
-				OMAP_WAKEUP_EN | OMAP_MUX_MODE1 |
-				OMAP_INPUT_EN);
-	omap_mux_init_signal("gpmc_a19.kpd_row7",
-				OMAP_PULL_ENA | OMAP_PULL_UP |
-				OMAP_WAKEUP_EN | OMAP_MUX_MODE1 |
-				OMAP_INPUT_EN);
-}
-
-/* Proximity Sensor */
-static void omap_prox_activate(int state)
-{
-	gpio_set_value(OMAP4_SFH7741_ENABLE_GPIO , state);
-}
-
-static int omap_prox_read(void)
-{
-	int proximity;
-	proximity = gpio_get_value(OMAP4_SFH7741_SENSOR_OUTPUT_GPIO);
-#ifdef CONFIG_ANDROID
-	/* Invert the output from the prox sensor for Android as 0 should
-	be near and 1 should be far */
-	return !proximity;
-#else
-	return proximity;
-#endif
-}
-
-static void omap_sfh7741prox_init(void)
-{
-	int  error;
-	int  gpio_val;
-
-	error = gpio_request(OMAP4_SFH7741_SENSOR_OUTPUT_GPIO, "sfh7741");
-	if (error < 0) {
-		pr_err("%s: GPIO configuration failed: GPIO %d, error %d\n"
-			, __func__, OMAP4_SFH7741_SENSOR_OUTPUT_GPIO, error);
-		return ;
-	}
-
-	error = gpio_direction_input(OMAP4_SFH7741_SENSOR_OUTPUT_GPIO);
-	if (error < 0) {
-		pr_err("Proximity GPIO input configuration failed\n");
-		goto fail1;
-	}
-
-	error = gpio_request(OMAP4_SFH7741_ENABLE_GPIO, "sfh7741");
-	if (error < 0) {
-		pr_err("failed to request GPIO %d, error %d\n",
-			OMAP4_SFH7741_ENABLE_GPIO, error);
-		goto fail1;
-	}
-
-	error = gpio_direction_output(OMAP4_SFH7741_ENABLE_GPIO , 0);
-	if (error < 0) {
-		pr_err("%s: GPIO configuration failed: GPIO %d,	error %d\n",
-			__func__, OMAP4_SFH7741_ENABLE_GPIO, error);
-		goto fail3;
-	}
-
-	gpio_val = omap_mux_get_gpio(OMAP4_SFH7741_SENSOR_OUTPUT_GPIO);
-	if ((gpio_val & OMAP_WAKEUP_EN) == 0) {
-		gpio_val |= OMAP_WAKEUP_EN;
-		omap_mux_set_gpio(gpio_val, OMAP4_SFH7741_SENSOR_OUTPUT_GPIO);
-	}
-	return;
-
-fail3:
-	gpio_free(OMAP4_SFH7741_ENABLE_GPIO);
-fail1:
-	gpio_free(OMAP4_SFH7741_SENSOR_OUTPUT_GPIO);
-}
-
-static struct sfh7741_platform_data omap_sfh7741_data = {
-	.flags = SFH7741_WAKEABLE_INT,
-	.irq = OMAP_GPIO_IRQ(OMAP4_SFH7741_SENSOR_OUTPUT_GPIO),
-	.prox_enable = 0,
-	.activate_func = omap_prox_activate,
-	.read_prox = omap_prox_read,
-};
-
-static struct platform_device sdp4430_proximity_device = {
-	.name		= SFH7741_NAME,
-	.id		= 1,
-	.dev		= {
-		.platform_data = &omap_sfh7741_data,
-	},
-};
-
-static struct cma3000_platform_data cma3000_platform_data = {
-	.def_poll_rate = 200,
-	.fuzz_x = 25,
-	.fuzz_y = 25,
-	.fuzz_z = 25,
-	.g_range = CMARANGE_8G,
-	.mode = CMAMODE_MEAS400,
-	.mdthr = 0x8,
-	.mdfftmr = 0x33,
-	.ffthr = 0x8,
-	.irqflags = IRQF_TRIGGER_HIGH,
-};
-
-static void omap_cma3000accl_init(void)
-{
-	if (gpio_request(OMAP4_CMA3000ACCL_GPIO, "Accelerometer") < 0) {
-		pr_err("Accelerometer GPIO request failed\n");
-		return;
-	}
-	gpio_direction_input(OMAP4_CMA3000ACCL_GPIO);
-}
 
 static struct gpio_led sdp4430_gpio_leds[] = {
 	{
@@ -580,23 +337,6 @@ static struct omap_dss_board_info sdp4430_dss_data = {
 	.devices	=	sdp4430_dss_devices,
 	.default_device	=	&sdp4430_lcd_device,
 };
-
-static struct platform_device *sdp4430_devices[] __initdata = {
-	&sdp4430_disp_led,
-	&sdp4430_proximity_device,
-	&sdp4430_leds_gpio,
-	&sdp4430_leds_pwm,
-};
-
-static void __init omap_4430sdp_init_irq(void)
-{
-	omap2_init_common_infrastructure();
-	omap2_init_common_devices(NULL, NULL);
-#ifdef CONFIG_OMAP_32K_TIMER
-	omap2_gp_clockevent_set_gptimer(1);
-#endif
-	gic_init_irq();
-}
 
 static const struct ehci_hcd_omap_platform_data ehci_pdata __initconst = {
 	.port_mode[0]	= EHCI_HCD_OMAP_MODE_PHY,
@@ -881,113 +621,6 @@ static struct twl4030_platform_data sdp4430_twldata = {
 	.codec		= &twl6040_codec,
 };
 
-/* Begin Synaptic Touchscreen TM-01217 */
-
-static char *tm12xx_idev_names[] = {
-	"Synaptic TM12XX TouchPoint 1",
-	"Synaptic TM12XX TouchPoint 2",
-	"Synaptic TM12XX TouchPoint 3",
-	"Synaptic TM12XX TouchPoint 4",
-	"Synaptic TM12XX TouchPoint 5",
-	"Synaptic TM12XX TouchPoint 6",
-	NULL,
-};
-
-static u8 tm12xx_button_map[] = {
-	KEY_F1,
-	KEY_F2,
-};
-
-static struct tm12xx_ts_platform_data tm12xx_platform_data[] = {
-	{ /* Primary Controller */
-		.gpio_intr = 35,
-		.idev_name = tm12xx_idev_names,
-		.button_map = tm12xx_button_map,
-		.num_buttons = ARRAY_SIZE(tm12xx_button_map),
-		.repeat = 0,
-		.swap_xy = 1,
-	/* Android does not have touchscreen as wakeup source */
-#if !defined(CONFIG_ANDROID)
-		.suspend_state = SYNTM12XX_ON_ON_SUSPEND,
-#else
-		.suspend_state = SYNTM12XX_SLEEP_ON_SUSPEND,
-#endif
-	},
-	{ /* Secondary Controller */
-		.gpio_intr = 36,
-		.idev_name = tm12xx_idev_names,
-		.button_map = tm12xx_button_map,
-		.num_buttons = ARRAY_SIZE(tm12xx_button_map),
-		.repeat = 0,
-		.swap_xy = 1,
-	/* Android does not have touchscreen as wakeup source */
-#if !defined(CONFIG_ANDROID)
-		.suspend_state = SYNTM12XX_ON_ON_SUSPEND,
-#else
-		.suspend_state = SYNTM12XX_SLEEP_ON_SUSPEND,
-#endif
-	},
-};
-
-/* End Synaptic Touchscreen TM-01217 */
-
-static struct i2c_board_info __initdata sdp4430_i2c_boardinfo[] = {
-	{
-		I2C_BOARD_INFO("twl6030", 0x48),
-		.flags = I2C_CLIENT_WAKE,
-		.irq = OMAP44XX_IRQ_SYS_1N,
-		.platform_data = &sdp4430_twldata,
-	},
-};
-
-static struct i2c_board_info __initdata sdp4430_i2c_2_boardinfo[] = {
-	{
-		I2C_BOARD_INFO("tm12xx_ts_primary", 0x4b),
-		.platform_data = &tm12xx_platform_data[0],
-	},
-};
-
-static struct i2c_board_info __initdata sdp4430_i2c_3_boardinfo[] = {
-	{
-		I2C_BOARD_INFO("tm12xx_ts_secondary", 0x4b),
-		.platform_data = &tm12xx_platform_data[1],
-	},
-	{
-		I2C_BOARD_INFO("tmp105", 0x48),
-	},
-	{
-		I2C_BOARD_INFO("bh1780", 0x29),
-	},
-};
-static struct i2c_board_info __initdata sdp4430_i2c_4_boardinfo[] = {
-	{
-		I2C_BOARD_INFO("bmp085", 0x77),
-	},
-	{
-		I2C_BOARD_INFO("hmc5843", 0x1e),
-	},
-	{
-		I2C_BOARD_INFO("cma3000_accl", 0x1c),
-		.platform_data = &cma3000_platform_data,
-	},
-};
-static int __init omap4_i2c_init(void)
-{
-	/*
-	 * Phoenix Audio IC needs I2C1 to
-	 * start with 400 KHz or less
-	 */
-	omap_register_i2c_bus(1, 400, sdp4430_i2c_boardinfo,
-			ARRAY_SIZE(sdp4430_i2c_boardinfo));
-	omap_register_i2c_bus(2, 400, sdp4430_i2c_2_boardinfo,
-			ARRAY_SIZE(sdp4430_i2c_2_boardinfo));
-	omap_register_i2c_bus(3, 400, sdp4430_i2c_3_boardinfo,
-				ARRAY_SIZE(sdp4430_i2c_3_boardinfo));
-	omap_register_i2c_bus(4, 400, sdp4430_i2c_4_boardinfo,
-				ARRAY_SIZE(sdp4430_i2c_4_boardinfo));
-	return 0;
-}
-
 #ifdef CONFIG_OMAP_MUX
 static struct omap_board_mux board_mux[] __initdata = {
 	OMAP4_MUX(USBB2_ULPITLL_CLK, OMAP_MUX_MODE4 | OMAP_PIN_OUTPUT),
@@ -1026,52 +659,73 @@ static void __init omap4_display_init(void)
 	gpio_direction_output(dsi2_panel.reset_gpio, 0);
 }
 
-/* Board revision */
-static u8 omap4_board_revision;
+static struct i2c_board_info __initdata tablet_i2c_boardinfo[] = {
+	{
+		I2C_BOARD_INFO("twl6030", 0x48),
+		.flags = I2C_CLIENT_WAKE,
+		.irq = OMAP44XX_IRQ_SYS_1N,
+		.platform_data = &sdp4430_twldata,
+	},
+};
 
-u8 omap4_board_rev(void)
+static struct i2c_board_info __initdata tablet_i2c_2_boardinfo[] = {
+};
+
+static struct i2c_board_info __initdata tablet_i2c_3_boardinfo[] = {
+	{
+		I2C_BOARD_INFO("tmp105", 0x48),
+	},
+};
+
+static struct i2c_board_info __initdata tablet_i2c_4_boardinfo[] = {
+	{
+		I2C_BOARD_INFO("bmp085", 0x77),
+	},
+	{
+		I2C_BOARD_INFO("hmc5843", 0x1e),
+	},
+};
+
+static int __init tablet_i2c_init(void)
 {
-	return omap4_board_revision;
-}
-EXPORT_SYMBOL(omap4_board_rev);
-
-static void __init omap4_get_revision(void)
-{
-
-	switch (system_rev) {
-		case 2143: /* Reading part number instead board revision */
-			omap4_board_revision = OMAP4_BLAZETABLET_BOARD;
-			break;
-		case 0x10: /* 1.0, hardcode in u-boot for Blaze and SDP boards*/
-			omap4_board_revision = OMAP4_BLAZE_BOARD;
-			break;
-		default:
-			omap4_board_revision = OMAP4_BLAZETABLET_BOARD;
-	}
+	/*
+	 * Phoenix Audio IC needs I2C1 to
+	 * start with 400 KHz or less
+	 */
+	omap_register_i2c_bus(1, 400, tablet_i2c_boardinfo,
+			ARRAY_SIZE(tablet_i2c_boardinfo));
+	omap_register_i2c_bus(2, 400, tablet_i2c_2_boardinfo,
+			ARRAY_SIZE(tablet_i2c_2_boardinfo));
+	omap_register_i2c_bus(3, 400, tablet_i2c_3_boardinfo,
+			ARRAY_SIZE(tablet_i2c_3_boardinfo));
+	omap_register_i2c_bus(4, 400, tablet_i2c_4_boardinfo,
+			ARRAY_SIZE(tablet_i2c_4_boardinfo));
+	return 0;
 }
 
-static void __init omap_4430sdp_init(void)
+static struct platform_device *blazetablet_devices[] __initdata = {
+	&sdp4430_disp_led,
+	/* TODO. Review button LEDs functionality
+	&sdp4430_leds_pwm, */
+	&sdp4430_leds_gpio,
+};
+
+void omap_44xxtablet_init(void)
 {
 	int status;
 	int package = OMAP_PACKAGE_CBS;
 
-#ifdef CONFIG_MACH_OMAP_44xxTABLET
-	omap4_get_revision();
-	if (omap4_board_rev() == OMAP4_BLAZETABLET_BOARD) {
-		omap_44xxtablet_init();
-		return;
-	}
-#endif
 	if (omap_rev() == OMAP4430_REV_ES1_0)
 		package = OMAP_PACKAGE_CBL;
 	omap4_mux_init(board_mux, package);
 
-	omap4_i2c_init();
+	tablet_i2c_init();
 	omap4_display_init();
 	omap_disp_led_init();
-	omap_sfh7741prox_init();
-	omap_cma3000accl_init();
-	platform_add_devices(sdp4430_devices, ARRAY_SIZE(sdp4430_devices));
+
+	platform_add_devices(blazetablet_devices,
+		ARRAY_SIZE(blazetablet_devices));
+
 	omap_serial_init();
 	omap4_twl6030_hsmmc_init(mmc);
 
@@ -1085,10 +739,6 @@ static void __init omap_4430sdp_init(void)
 	usb_ehci_init(&ehci_pdata);
 	usb_musb_init(&musb_board_data);
 
-	status = omap4_keypad_initialization(&sdp4430_keypad_data);
-	if (status)
-		pr_err("Keypad initialization failed: %d\n", status);
-
 	status = omap_ethernet_init();
 	if (status) {
 		pr_err("Ethernet initialization failed: %d\n", status);
@@ -1099,19 +749,3 @@ static void __init omap_4430sdp_init(void)
 	}
 	omap_display_init(&sdp4430_dss_data);
 }
-
-static void __init omap_4430sdp_map_io(void)
-{
-	omap2_set_globals_443x();
-	omap44xx_map_common_io();
-}
-
-MACHINE_START(OMAP_4430SDP, "OMAP4430 4430SDP board")
-	/* Maintainer: Santosh Shilimkar - Texas Instruments Inc */
-	.boot_params	= 0x80000100,
-	.map_io		= omap_4430sdp_map_io,
-	.reserve	= omap_reserve,
-	.init_irq	= omap_4430sdp_init_irq,
-	.init_machine	= omap_4430sdp_init,
-	.timer		= &omap_timer,
-MACHINE_END

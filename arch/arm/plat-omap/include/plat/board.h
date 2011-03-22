@@ -26,6 +26,11 @@ enum {
 	OMAP3EVM_BOARD_GEN_2,		/* EVM Rev >= Rev E */
 };
 
+#if defined(CONFIG_MACH_OMAP_4430SDP)
+#define OMAP4_BLAZE_BOARD		0   /* 0x0010 */
+#define OMAP4_BLAZETABLET_BOARD 	1   /* 2143d */
+#endif
+
 /* Different peripheral ids */
 #define OMAP_TAG_CLOCK		0x4f01
 #define OMAP_TAG_LCD		0x4f05
@@ -166,6 +171,8 @@ extern int omap_board_config_size;
 
 /* for TI reference platforms sharing the same debug card */
 extern int debug_card_init(u32 addr, unsigned gpio);
+
+u8 omap4_board_rev(void);
 
 /* OMAP3EVM revision */
 #if defined(CONFIG_MACH_OMAP3EVM)
