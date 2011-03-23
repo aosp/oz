@@ -57,6 +57,8 @@
 
 #define LED_SEC_DISP_GPIO 27
 #define DSI2_GPIO_59	59
+#define DP_4430_GPIO_59         59
+
 
 #define LED_PWM2ON		0x03
 #define LED_PWM2OFF		0x04
@@ -299,8 +301,39 @@ static struct omap_dss_device blazetablet_lcd_device = {
 	.channel		= OMAP_DSS_CHANNEL_LCD,
 };
 
+/* PARADE DP501, DisplayPort chip */
+static int sdp4430_panel_enable_displayport(struct omap_dss_device *dssdev)
+{
+	printk(KERN_ERR "sdp4430_panel_enable_displayport is called\n");
+	gpio_request(DP_4430_GPIO_59, "DISPLAYPORT POWER DOWN");
+	gpio_direction_output(DP_4430_GPIO_59, 0);
+	mdelay(100);
+	gpio_set_value(DP_4430_GPIO_59, 1);
+	mdelay(100);
+	return 0;
+}
+
+static void sdp4430_panel_disable_displayport(struct omap_dss_device *dssdev)
+{
+	printk(KERN_DEBUG "sdp4430_panel_disable_displayport is called\n");
+	gpio_set_value(DP_4430_GPIO_59, 0);
+}
+
+static struct omap_dss_device sdp4430_displayport_device = {
+	.name				= "DP501",
+	.driver_name			= "displayport_panel",
+	.type				= OMAP_DISPLAY_TYPE_DPI,
+	.phy.dpi.data_lines		= 24,
+	.platform_enable		= sdp4430_panel_enable_displayport,
+	.platform_disable		= sdp4430_panel_disable_displayport,
+	.channel			= OMAP_DSS_CHANNEL_LCD2,
+};
+
 static struct omap_dss_device *blazetablet_dss_devices[] = {
 	&blazetablet_lcd_device,
+#ifdef CONFIG_PANEL_DP501
+	&sdp4430_displayport_device,
+#endif
 };
 
 static struct omap_dss_board_info blazetablet_dss_data = {
@@ -639,6 +672,9 @@ static struct i2c_board_info __initdata tablet_i2c_boardinfo[] = {
 static struct i2c_board_info __initdata tablet_i2c_2_boardinfo[] = {
 	{
 		I2C_BOARD_INFO("d2l_i2c_driver", 0x0f),
+	},
+	{
+		I2C_BOARD_INFO("DP501_i2c_driver", 0x08),
 	},
 };
 
