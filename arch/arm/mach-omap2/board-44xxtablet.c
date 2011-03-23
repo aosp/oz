@@ -72,6 +72,7 @@ static struct gpio_keys_button tablet_gpio_keys_buttons[] = {
 		.gpio			= 43,
 		.desc			= "SW1",
 		.active_low		= 1,
+		.wakeup			= 1,
 		.debounce_interval	= 30,
 	},
 	[1] = {
@@ -79,6 +80,7 @@ static struct gpio_keys_button tablet_gpio_keys_buttons[] = {
 		.gpio			= 46,
 		.desc			= "SW2",
 		.active_low		= 1,
+		.wakeup			= 1,
 		.debounce_interval	= 30,
 	},
 	[2] = {
@@ -86,6 +88,7 @@ static struct gpio_keys_button tablet_gpio_keys_buttons[] = {
 		.gpio			= 47,
 		.desc			= "SW3",
 		.active_low		= 1,
+		.wakeup			= 1,
 		.debounce_interval	= 30,
 	},
 };
