@@ -27,6 +27,7 @@
 #include <linux/leds-omap4430sdp-display.h>
 #include <linux/delay.h>
 #include <linux/input/sfh7741.h>
+#include <linux/i2c/atmel_mxt224.h>
 #include <linux/i2c/cma3000.h>
 
 #include <mach/hardware.h>
@@ -42,7 +43,6 @@
 #include <plat/omap_device.h>
 #include <plat/omap_hwmod.h>
 #include <plat/omap4-keypad.h>
-#include <plat/syntm12xx.h>
 #include <plat/mmc.h>
 #include <plat/toshiba-dsi-panel.h>
 
@@ -341,6 +341,20 @@ static struct omap_dss_board_info blazetablet_dss_data = {
 	.devices	=	blazetablet_dss_devices,
 	.default_device =	&blazetablet_lcd_device,
 };
+
+/* Atmel MXT224 TouchScreen Begin */
+static struct atmel_mxt224_platform_data atmel_mxt224_ts_platform_data[] = {
+	{
+		.x_line = 17,
+		.y_line = 13,
+		.x_size = 1023,
+		.y_size = 767,
+		.blen = 1,
+		.threshold = 30,
+		.orient = 4,
+	},
+};
+/* End Atmel Touch screen */
 
 static const struct ehci_hcd_omap_platform_data ehci_pdata __initconst = {
 	.port_mode[0]	= EHCI_HCD_OMAP_MODE_PHY,
@@ -685,6 +699,11 @@ static struct i2c_board_info __initdata tablet_i2c_3_boardinfo[] = {
 };
 
 static struct i2c_board_info __initdata tablet_i2c_4_boardinfo[] = {
+	{
+		I2C_BOARD_INFO("atmel_mxt224", 0x4b),
+		.platform_data = &atmel_mxt224_ts_platform_data[0],
+		.irq = 35,
+	},
 	{
 		I2C_BOARD_INFO("bmp085", 0x77),
 	},
