@@ -316,6 +316,7 @@ config MACH_OMAP_44xxTABLET
 	select PANEL_DP501
 	select PANEL_D2L
 	select TOUCHSCREEN_ATMELMXT224
+	select KEYBOARD_GPIO
 
 config MACH_OMAP4_PANDA
 	bool "OMAP4 Panda Board"

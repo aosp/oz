@@ -64,6 +64,46 @@
 #define LED_PWM2OFF		0x04
 #define LED_TOGGLE3		0x92
 
+
+/* GPIO_KEY for Tablet */
+static struct gpio_keys_button tablet_gpio_keys_buttons[] = {
+	[0] = {
+		.code			= KEY_BACK,
+		.gpio			= 43,
+		.desc			= "SW1",
+		.active_low		= 1,
+		.debounce_interval	= 30,
+	},
+	[1] = {
+		.code			= KEY_HOME,
+		.gpio			= 46,
+		.desc			= "SW2",
+		.active_low		= 1,
+		.debounce_interval	= 30,
+	},
+	[2] = {
+		.code			= KEY_F1,
+		.gpio			= 47,
+		.desc			= "SW3",
+		.active_low		= 1,
+		.debounce_interval	= 30,
+	},
+};
+
+static struct gpio_keys_platform_data tablet_gpio_keys = {
+	.buttons		= tablet_gpio_keys_buttons,
+	.nbuttons		= ARRAY_SIZE(tablet_gpio_keys_buttons),
+	.rep			= 1,
+};
+
+static struct platform_device tablet_gpio_keys_device = {
+	.name		= "gpio-keys",
+	.id		= -1,
+	.dev		= {
+		.platform_data	= &tablet_gpio_keys,
+	},
+};
+
 static struct gpio_led sdp4430_gpio_leds[] = {
 	{
 		.name	= "omap4:green:debug0",
@@ -734,6 +774,7 @@ static struct platform_device *blazetablet_devices[] __initdata = {
 	/* TODO. Review button LEDs functionality
 	&sdp4430_leds_pwm, */
 	&sdp4430_leds_gpio,
+	&tablet_gpio_keys_device,
 };
 
 void omap_44xxtablet_init(void)
