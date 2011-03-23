@@ -807,24 +807,12 @@ static int atmel_mxt224_get_object_table(struct atmel_mxt224_data *data)
 	return 0;
 }
 
-static int atmel_mxt224_initialize(struct atmel_mxt224_data *data)
+static int atmel_mxt224_configure(struct atmel_mxt224_data *data)
 {
 	struct i2c_client *client = data->client;
 	struct atmel_mxt224_info *info = &data->info;
 	int ret;
 	u8 val;
-
-	ret = atmel_mxt224_get_info(data);
-	if (ret)
-		return ret;
-
-	data->object_table =
-		kzalloc(sizeof(struct atmel_mxt224_data) * info->object_num,
-				GFP_KERNEL);
-	if (!data->object_table) {
-		dev_err(&client->dev, "Failed to allocate memory\n");
-		return -ENOMEM;
-	}
 
 	/* Get object table information */
 	ret = atmel_mxt224_get_object_table(data);
@@ -869,6 +857,29 @@ static int atmel_mxt224_initialize(struct atmel_mxt224_data *data)
 			info->object_num);
 
 	return 0;
+}
+
+static int atmel_mxt224_initialize(struct atmel_mxt224_data *data)
+{
+	struct i2c_client *client = data->client;
+	struct atmel_mxt224_info *info = &data->info;
+	int ret;
+	u8 val;
+
+	ret = atmel_mxt224_get_info(data);
+	if (ret)
+		return ret;
+
+	data->object_table =
+		kzalloc(sizeof(struct atmel_mxt224_data) * info->object_num,
+				GFP_KERNEL);
+	if (!data->object_table) {
+		dev_err(&client->dev, "Failed to allocate memory\n");
+		return -ENOMEM;
+	}
+
+	ret = atmel_mxt224_configure(data);
+	return ret;
 }
 
 static struct attribute *atmel_mxt224_attrs[] = {
@@ -1055,8 +1066,10 @@ static int atmel_mxt224_resume(struct i2c_client *client)
 
 	mutex_lock(&input_dev->mutex);
 
-	if (input_dev->users)
+	if (input_dev->users) {
+		atmel_mxt224_configure(data);
 		atmel_mxt224_start(data);
+	}
 
 	mutex_unlock(&input_dev->mutex);
 
