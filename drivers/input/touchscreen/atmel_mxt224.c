@@ -428,8 +428,8 @@ static int atmel_mxt224_read_message(struct atmel_mxt224_data *data,
 		sizeof(struct atmel_mxt224_message), (u8 *)message);
 }
 
-static int atmel_mxt224_read_object(struct atmel_mxt224_data *data, u8 type, u8 offset,
-		u8 *val)
+static int atmel_mxt224_read_object(struct atmel_mxt224_data *data,
+		u8 type, u8 offset, u8 *val)
 {
 	struct atmel_mxt224_object *object;
 	u16 reg;
@@ -456,7 +456,8 @@ static int atmel_mxt224_write_object(struct atmel_mxt224_data *data, u8 type,
 	return atmel_mxt224_write_reg(data->client, reg + offset, val);
 }
 
-static void atmel_mxt224_input_report(struct atmel_mxt224_data *data, int single_id)
+static void atmel_mxt224_input_report(struct atmel_mxt224_data *data,
+		int single_id)
 {
 	struct atmel_mxt224_finger *finger = data->finger;
 	struct input_dev *input_dev = data->input_dev;
@@ -639,7 +640,7 @@ static int atmel_mxt224_check_matrix_size(struct atmel_mxt224_data *data)
 		if (pdata->y_line <= 10)
 			mode = 3;
 		if (pdata->y_line == 11 || pdata->y_line == 12)
-		mode = 2;
+			mode = 2;
 		break;
 	case 19:
 		if (pdata->y_line <= 9)
@@ -684,7 +685,8 @@ static int atmel_mxt224_make_highchg(struct atmel_mxt224_data *data)
 
 	/* Read dummy message to make high CHG pin */
 	do {
-		ret = atmel_mxt224_read_object(data, QT602240_GEN_MESSAGE, 0, &val);
+		ret = atmel_mxt224_read_object(data, QT602240_GEN_MESSAGE,
+			0, &val);
 		if (ret)
 			return ret;
 	} while ((val != 0xff) && --count);
@@ -703,14 +705,14 @@ static void atmel_mxt224_handle_pdata(struct atmel_mxt224_data *data)
 	u8 voltage;
 
 	/* Set touchscreen lines */
-	atmel_mxt224_write_object(data, QT602240_TOUCH_MULTI, QT602240_TOUCH_XSIZE,
-			pdata->x_line);
-	atmel_mxt224_write_object(data, QT602240_TOUCH_MULTI, QT602240_TOUCH_YSIZE,
-			pdata->y_line);
+	atmel_mxt224_write_object(data, QT602240_TOUCH_MULTI,
+		QT602240_TOUCH_XSIZE, pdata->x_line);
+	atmel_mxt224_write_object(data, QT602240_TOUCH_MULTI,
+		QT602240_TOUCH_YSIZE, pdata->y_line);
 
 	/* Set touchscreen orient */
-	atmel_mxt224_write_object(data, QT602240_TOUCH_MULTI, QT602240_TOUCH_ORIENT,
-			pdata->orient);
+	atmel_mxt224_write_object(data, QT602240_TOUCH_MULTI,
+		QT602240_TOUCH_ORIENT, pdata->orient);
 
 	/* Set touchscreen burst length */
 	atmel_mxt224_write_object(data, QT602240_TOUCH_MULTI,
@@ -893,8 +895,8 @@ static const struct attribute_group atmel_mxt224_attr_group = {
 static void atmel_mxt224_start(struct atmel_mxt224_data *data)
 {
 	/* Touch enable */
-	atmel_mxt224_write_object(data, QT602240_TOUCH_MULTI, QT602240_TOUCH_CTRL,
-			0x83);
+	atmel_mxt224_write_object(data, QT602240_TOUCH_MULTI,
+		QT602240_TOUCH_CTRL, 0x83);
 
 	atmel_mxt224_make_highchg(data);
 }
@@ -902,8 +904,8 @@ static void atmel_mxt224_start(struct atmel_mxt224_data *data)
 static void atmel_mxt224_stop(struct atmel_mxt224_data *data)
 {
 	/* Touch disable */
-	atmel_mxt224_write_object(data, QT602240_TOUCH_MULTI, QT602240_TOUCH_CTRL,
-			0);
+	atmel_mxt224_write_object(data, QT602240_TOUCH_MULTI,
+		QT602240_TOUCH_CTRL, 0);
 }
 
 static int atmel_mxt224_input_open(struct input_dev *dev)
@@ -987,7 +989,8 @@ static int __devinit atmel_mxt224_probe(struct i2c_client *client,
 
 	gpio_direction_input(data->irq);
 
-	ret = request_threaded_irq(gpio_to_irq(client->irq), NULL, atmel_mxt224_interrupt,
+	ret = request_threaded_irq(gpio_to_irq(client->irq),
+		NULL, atmel_mxt224_interrupt,
 		IRQF_TRIGGER_FALLING, client->dev.driver->name, data);
 	if (ret) {
 		dev_err(&client->dev, "Failed to register interrupt\n");
@@ -1037,7 +1040,6 @@ static int __devexit atmel_mxt224_remove(struct i2c_client *client)
 }
 
 #ifdef CONFIG_PM
-//TODO. Review PM, Touchscreen is not waking up
 static int atmel_mxt224_suspend(struct i2c_client *client, pm_message_t mesg)
 {
 	struct atmel_mxt224_data *data = i2c_get_clientdata(client);
@@ -1080,7 +1082,7 @@ static int atmel_mxt224_resume(struct i2c_client *client)
 static void atmel_mxt224_early_suspend(struct early_suspend *handler)
 {
 	struct atmel_mxt224_data *data;
-printk("%s:%s\n",__FILE__,__FUNCTION__);
+	printk(KERN_INFO "%s:%s\n", __FILE__, __func__);
 	data = container_of(handler, struct atmel_mxt224_data, early_suspend);
 	atmel_mxt224_suspend(data->client, PMSG_SUSPEND);
 }
@@ -1088,7 +1090,7 @@ printk("%s:%s\n",__FILE__,__FUNCTION__);
 static void atmel_mxt224_late_resume(struct early_suspend *handler)
 {
 	struct atmel_mxt224_data *data;
-printk("%s:%s\n",__FILE__,__FUNCTION__);
+	printk(KERN_INFO "%s:%s\n", __FILE__, __func__);
 	data = container_of(handler, struct atmel_mxt224_data, early_suspend);
 	atmel_mxt224_resume(data->client);
 }
