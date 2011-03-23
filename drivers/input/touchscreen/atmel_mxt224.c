@@ -32,6 +32,10 @@
 #include <linux/slab.h>
 #include <linux/gpio.h>
 
+#ifdef CONFIG_HAS_EARLYSUSPEND
+#include <linux/earlysuspend.h>
+#endif
+
 /* Version */
 #define QT602240_VER_22                        22
 
@@ -263,7 +267,17 @@ struct atmel_mxt224_data {
 	struct atmel_mxt224_info info;
 	struct atmel_mxt224_finger finger[QT602240_MAX_FINGER];
 	unsigned int irq;
+	#ifdef CONFIG_HAS_EARLYSUSPEND
+	struct early_suspend		early_suspend;
+	#endif
 };
+
+#ifdef CONFIG_PM
+#ifdef CONFIG_HAS_EARLYSUSPEND
+static void atmel_mxt224_early_suspend(struct early_suspend *handler);
+static void atmel_mxt224_late_resume(struct early_suspend *handler);
+#endif
+#endif
 
 static int atmel_mxt224_object_readable(unsigned int type)
 {
@@ -977,6 +991,13 @@ static int __devinit atmel_mxt224_probe(struct i2c_client *client,
 	if (ret)
 		goto err_unregister_device;
 
+#ifdef CONFIG_HAS_EARLYSUSPEND
+	data->early_suspend.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN + 1;
+	data->early_suspend.suspend = atmel_mxt224_early_suspend;
+	data->early_suspend.resume = atmel_mxt224_late_resume;
+	register_early_suspend(&data->early_suspend);
+#endif
+
 	return 0;
 
 err_unregister_device:
@@ -1005,6 +1026,7 @@ static int __devexit atmel_mxt224_remove(struct i2c_client *client)
 }
 
 #ifdef CONFIG_PM
+//TODO. Review PM, Touchscreen is not waking up
 static int atmel_mxt224_suspend(struct i2c_client *client, pm_message_t mesg)
 {
 	struct atmel_mxt224_data *data = i2c_get_clientdata(client);
@@ -1040,9 +1062,24 @@ static int atmel_mxt224_resume(struct i2c_client *client)
 
 	return 0;
 }
-#else
-#define atmel_mxt224_suspend	NULL
-#define atmel_mxt224_resume	NULL
+
+#ifdef CONFIG_HAS_EARLYSUSPEND
+static void atmel_mxt224_early_suspend(struct early_suspend *handler)
+{
+	struct atmel_mxt224_data *data;
+printk("%s:%s\n",__FILE__,__FUNCTION__);
+	data = container_of(handler, struct atmel_mxt224_data, early_suspend);
+	atmel_mxt224_suspend(data->client, PMSG_SUSPEND);
+}
+
+static void atmel_mxt224_late_resume(struct early_suspend *handler)
+{
+	struct atmel_mxt224_data *data;
+printk("%s:%s\n",__FILE__,__FUNCTION__);
+	data = container_of(handler, struct atmel_mxt224_data, early_suspend);
+	atmel_mxt224_resume(data->client);
+}
+#endif
 #endif
 
 static const struct i2c_device_id atmel_mxt224_id[] = {
@@ -1057,8 +1094,15 @@ static struct i2c_driver atmel_mxt224_driver = {
 	},
 	.probe		= atmel_mxt224_probe,
 	.remove		= __devexit_p(atmel_mxt224_remove),
+#ifdef CONFIG_PM
+#ifdef CONFIG_HAS_EARLYSUSPEND
+	.suspend        = NULL,
+	.resume         = NULL,
+#else
 	.suspend	= atmel_mxt224_suspend,
 	.resume		= atmel_mxt224_resume,
+#endif
+#endif
 	.id_table	= atmel_mxt224_id,
 };
 
