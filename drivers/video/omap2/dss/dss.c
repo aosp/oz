@@ -530,8 +530,6 @@ retry:
 					goto found;
 			}
 		}
-	} else {
-		BUG();
 	}
 
 found:

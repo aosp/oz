@@ -2093,7 +2093,12 @@ static void dispc_enable_lcd_out(enum omap_channel channel, bool enable)
 			DSSERR("failed to register FRAMEDONE isr\n");
 	}
 
-	_enable_lcd_out(channel, enable);
+	if (omap4_board_rev() == OMAP4_BLAZETABLET_BOARD) {
+		if ((is_on && !enable) || (!is_on && enable))
+			_enable_lcd_out(channel, enable);
+	} else {
+		_enable_lcd_out(channel, enable);
+	}
 
 	if (!enable && is_on) {
 		if (!wait_for_completion_timeout(&frame_done_completion,

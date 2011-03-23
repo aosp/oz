@@ -244,7 +244,9 @@ int dsi_vc_set_max_rx_packet_size(struct omap_dss_device *dssdev,
 int dsi_vc_send_null(struct omap_dss_device *dssdev, int channel);
 int dsi_vc_send_bta_sync(struct omap_dss_device *dssdev, int channel);
 
-void dsi_set_stop_mode(bool stop);
+int dsi_vc_send_long(struct omap_dss_device *dssdev, int channel,
+	u8 data_type, u8 *data, u16 len, u8 ecc);
+void dsi_set_stop_mode(struct omap_dss_device *dssdev, bool stop);
 
 /* Board specific data */
 struct omap_dss_board_info {
@@ -613,5 +615,8 @@ int omap_rfbi_prepare_update(struct omap_dss_device *dssdev,
 int omap_rfbi_update(struct omap_dss_device *dssdev,
 		u16 x, u16 y, u16 w, u16 h,
 		void (*callback)(void *), void *data);
+
+void dsi_videomode_panel_preinit(struct omap_dss_device *dssdev);
+void dsi_videomode_panel_postinit(struct omap_dss_device *dssdev);
 
 #endif

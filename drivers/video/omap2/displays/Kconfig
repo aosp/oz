@@ -39,6 +39,12 @@ config PANEL_D2L
         help
           Toshiba D2L DSI video mode panel.
 
+config PANEL_DP501
+        tristate "DisplayPort DP501 Panel"
+        depends on OMAP2_DSS
+        help
+          DisplayPort Panel used in TI's Blaze Tablet
+
 config PANEL_TPO_TD043MTEA1
 	tristate "TPO TD043MTEA1 LCD Panel"
 	depends on OMAP2_DSS && SPI
