@@ -34,6 +34,9 @@
 
 #include "omapfb.h"
 
+/* OMAPDSS HWC for now is part of omapfb */
+#define OMAPDSS_HWC_SET  _IOW('O', 128, struct dss_hwc_set_info)
+
 static u8 get_mem_idx(struct omapfb_info *ofbi)
 {
 	if (ofbi->id == ofbi->region->id)
@@ -889,6 +892,27 @@ int omapfb_ioctl(struct fb_info *fbi, unsigned int cmd, unsigned long arg)
 		if (copy_to_user((void __user *)arg, &p.display_info,
 					sizeof(p.display_info)))
 			r = -EFAULT;
+		break;
+	}
+
+	case OMAPDSS_HWC_SET:
+	{
+		struct {
+			struct dss_hwc_set_info set;
+			struct dss_hwc_ovl_info ovl[5];
+		} p;
+
+		if (copy_from_user(&p.set, (void __user *)arg,
+					sizeof(p.set)) ||
+		    p.set.num_ovls >= ARRAY_SIZE(p.ovl) ||
+		    copy_from_user(&p.ovl, (void __user *)arg + sizeof(p.set),
+					sizeof(*p.ovl) * p.set.num_ovls)) {
+			r = -EFAULT;
+			break;
+		}
+
+		r = omapdss_hwc_set(&p.set);
+
 		break;
 	}
 

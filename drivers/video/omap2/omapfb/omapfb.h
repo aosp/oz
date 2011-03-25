@@ -178,4 +178,6 @@ static inline void omapfb_put_mem_region(struct omapfb2_mem_region *rg)
 	up_read(&rg->lock);
 }
 
+int omapdss_hwc_set(struct dss_hwc_set_info *set);
+
 #endif
