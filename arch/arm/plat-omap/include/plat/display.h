@@ -306,6 +306,24 @@ enum device_n_buffer_type {
 	IBUF_PDEV_SWAP	= OMAP_FLAG_IBUF | OMAP_FLAG_ISWAP,
 };
 
+/*
+ * This structure will surpass the above device_n_buffer_type structure
+ * when interlaced device support is integrated into DSS.  The above structure
+ * intertwines the interlaced-device and the interlaced-buffer concepts which
+ * make implementation more confusing.
+ */
+enum omap_dss_ilace_mode {
+	OMAP_DSS_ILACE		= (1 << 0),	/* interlaced vs. progressive */
+	OMAP_DSS_ILACE_SEQ	= (1 << 1),	/* sequential vs interleaved */
+	OMAP_DSS_ILACE_SWAP	= (1 << 2),	/* swap fields, e.g. TB=>BT */
+
+	OMAP_DSS_ILACE_NONE	= 0,
+	OMAP_DSS_ILACE_IL_TB	= OMAP_DSS_ILACE,
+	OMAP_DSS_ILACE_IL_BT	= OMAP_DSS_ILACE | OMAP_DSS_ILACE_SWAP,
+	OMAP_DSS_ILACE_SEQ_TB	= OMAP_DSS_ILACE_IL_TB | OMAP_DSS_ILACE_SEQ,
+	OMAP_DSS_ILACE_SEQ_BT	= OMAP_DSS_ILACE_IL_BT | OMAP_DSS_ILACE_SEQ,
+};
+
 /* Stereoscopic Panel types
  * row, column, overunder, sidebyside options
  * are with respect to native scan order
@@ -859,6 +877,163 @@ struct d2l_platform_data {
 	u8 gpio_intr;
 };
 
+struct dss_color_conv_info {
+	int r_y, r_cr, r_cb;
+	int g_y, g_cr, g_cb;
+	int b_y, b_cr, b_cb;
+
+	/* Y is 16..235, UV is 16..240 if not fullrange.  Otherwise 0..255 */
+	s32 fullrange;
+};
+
+struct dss_vc1_range_map_info {
+	s32 enable;	/* map or not? */
+
+	u32 range_y;	/* 0..7 */
+	u32 range_uv;	/* 0..7 */
+};
+
+/*
+ * DSS HWC overlay information.  This structure contains all information
+ * needed to set up the overlay for a particular buffer to be displayed
+ * at a particular orientation.
+ *
+ * The following information is deemed to be set globally, so it is not
+ * included:
+ *   - whether to enable zorder (always enabled)
+ *   - whether to replicate/truncate color fields (it is decided per the
+ *     whole manager/overlay settings, and is enabled unless overlay is
+ *     directed to WB.)
+ *   - CLUT
+ *
+ * Assumptions:
+ *
+ * 1) 0 <= crop_x <= crop_x + crop_w <= width
+ * 2) 0 <= crop_y <= crop_y + crop_h <= height
+ * 3) color_mode is supported by overlay
+ * 4) requested scaling is supported by overlay and functional clocks
+ *
+ * Notes:
+ *
+ * 1) Any portions of X:[pos_x, pos_x + out_width] and
+ *    Y:[pos_y, pos_y + out_height] outside of the screen
+ *    X:[0, screen.width], Y:[0, screen.height] will be cropped
+ *    automatically without changing the scaling ratio.
+ *
+ * 2) Crop region will be adjusted to the pixel granularity:
+ *    (2-by-1) for YUV422, (2-by-2) for YUV420.  This will
+ *    not modify the output region.  Crop region is for the
+ *    original (unrotated) buffer, so it does not change with
+ *    rotation.
+ *
+ * 3) Rotation will not modify the output region, specifically
+ *    its height and width.  Also the coordinate system of the
+ *    display is always (0,0) = top left.
+ *
+ * 4) cconv and vc1 only needs to be filled for YUV color modes.
+ *
+ * 5) vc1.range_y and vc1.range_uv only needs to be filled if
+ *    vc1.enable is true.
+ *
+ */
+struct dss_hwc_ovl_info {
+	/* THE PORTION BELOW MUST BE FILLED OUT TO CHECK DSS SUPPORT */
+
+	u32 ix;	/* ovl index same as sysfs/overlay# */
+
+	/* :TBD: some way of specifying buffer address */
+	u32 handle;	/* for buffer_handle_t */
+	u32 module;	/* for gralloc_module_t */
+
+	/* the following may be able to be derived from the handle or
+	   may have to be specified */
+	u16 width;	/* buffer width */
+	u16 height;	/* buffer height */
+	u16 stride;	/* buffer stride */
+
+	enum omap_color_mode color_mode;
+	s32 pre_mult_alpha;
+	u32 global_alpha;
+
+	int rotation;	/* 0..3 (*90 degrees clockwise) */
+	s32 mirror;	/* left-to-right */
+	enum omap_dss_ilace_mode ilace;	/* interlace mode */
+
+	s16 pos_x;
+	s16 pos_y;
+	u16 out_width;
+	u16 out_height;
+
+	u16 crop_x;
+	u16 crop_y;
+	u16 crop_w;
+	u16 crop_h;
+
+	/* END OF PORTION OF THE CONFIGURATION TO CHECK DSS SUPPORT */
+
+
+	/* THIS PORTION OF THE CONFIGURATION IS ONLY USED FOR SET */
+
+	u16 zorder;	/* 0..3 */
+	s32 enabled;
+
+	struct dss_color_conv_info cconv;
+	struct dss_vc1_range_map_info vc1;
+
+	/* END OF PORTION OF THE CONFIGURATION USED FOR SET */
+};
+
+/*
+ * DSS HWC manager information.
+ *
+ * The following information is deemed to be set globally, so it is not
+ * included:
+ *   - gamma correction
+ *   - color phase correction
+ *
+ *   whether to enable zorder (always enabled)
+ *   whether to replicate/truncate color fields (it is decided per the
+ *   whole manager/overlay settings, and is enabled unless overlay is
+ *   directed to WB.)
+ * Notes:
+ *
+ * 1) trans_key_type and trans_enabled only need to be filled if
+ *    trans_enabled is true, and alpha_blending is false.
+ */
+
+struct dss_hwc_mgr_info {
+	u32 ix;	/* display index same as sysfs/display# */
+
+	s32 interlaced;
+
+	u32 default_color;
+
+	s32 alpha_blending;	/* overrides transparency */
+
+	s32 trans_enabled;
+	enum omap_dss_trans_key_type trans_key_type;
+	u32 trans_key;
+};
+
+/*
+ * DSS HWC set operation information.  This operation sets the manager and
+ * all associated pipelines.
+ *
+ * Notes:
+ *
+ * 1) x, y, w, h only needs to be set if update is true.
+ */
+struct dss_hwc_set_info {
+	s32 update;	/* calls display update after setting up compositor */
+	u16 x, y;	/* update region */
+	u16 w, h;	/* (set w/h to 0/0 for full screen) */
+	u32 num_ovls;	/* number of overlays used in the composition */
+	struct dss_hwc_mgr_info mgr;
+	struct dss_hwc_ovl_info ovls[0]; /* up to 5 overlays to set up */
+};
+
+
+
 int omap_dss_register_driver(struct omap_dss_driver *);
 void omap_dss_unregister_driver(struct omap_dss_driver *);
 
@@ -961,5 +1136,9 @@ int omap_rfbi_update(struct omap_dss_device *dssdev,
 
 void change_base_address(int id, u32 p_uv_addr);
 bool is_hdmi_interlaced(void);
+
+int set_dss_ovl_info(struct dss_hwc_ovl_info *oi);
+struct omap_overlay_manager *find_dss_mgr(int display_ix);
+int set_dss_mgr_info(struct dss_hwc_mgr_info *mi);
 
 #endif
