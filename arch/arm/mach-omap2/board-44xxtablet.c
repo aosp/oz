@@ -1627,7 +1627,7 @@ static void __init omap_4430sdp_map_io(void)
 	omap44xx_map_common_io();
 }
 
-MACHINE_START(OMAP_BLAZE, "OMAP4430 Tablet board")
+MACHINE_START(OMAP_BLAZE, "OMAP4430")
 	.phys_io	= 0x48000000,
 	.io_pg_offst	= ((0xfa000000) >> 18) & 0xfffc,
 	.boot_params	= 0x80000100,
