@@ -1601,20 +1601,26 @@ static void _dispc_set_color_mode(enum omap_plane plane,
 			m = 0x5; break;
 		case OMAP_DSS_COLOR_RGB16:
 			m = 0x6; break;
+		case OMAP_DSS_COLOR_ARGB16_1555:
+			m = 0x7; break;
 		case OMAP_DSS_COLOR_RGB24U:
 			m = 0x8; break;
 		case OMAP_DSS_COLOR_RGB24P:
 			m = 0x9; break;
 		case OMAP_DSS_COLOR_YUV2:
+		case OMAP_DSS_COLOR_RGBX12:
 			m = 0xa; break;
 		case OMAP_DSS_COLOR_UYVY:
+		case OMAP_DSS_COLOR_RGBA16:
 			m = 0xb; break;
 		case OMAP_DSS_COLOR_ARGB32:
 			m = 0xc; break;
 		case OMAP_DSS_COLOR_RGBA32:
 			m = 0xd; break;
-		case OMAP_DSS_COLOR_RGBX32:
+		case OMAP_DSS_COLOR_RGBX24:
 			m = 0xe; break;
+		case OMAP_DSS_COLOR_XRGB15:
+			m = 0xf; break;
 		default:
 			BUG(); break;
 		}
@@ -1622,11 +1628,11 @@ static void _dispc_set_color_mode(enum omap_plane plane,
 		switch (color_mode) {
 		case OMAP_DSS_COLOR_NV12:
 			m = 0x0; break;
-		case OMAP_DSS_COLOR_RGB12U:
+		case OMAP_DSS_COLOR_RGBX12:
 			m = 0x1; break;
-		case OMAP_DSS_COLOR_RGBA12:
+		case OMAP_DSS_COLOR_RGBA16:
 			m = 0x2; break;
-		case OMAP_DSS_COLOR_XRGB12:
+		case OMAP_DSS_COLOR_RGB12U:
 			m = 0x4; break;
 		case OMAP_DSS_COLOR_ARGB16:
 			m = 0x5; break;
@@ -1646,7 +1652,7 @@ static void _dispc_set_color_mode(enum omap_plane plane,
 			m = 0xC; break;
 		case OMAP_DSS_COLOR_RGBA32:
 			m = 0xD; break;
-		case OMAP_DSS_COLOR_RGBX24_32_ALGN:
+		case OMAP_DSS_COLOR_RGBX24:
 			m = 0xE; break;
 		case OMAP_DSS_COLOR_XRGB15:
 			m = 0xF; break;
@@ -2432,8 +2438,12 @@ static int color_mode_to_bpp(enum omap_color_mode color_mode)
 	case OMAP_DSS_COLOR_NV12:
 		return 8;
 	case OMAP_DSS_COLOR_RGB12U:
+	case OMAP_DSS_COLOR_RGBX12:
 	case OMAP_DSS_COLOR_RGB16:
+	case OMAP_DSS_COLOR_ARGB16_1555:
 	case OMAP_DSS_COLOR_ARGB16:
+	case OMAP_DSS_COLOR_RGBA16:
+	case OMAP_DSS_COLOR_XRGB15:
 	case OMAP_DSS_COLOR_YUV2:
 	case OMAP_DSS_COLOR_UYVY:
 		return 16;
@@ -2442,7 +2452,7 @@ static int color_mode_to_bpp(enum omap_color_mode color_mode)
 	case OMAP_DSS_COLOR_RGB24U:
 	case OMAP_DSS_COLOR_ARGB32:
 	case OMAP_DSS_COLOR_RGBA32:
-	case OMAP_DSS_COLOR_RGBX32:
+	case OMAP_DSS_COLOR_RGBX24:
 		return 32;
 	default:
 		BUG();
@@ -2471,34 +2481,20 @@ static void calc_tiler_row_rotation(u8 rotation,
 		enum device_n_buffer_type  ilace,
 		u16 pic_height)
  {
-	u8 ps = 1;
+	u8 ps = color_mode_to_bpp(color_mode) / 8;
 	u32 line_size = 0;
 	DSSDBG("calc_tiler_rot(%d): %dx%d\n", rotation, width, pic_height);
 
-	switch (color_mode) {
-	case OMAP_DSS_COLOR_RGB16:
-	case OMAP_DSS_COLOR_ARGB16:
-		ps = 2;
-		break;
+	BUG_ON(ps == 0);
 
-	case OMAP_DSS_COLOR_RGB24P:
-	case OMAP_DSS_COLOR_RGB24U:
-	case OMAP_DSS_COLOR_ARGB32:
-	case OMAP_DSS_COLOR_RGBA32:
-	case OMAP_DSS_COLOR_RGBX32:
-	case OMAP_DSS_COLOR_YUV2:
-	case OMAP_DSS_COLOR_UYVY:
+	if (color_mode == OMAP_DSS_COLOR_YUV2 ||
+	    color_mode == OMAP_DSS_COLOR_UYVY)
+		/* YUV422 is handled as 4bpp */
 		ps = 4;
-		break;
+	else if (color_mode == OMAP_DSS_COLOR_RGB24P)
+		/* we don't rotate this format */
+		rotation = 0;
 
-	case OMAP_DSS_COLOR_NV12:
-		ps = 1;
-		break;
-
-	default:
-		BUG();
-		return;
-	}
 	switch (rotation) {
 	case 0:
 	case 2:
@@ -3024,6 +3020,7 @@ static int _dispc_setup_plane(enum omap_plane plane,
 	s32 pix_inc;
 	u16 frame_height = height;
 	unsigned int field_offset = 0;
+	unsigned int color_mask;
 
 	if (paddr == 0)
 		return -EINVAL;
@@ -3066,66 +3063,22 @@ static int _dispc_setup_plane(enum omap_plane plane,
 	}
 
 	/* check if color format is supported */
-	if (plane == OMAP_DSS_GFX) {
-		switch (color_mode) {
-		case OMAP_DSS_COLOR_ARGB16:
-		case OMAP_DSS_COLOR_ARGB32:
-		case OMAP_DSS_COLOR_RGBA32:
-		case OMAP_DSS_COLOR_RGBX32:
-
-			if (cpu_is_omap24xx())
-				return -EINVAL;
-			/* fall through */
-		case OMAP_DSS_COLOR_RGB12U:
-		case OMAP_DSS_COLOR_RGB16:
-		case OMAP_DSS_COLOR_RGB24P:
-		case OMAP_DSS_COLOR_RGB24U:
-		case OMAP_DSS_COLOR_CLUT8:
-		case OMAP_DSS_COLOR_CLUT4:
-		case OMAP_DSS_COLOR_CLUT2:
-			break;
-
-		default:
-			return -EINVAL;
-		}
+	if (cpu_is_omap44xx()) {
+		color_mask = (plane == OMAP_DSS_GFX) ?
+			OMAP_DSS_COLOR_GFX_OMAP4 : OMAP_DSS_COLOR_VID_OMAP4;
+	} else if (cpu_is_omap24xx()) {
+		color_mask = (plane == OMAP_DSS_GFX) ?
+			OMAP_DSS_COLOR_GFX_OMAP2 : OMAP_DSS_COLOR_VID_OMAP2;
 	} else {
-		/* video plane */
-
-		switch (color_mode) {
-		case OMAP_DSS_COLOR_RGBX32:
-		case OMAP_DSS_COLOR_RGB12U:
-			if (cpu_is_omap24xx())
-				return -EINVAL;
-			/* fall through */
-		case OMAP_DSS_COLOR_RGB16:
-		case OMAP_DSS_COLOR_RGB24P:
-		case OMAP_DSS_COLOR_RGB24U:
-			break;
-
-		case OMAP_DSS_COLOR_ARGB16:
-		case OMAP_DSS_COLOR_ARGB32:
-		case OMAP_DSS_COLOR_RGBA32:
-		case OMAP_DSS_COLOR_RGBA12:
-		case OMAP_DSS_COLOR_XRGB12:
-		case OMAP_DSS_COLOR_ARGB16_1555:
-		case OMAP_DSS_COLOR_RGBX24_32_ALGN:
-		case OMAP_DSS_COLOR_XRGB15:
-			if (cpu_is_omap24xx())
-				return -EINVAL;
-			if (!cpu_is_omap44xx() && plane == OMAP_DSS_VIDEO1)
-				return -EINVAL;
-			break;
-
-		case OMAP_DSS_COLOR_NV12:
-		case OMAP_DSS_COLOR_YUV2:
-		case OMAP_DSS_COLOR_UYVY:
-			cconv = 1;
-			break;
-
-		default:
-			return -EINVAL;
-		}
+		color_mask = (plane == OMAP_DSS_GFX) ?
+			OMAP_DSS_COLOR_GFX_OMAP3 : (plane == OMAP_DSS_VIDEO1) ?
+			OMAP_DSS_COLOR_VID1_OMAP3 : OMAP_DSS_COLOR_VID2_OMAP3;
 	}
+	if (!(color_mode & color_mask))
+		return -EINVAL;
+
+	cconv = (color_mode & (OMAP_DSS_COLOR_YUV2 | OMAP_DSS_COLOR_UYVY |
+				OMAP_DSS_COLOR_NV12)) != 0;
 
 	/* predecimate */
 	width = DIV_ROUND_UP(width, x_decim);
@@ -5205,16 +5158,17 @@ int dispc_setup_wb(struct writeback_cache_data *wb)
 	case OMAP_DSS_COLOR_RGB16:
 	case OMAP_DSS_COLOR_RGB24P:
 	case OMAP_DSS_COLOR_ARGB16:
-	case OMAP_DSS_COLOR_RGBA12:
-	case OMAP_DSS_COLOR_XRGB12:
+	case OMAP_DSS_COLOR_RGBA16:
+	case OMAP_DSS_COLOR_RGBX12:
+	case OMAP_DSS_COLOR_RGB12U:
 	case OMAP_DSS_COLOR_ARGB16_1555:
-	case OMAP_DSS_COLOR_RGBX24_32_ALGN:
 	case OMAP_DSS_COLOR_XRGB15:
 		truncate = 1;
 		break;
 	case OMAP_DSS_COLOR_ARGB32:
 	case OMAP_DSS_COLOR_RGBA32:
 	case OMAP_DSS_COLOR_RGB24U:
+	case OMAP_DSS_COLOR_RGBX24:
 		break;
 	case OMAP_DSS_COLOR_NV12:
 	case OMAP_DSS_COLOR_YUV2:
@@ -5300,23 +5254,8 @@ int dispc_setup_wb(struct writeback_cache_data *wb)
 	} else {
 		row_inc = 1;
 		if (lines_to_skip) {
-			u8 ps = 2;
-
-			switch (color_mode) {
-			case OMAP_DSS_COLOR_RGB24P:
-			case OMAP_DSS_COLOR_RGB24U:
-			case OMAP_DSS_COLOR_ARGB32:
-			case OMAP_DSS_COLOR_RGBA32:
-			case OMAP_DSS_COLOR_RGBX32:
-				ps = 4;
-				break;
-			case OMAP_DSS_COLOR_NV12:
-				ps = 1;
-				break;
-			default:
-				;
-			}
-			row_inc += width * ps * lines_to_skip;
+			u8 ps = color_mode_to_bpp(color_mode);
+			row_inc += DIV_ROUND_UP(width * ps, 8) * lines_to_skip;
 		}
 	}
 

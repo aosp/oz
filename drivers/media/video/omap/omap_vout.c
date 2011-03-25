@@ -915,10 +915,17 @@ enum omap_color_mode video_mode_to_dss_mode(struct v4l2_pix_format *pix,
 	case V4L2_PIX_FMT_UYVY:
 		mode = OMAP_DSS_COLOR_UYVY;
 		break;
+	case V4L2_PIX_FMT_RGB555:
+		mode = OMAP_DSS_COLOR_ARGB16_1555;
+		break;
+	case V4L2_PIX_FMT_RGB444:
+		mode = OMAP_DSS_COLOR_ARGB16;
+		break;
 	case V4L2_PIX_FMT_RGB565:
 		mode = OMAP_DSS_COLOR_RGB16;
 		break;
 	case V4L2_PIX_FMT_RGB24:
+	case V4L2_PIX_FMT_BGR24:
 		mode = OMAP_DSS_COLOR_RGB24P;
 		break;
 	case V4L2_PIX_FMT_RGB32:
@@ -930,7 +937,7 @@ enum omap_color_mode video_mode_to_dss_mode(struct v4l2_pix_format *pix,
 #endif
 		break;
 	case V4L2_PIX_FMT_BGR32:
-		mode = OMAP_DSS_COLOR_RGBX32;
+		mode = OMAP_DSS_COLOR_RGBX24;
 		break;
 	default:
 		mode = -EINVAL;
