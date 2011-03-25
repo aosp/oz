@@ -33,6 +33,7 @@
 #include <linux/regulator/consumer.h>
 #include <linux/wait.h>
 #include <linux/workqueue.h>
+#include <asm/mach-types.h>
 #include <plat/board.h>
 #include <plat/display.h>
 #include <plat/clock.h>
@@ -791,7 +792,7 @@ static void dsi_vc_enable_bta_irq(enum omap_dsi_index ix,
 	u32 l;
 
 	// we don't need bta... TODO: a best way to validate this
-	if(omap4_board_rev()==OMAP4_BLAZETABLET_BOARD)
+	if (machine_is_omap_tabletblaze())
 		return;
 
 	dsi_write_reg(ix, DSI_VC_IRQSTATUS(channel), DSI_VC_IRQ_BTA);
@@ -807,7 +808,7 @@ static void dsi_vc_disable_bta_irq(enum omap_dsi_index ix,
 	u32 l;
 
 	// we don't need bta... TODO: a best way to validate this
-	if(omap4_board_rev()==OMAP4_BLAZETABLET_BOARD)
+	if (machine_is_omap_tabletblaze())
 		return;
 
 	l = dsi_read_reg(ix, DSI_VC_IRQENABLE(channel));
@@ -1712,8 +1713,7 @@ static void dsi_complexio_config(struct omap_dss_device *dssdev)
 	r = FLD_MOD(r, data2_lane, 10, 8);
 	r = FLD_MOD(r, data2_pol, 11, 11);
 
-	if(omap4_board_rev()==OMAP4_BLAZETABLET_BOARD)
-	{
+	if (machine_is_omap_tabletblaze()) {
 		r = FLD_MOD(r, data3_lane, 14, 12);
 		r = FLD_MOD(r, data3_pol, 15, 15);
 		r = FLD_MOD(r, data4_lane, 18, 16);
@@ -2273,7 +2273,7 @@ static int dsi_vc_send_bta(enum omap_dsi_index ix, int channel)
 	struct dsi_struct *p_dsi = (ix == DSI1) ? &dsi1 : &dsi2;
 
 	// we don't need bta... TODO: a best way to validate this
-	if(omap4_board_rev()==OMAP4_BLAZETABLET_BOARD)
+	if (machine_is_omap_tabletblaze())
 		return 0;
 
 	if (p_dsi->debug_write || p_dsi->debug_read)
@@ -2299,7 +2299,7 @@ int dsi_vc_send_bta_sync(enum omap_dsi_index ix, int channel)
 	struct dsi_struct *p_dsi = (ix == DSI1) ? &dsi1 : &dsi2;
 
 	// we don't need bta... TODO: a best way to validate this
-	if(omap4_board_rev()==OMAP4_BLAZETABLET_BOARD)
+	if (machine_is_omap_tabletblaze())
 		return 0;
 
 	INIT_COMPLETION(p_dsi->bta_completion);
@@ -3546,7 +3546,7 @@ int omap_dsi_update(struct omap_dss_device *dssdev,
 			p_dsi->update_region.h = h;
 			p_dsi->update_region.device = dssdev;
 
-			if(omap4_board_rev()==OMAP4_BLAZETABLET_BOARD)
+			if (machine_is_omap_tabletblaze())
 				dsi_videomode_update_screen_dispc(dssdev, x, y, w, h);
 			else
 				dsi_update_screen_dispc(dssdev, x, y, w, h);
@@ -3567,7 +3567,7 @@ static int dsi_display_init_dispc(struct omap_dss_device *dssdev)
 {
 	int r;
 
-	if (omap4_board_rev() == OMAP4_BLAZETABLET_BOARD) {
+	if (machine_is_omap_tabletblaze()) {
         //hardcoding this for DSI videomode as it waits for VSYNC instead of FRAMEDONE
 		r = omap_dispc_register_isr((dssdev->channel == OMAP_DSS_CHANNEL_LCD) ?
 			dsi_framedone_irq_callback : dsi2_framedone_irq_callback,
@@ -3606,7 +3606,7 @@ static int dsi_display_init_dispc(struct omap_dss_device *dssdev)
 			.y_res		= 480,
 		};
 
-		if (omap4_board_rev() == OMAP4_BLAZETABLET_BOARD) {
+		if (machine_is_omap_tabletblaze()) {
 	        //just set the values on panel-d2l, no need to hardcode them here anymore.
 	        dispc_set_lcd_timings(dssdev->channel, &dssdev->panel.timings);
 		}
@@ -3619,7 +3619,7 @@ static int dsi_display_init_dispc(struct omap_dss_device *dssdev)
 
 static void dsi_display_uninit_dispc(struct omap_dss_device *dssdev)
 {
-	if (omap4_board_rev() == OMAP4_BLAZETABLET_BOARD) {
+	if (machine_is_omap_tabletblaze()) {
 		omap_dispc_unregister_isr((dssdev->channel == OMAP_DSS_CHANNEL_LCD) ?
 			dsi_framedone_irq_callback : dsi2_framedone_irq_callback,
 			NULL, (dssdev->channel == OMAP_DSS_CHANNEL_LCD) ?

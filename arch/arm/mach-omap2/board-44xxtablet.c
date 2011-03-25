@@ -1,9 +1,9 @@
 /*
  * Board support file for OMAP4430 SDP.
  *
- * Copyright (C) 2009 Texas Instruments
+ * Copyright (C) 2011 Texas Instruments
  *
- * Author: Santosh Shilimkar <santosh.shilimkar@ti.com>
+
  *
  * Based on mach-omap2/board-3430sdp.c
  *
@@ -651,6 +651,16 @@ static struct platform_device *blazetablet_devices[] __initdata = {
 	&sdp4430_hdmi_audio_device,
 	&tablet_gpio_keys_device,
 };
+
+static void __init omap_4430sdp_init_irq(void)
+{
+	omap2_init_common_hw(NULL, NULL);
+#ifdef CONFIG_OMAP_32K_TIMER
+	omap2_gp_clockevent_set_gptimer(1);
+#endif
+	gic_init_irq();
+	sr_class3_init();
+}
 
 static struct omap_musb_board_data musb_board_data = {
 	.interface_type		= MUSB_INTERFACE_UTMI,
@@ -1533,7 +1543,8 @@ static void omap4_4430sdp_wifi_init(void)
 		pr_err("Error setting wl12xx data\n");
 }
 #endif
-void omap_44xxtablet_init(void)
+
+static void __init omap_44xxtablet_init(void)
 {
 	int status;
 	int package = OMAP_PACKAGE_CBS;
@@ -1609,3 +1620,19 @@ void omap_44xxtablet_init(void)
 	omap_voltage_register_pmic(&omap_pmic_iva, "iva");
 	omap_voltage_init_vc(&vc_config);
 }
+
+static void __init omap_4430sdp_map_io(void)
+{
+	omap2_set_globals_443x();
+	omap44xx_map_common_io();
+}
+
+MACHINE_START(OMAP_BLAZE, "OMAP4430 Tablet board")
+	.phys_io	= 0x48000000,
+	.io_pg_offst	= ((0xfa000000) >> 18) & 0xfffc,
+	.boot_params	= 0x80000100,
+	.map_io		= omap_4430sdp_map_io,
+	.init_irq	= omap_4430sdp_init_irq,
+	.init_machine	= omap_44xxtablet_init,
+	.timer		= &omap_timer,
+MACHINE_END

@@ -33,6 +33,8 @@
 #include <linux/workqueue.h>
 #include <linux/hardirq.h>
 
+#include <asm/mach-types.h>
+
 #include <plat/sram.h>
 #include <plat/clock.h>
 
@@ -3374,7 +3376,7 @@ static void dispc_enable_lcd_out(enum omap_channel channel, bool enable)
 		irq = DISPC_IRQ_FRAMEDONE;
 	}
 
-	if (omap4_board_rev() == OMAP4_BLAZETABLET_BOARD) {
+	if (machine_is_omap_tabletblaze()) {
 		/* another change */
 		irq = DISPC_IRQ_VSYNC;
 	}
@@ -3390,7 +3392,7 @@ static void dispc_enable_lcd_out(enum omap_channel channel, bool enable)
 			DSSERR("failed to register FRAMEDONE isr\n");
 	}
 
-	if (omap4_board_rev() == OMAP4_BLAZETABLET_BOARD) {
+	if (machine_is_omap_tabletblaze()) {
 		if ((is_on && !enable) | (!is_on && enable))
 	    	_enable_lcd_out(channel, enable);
 	} else {
@@ -3772,7 +3774,7 @@ void dispc_set_parallel_interface_mode(enum omap_channel channel,
 		break;
 
 	case OMAP_DSS_PARALLELMODE_DSI:
-		if (omap4_board_rev() == OMAP4_BLAZETABLET_BOARD) {
+		if (machine_is_omap_tabletblaze()) {
 			//seems like nobody thought about DSI videomode where stallmode needs to be off, so turning it off here.
 			stallmode = 0;
 		}

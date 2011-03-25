@@ -228,7 +228,7 @@ config MACH_OMAP_4430SDP
 	select SECURITY_MIDDLEWARE_COMPONENT
 	select CDC_TCXO
 
-config MACH_OMAP_44xxTABLET
+config MACH_OMAP_BLAZE
 	bool "OMAP 44xx Tablet board"
 	depends on ARCH_OMAP4
 	select HIGHMEM
@@ -259,6 +259,8 @@ config MACH_OMAP_44xxTABLET
 	select CHARGER_BQ2415x
 	select SECURITY_MIDDLEWARE_COMPONENT
 	select CDC_TCXO
+	select PANEL_DP501
+	select PANEL_D2L
 
 config MACH_OMAP4_PANDA
 	bool "OMAP4 based Panda board"
