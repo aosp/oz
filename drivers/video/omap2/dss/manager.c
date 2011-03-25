@@ -263,6 +263,10 @@ static ssize_t manager_alpha_blending_enabled_store(
 	if (sscanf(buf, "%d", &enable) != 1)
 		return -EINVAL;
 
+	/* on OMAP4 alpha blending is always enabled */
+	if (cpu_is_omap44xx() && !enable)
+		return -EINVAL;
+
 	mgr->get_manager_info(mgr, &info);
 
 	info.alpha_enabled = enable ? true : false;
@@ -961,7 +965,15 @@ static void configure_manager(enum omap_channel channel)
 	dispc_set_default_color(channel, c->default_color);
 	dispc_set_trans_key(channel, c->trans_key_type, c->trans_key);
 	dispc_enable_trans_key(channel, c->trans_enabled);
-	dispc_enable_alpha_blending(channel, c->alpha_enabled);
+
+	/* on OMAP4 alpha_blending is always ON */
+	if (cpu_is_omap44xx()) {
+		/* and alpha_blending bit enables OMAP3 compatibility mode */
+		dispc_enable_alpha_blending(channel, false);
+		c->alpha_enabled = true;
+	} else {
+		dispc_enable_alpha_blending(channel, c->alpha_enabled);
+	}
 }
 
 /* configure_dispc() tries to write values from cache to shadow registers.
@@ -1741,12 +1753,20 @@ EXPORT_SYMBOL(omap_dss_wb_flush);
 
 static int dss_check_manager(struct omap_overlay_manager *mgr)
 {
-	/* OMAP supports only graphics source transparency color key and alpha
-	 * blending simultaneously. See TRM 15.4.2.4.2.2 Alpha Mode */
-
-	if (mgr->info.alpha_enabled && mgr->info.trans_enabled &&
+	if (cpu_is_omap44xx()) {
+		/* alpha blending is always enabled on OMAP4 */
+		if (!mgr->info.alpha_enabled)
+			return -EINVAL;
+	} else {
+		/*
+		 * OMAP3- supports only graphics destination transparency
+		 * color key and alpha blending simultaneously.
+		 * See TRM 15.4.2.4.2.2 Alpha Mode.
+		 */
+		if (mgr->info.alpha_enabled && mgr->info.trans_enabled &&
 			mgr->info.trans_key_type != OMAP_DSS_COLOR_KEY_GFX_DST)
-		return -EINVAL;
+			return -EINVAL;
+	}
 
 	return 0;
 }
@@ -1810,6 +1830,10 @@ int dss_init_overlay_managers(struct platform_device *pdev)
 		mgr = kzalloc(sizeof(*mgr), GFP_KERNEL);
 
 		BUG_ON(mgr == NULL);
+
+		/* alpha is always enabled on OMAP4 */
+		if (cpu_is_omap44xx())
+			mgr->info.alpha_enabled = true;
 
 		switch (i) {
 		case 0:

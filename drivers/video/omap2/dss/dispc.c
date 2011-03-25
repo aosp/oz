@@ -3679,6 +3679,10 @@ void dispc_enable_alpha_blending(enum omap_channel ch, bool enable)
 	if (cpu_is_omap24xx())
 		return;
 
+	/* compatibility mode is not supported on LCD2 */
+	if (ch == OMAP_DSS_CHANNEL_LCD2)
+		return;
+
 	enable_clocks(1);
 	if (ch == OMAP_DSS_CHANNEL_LCD)
 		REG_FLD_MOD(DISPC_CONFIG, enable, 18, 18);
@@ -3696,6 +3700,8 @@ bool dispc_alpha_blending_enabled(enum omap_channel ch)
 	enable_clocks(1);
 	if (ch == OMAP_DSS_CHANNEL_LCD)
 		enabled = REG_GET(DISPC_CONFIG, 18, 18);
+	else if (ch == OMAP_DSS_CHANNEL_LCD2)
+		enabled = false;
 	else if (ch == OMAP_DSS_CHANNEL_DIGIT)
 		enabled = REG_GET(DISPC_CONFIG, 18, 18);
 	else
