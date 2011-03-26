@@ -1336,7 +1336,14 @@ static int conf_overlay_info(const struct s3d_ovl_device *dev,
 	info.width = ovl->src.w;
 	info.height = ovl->src.h;
 	info.color_mode = ovl->queue->color_mode;
+	/*
+	 * DSS mirroring is left-to-right, while ovl->vflip is top-down,
+	 * so adjust rotation by 180 degrees
+	 */
 	info.mirror = ovl->vflip;
+	if (ovl->vflip)
+		info.rotation ^= OMAP_DSS_ROT_180;
+
 	info.pos_x = ovl->dst.x;
 	info.pos_y = ovl->dst.y;
 	info.out_width = ovl->dst.w;

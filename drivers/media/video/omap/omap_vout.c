@@ -968,6 +968,7 @@ int omapvid_setup_overlay(struct omap_vout_device *vout,
 	int ret = 0;
 	struct omap_overlay_info info;
 	int cropheight, cropwidth, pixheight, pixwidth;
+	int rotation = vout->rotation;
 
 	if ((ovl->caps & OMAP_DSS_OVL_CAP_SCALE) == 0 &&
 			(outw != vout->pix.width || outh != vout->pix.height)) {
@@ -1009,7 +1010,13 @@ int omapvid_setup_overlay(struct omap_vout_device *vout,
 	info.width = cropwidth;
 	info.height = cropheight;
 	info.color_mode = vout->dss_mode;
+	/*
+	 * DSS mirroring is left-to-right, while vout->mirror is top-down,
+	 * so adjust rotation by 180 degrees
+	 */
 	info.mirror = vout->mirror;
+	if (vout->mirror)
+		rotation ^= dss_rotation_180_degree;
 	info.pos_x = posx;
 	info.pos_y = posy;
 	info.out_width = outw;
@@ -1028,14 +1035,14 @@ int omapvid_setup_overlay(struct omap_vout_device *vout,
 			info.rotation_type = OMAP_DSS_ROT_DMA;
 			info.screen_width = pixwidth;
 		} else {
-			info.rotation = vout->rotation;
+			info.rotation = rotation;
 			info.rotation_type = OMAP_DSS_ROT_VRFB;
 			info.screen_width = 2048;
 		}
 	} else {
 		info.rotation_type = OMAP_DSS_ROT_TILER;
 		info.screen_width = pixwidth;
-		info.rotation = vout->rotation;
+		info.rotation = rotation;
 	}
 
 	v4l2_dbg(1, debug, &vout->vid_dev->v4l2_dev,

@@ -2379,21 +2379,22 @@ static void _dispc_set_rotation_attrs(enum omap_plane plane, u8 rotation,
 	BUG_ON(plane == OMAP_DSS_WB);
 
 	if (color_mode == OMAP_DSS_COLOR_YUV2 ||
-			color_mode == OMAP_DSS_COLOR_UYVY) {
+			color_mode == OMAP_DSS_COLOR_UYVY ||
+			color_mode == OMAP_DSS_COLOR_RGB24P) {
 		int vidrot = 0;
 
 		switch (rotation) {
 		case OMAP_DSS_ROT_0:
-			vidrot = 0;
+			vidrot = mirroring ? 2 : 0;
 			break;
 		case OMAP_DSS_ROT_180:
-			vidrot = 2;
+			vidrot = mirroring ? 0 : 2;
 			break;
 		case OMAP_DSS_ROT_90:
-			vidrot = mirroring ? 3 : 1;
+			vidrot = 1;
 			break;
 		case OMAP_DSS_ROT_270:
-			vidrot = mirroring ? 1 : 3;
+			vidrot = 3;
 			break;
 		}
 
@@ -3135,9 +3136,9 @@ static int _dispc_setup_plane(enum omap_plane plane,
 
 		if (mirror) {
 			if (rotation & 1)
-				mir_x = 1;
-			else
 				mir_y = 1;
+			else
+				mir_x = 1;
 		}
 		orient.x_invert ^= mir_x;
 		orient.y_invert ^= mir_y;
@@ -5226,9 +5227,9 @@ int dispc_setup_wb(struct writeback_cache_data *wb)
 
 		if (mirror) {
 			if (rotation & 1)
-				mir_x = 1;
-			else
 				mir_y = 1;
+			else
+				mir_x = 1;
 		}
 		orient.x_invert ^= mir_x;
 		orient.y_invert ^= mir_y;
