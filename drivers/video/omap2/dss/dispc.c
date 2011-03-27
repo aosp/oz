@@ -2699,7 +2699,7 @@ static void calc_dma_rotation_offset(u8 rotation, bool mirror,
 		enum omap_color_mode color_mode, bool fieldmode,
 		unsigned int field_offset,
 		unsigned *offset0, unsigned *offset1,
-		s32 *row_inc, s32 *pix_inc)
+		s32 *row_inc, s32 *pix_inc, int x_decim, int y_decim)
 {
 	u8 ps;
 	u16 fbw, fbh;
@@ -2740,10 +2740,10 @@ static void calc_dma_rotation_offset(u8 rotation, bool mirror,
 			*offset0 = *offset1 + field_offset * screen_width * ps;
 		else
 			*offset0 = *offset1;
-		*row_inc = pixinc(1 + (screen_width - fbw) +
+		*row_inc = pixinc(1 + (y_decim * screen_width - fbw * x_decim) +
 				(fieldmode ? screen_width : 0),
 				ps);
-		*pix_inc = pixinc(1, ps);
+		*pix_inc = pixinc(x_decim, ps);
 		break;
 	case OMAP_DSS_ROT_90:
 		*offset1 = screen_width * (fbh - 1) * ps;
@@ -3186,7 +3186,8 @@ static int _dispc_setup_plane(enum omap_plane plane,
 #ifdef CONFIG_TILER_OMAP
 		int bpp = color_mode_to_bpp(color_mode) / 8;
 		struct tiler_view_orient orient = {0};
-		unsigned long tiler_width = width, tiler_height = height;
+		unsigned long tiler_width = (width - 1) * x_decim + 1;
+		unsigned long tiler_height = (height - 1) * y_decim + 1;
 		u8 mir_x = 0, mir_y = 0;
 		u8 tiler_rotation = rotation;
 
@@ -3256,7 +3257,9 @@ static int _dispc_setup_plane(enum omap_plane plane,
 		calc_dma_rotation_offset(rotation, mirror,
 				screen_width, width, frame_height, color_mode,
 				fieldmode, field_offset,
-				&offset0, &offset1, &row_inc, &pix_inc);
+				&offset0, &offset1, &row_inc, &pix_inc,
+				x_decim, y_decim);
+
 	} else if (rotation_type == OMAP_DSS_ROT_VRFB) {
 		calc_vrfb_rotation_offset(rotation, mirror,
 				screen_width, width, frame_height, color_mode,
