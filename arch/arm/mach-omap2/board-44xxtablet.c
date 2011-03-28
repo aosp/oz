@@ -1311,6 +1311,19 @@ static void enable_board_wakeup_source(void)
 	}
 
 #endif
+
+	omap_mux_init_signal("gpmc_a22.gpio_46",
+			OMAP_PULL_ENA | OMAP_PULL_UP |
+			OMAP_WAKEUP_EN | OMAP_MUX_MODE3 |
+			OMAP_INPUT_EN);
+	omap_mux_init_signal("gpmc_a23.gpio_47",
+			OMAP_PULL_ENA | OMAP_PULL_UP |
+			OMAP_WAKEUP_EN | OMAP_MUX_MODE3 |
+			OMAP_INPUT_EN);
+	omap_mux_init_signal("gpmc_a19.gpio_43",
+			OMAP_PULL_ENA | OMAP_PULL_UP |
+			OMAP_WAKEUP_EN | OMAP_MUX_MODE3 |
+			OMAP_INPUT_EN);
 	/*
 	 * Enable IO daisy for sys_nirq1/2, to be able to
 	 * wakeup from interrupts from PMIC/Audio IC.
