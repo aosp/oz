@@ -246,6 +246,7 @@ config MACH_OMAP_BLAZE
 	select LEDS_TRIGGER_TIMER
 	select MISC_DEVICES
 	select INPUT_BMP085
+	select INPUT_BMA180
 	select STAGING
 	select IIO
 	select INPUT_HMC5843
