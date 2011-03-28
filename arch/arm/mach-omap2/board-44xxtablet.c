@@ -105,7 +105,7 @@ static struct gpio_keys_button tablet_gpio_keys_buttons[] = {
 		.desc			= "SW1",
 		.active_low		= 1,
 		.wakeup			= 1,
-		.debounce_interval	= 30,
+		.debounce_interval	= 5,
 	},
 	[1] = {
 		.code			= KEY_HOME,
@@ -113,7 +113,7 @@ static struct gpio_keys_button tablet_gpio_keys_buttons[] = {
 		.desc			= "SW2",
 		.active_low		= 1,
 		.wakeup			= 1,
-		.debounce_interval	= 30,
+		.debounce_interval	= 5,
 	},
 	[2] = {
 		.code			= KEY_F1,
@@ -121,14 +121,14 @@ static struct gpio_keys_button tablet_gpio_keys_buttons[] = {
 		.desc			= "SW3",
 		.active_low		= 1,
 		.wakeup			= 1,
-		.debounce_interval	= 30,
+		.debounce_interval	= 5,
 		},
 	};
 
 static struct gpio_keys_platform_data tablet_gpio_keys = {
 	.buttons		= tablet_gpio_keys_buttons,
 	.nbuttons		= ARRAY_SIZE(tablet_gpio_keys_buttons),
-	.rep			= 1,
+	.rep			= 0,
 };
 
 static struct platform_device tablet_gpio_keys_device = {
