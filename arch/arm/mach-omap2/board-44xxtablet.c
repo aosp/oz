@@ -21,6 +21,7 @@
 #include <linux/spi/spi.h>
 #include <linux/i2c/twl.h>
 #include <linux/i2c/bq2415x.h>
+#include <linux/i2c/bma180.h>
 #include <linux/regulator/machine.h>
 #include <linux/leds.h>
 #include <linux/leds_pwm.h>
@@ -73,7 +74,7 @@
 #define ETH_KS8851_QUART		138
 
 #define OMAP4_TOUCH_IRQ_1		35
-
+#define OMAP4_BMA180ACCEL_GPIO		178
 #define OMAP4SDP_MDM_PWR_EN_GPIO	157
 
 #define LED_SEC_DISP_GPIO 27
@@ -318,6 +319,20 @@ static struct platform_device sdp4430_disp_led = {
 		.platform_data = &sdp4430_disp_led_data,
 	},
 };
+
+static struct bma180accel_platform_data bma180accel_platform_data = {
+	.method		= BMA_METHOD_POLLING,
+	.g_range	= BMA_GRANGE_2G,
+	.bandwidth	= BMA_BW_10HZ,
+	.mode		= BMA_MODE_LOW_NOISE,
+	.bit_mode	= BMA_BITMODE_14BITS,
+	.smp_skip	= 1,
+	.def_poll_rate	= 200,
+	.fuzz_x		= 25,
+	.fuzz_y		= 25,
+	.fuzz_z		= 25,
+};
+
 
 /* Atmel MXT224 TouchScreen Begin */
 static struct qtm_touch_keyarray_cfg blaze_tablet_key_array_data[] = {
@@ -1128,6 +1143,11 @@ static struct i2c_board_info __initdata tablet_i2c_4_boardinfo[] = {
 	},
 	{
 		I2C_BOARD_INFO("hmc5843", 0x1e),
+	},
+	{
+		I2C_BOARD_INFO("bma180_accel", 0x40),
+		.platform_data = &bma180accel_platform_data,
+		.irq = OMAP4_BMA180ACCEL_GPIO,
 	},
 };
 
