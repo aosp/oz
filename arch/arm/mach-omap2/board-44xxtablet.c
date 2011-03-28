@@ -337,12 +337,12 @@ static struct qtm_touch_keyarray_cfg blaze_tablet_key_array_data[] = {
 
 static void blaze_tablet_touch_init(void)
 {
-	gpio_request(35, "atmel touch irq");
-	gpio_direction_input(35);
+	gpio_request(OMAP4_TOUCH_IRQ_1, "atmel touch irq");
+	gpio_direction_input(OMAP4_TOUCH_IRQ_1);
 }
 
 static struct qtouch_ts_platform_data atmel_mxt224_ts_platform_data = {
-	.irqflags	= (IRQF_TRIGGER_FALLING |IRQF_TRIGGER_LOW),
+	.irqflags	= (IRQF_TRIGGER_FALLING | IRQF_TRIGGER_LOW),
 	.flags		= (QTOUCH_USE_MULTITOUCH | QTOUCH_FLIP_Y),
 	.abs_min_x	= 0,
 	.abs_max_x	= 768,
@@ -434,9 +434,6 @@ static struct qtouch_ts_platform_data atmel_mxt224_ts_platform_data = {
 		.burst_freq_4 = 0x1e,
 		.num_of_gcaf_samples = 0x04,
 	},
-
-	/* QT602240_SPT_CTECONFIG(28) */
-	/* 0x00, 0x00, 0x01, 0x04, 0x08, 0x00,*/
 	.spt_cte_cfg = {
 		.ctrl = 0x00,
 		.command = 0x00,
