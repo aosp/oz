@@ -424,10 +424,10 @@ static struct qtouch_ts_platform_data atmel_mxt224_ts_platform_data = {
 		.gcaf_upper_limit = 0x000a,
 		.gcaf_lower_limit = 0xfff6,
 		.gcaf_valid	= 0x04,
-		.noise_thresh 	= 0x08,
-		.reserved1 	= 0x00,
+		.noise_thresh	= 0x08,
+		.reserved1	= 0x00,
 		.freq_hop_scale = 0x01,
-		.burst_freq_0 	= 0x0a,
+		.burst_freq_0	= 0x0a,
 		.burst_freq_1 = 0x0f,
 		.burst_freq_2 = 0x14,
 		.burst_freq_3 = 0x19,
@@ -570,7 +570,7 @@ static struct omap_dss_device sdp4430_picoDLP_device = {
 /* PARADE DP501, DisplayPort chip */
 static int sdp4430_panel_enable_displayport(struct omap_dss_device *dssdev)
 {
-	printk(KERN_DEBUG "sdp4430_panel_enable_displayport is called \n");
+	printk(KERN_DEBUG "sdp4430_panel_enable_displayport is called\n");
 	gpio_request(DP_4430_GPIO_59, "DISPLAYPORT POWER DOWN");
 	gpio_direction_output(DP_4430_GPIO_59, 0);
 	mdelay(100);
@@ -581,7 +581,7 @@ static int sdp4430_panel_enable_displayport(struct omap_dss_device *dssdev)
 
 static void sdp4430_panel_disable_displayport(struct omap_dss_device *dssdev)
 {
-	printk(KERN_DEBUG "sdp4430_panel_disable_displayport is called \n");
+	printk(KERN_DEBUG "sdp4430_panel_disable_displayport is called\n");
 	gpio_set_value(DP_4430_GPIO_59, 0);
 }
 
