@@ -500,7 +500,12 @@ int omap_st_is_enabled(unsigned int id)
 	return st_data->enabled;
 }
 EXPORT_SYMBOL(omap_st_is_enabled);
+#else
+static inline void omap_st_start(struct omap_mcbsp *mcbsp) {}
+static inline void omap_st_stop(struct omap_mcbsp *mcbsp) {}
+#endif
 
+#if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_ARCH_OMAP4)
 /*
  * omap_mcbsp_set_rx_threshold configures the transmit threshold in words.
  * The threshold parameter is 1 based, and it is converted (threshold - 1)
@@ -677,6 +682,7 @@ static inline void omap34xx_mcbsp_request(struct omap_mcbsp *mcbsp)
 	if (cpu_is_omap34xx() || cpu_is_omap44xx()) {
 
 		if (mcbsp->dma_op_mode == MCBSP_DMA_MODE_THRESHOLD) {
+			MCBSP_WRITE(mcbsp, WAKEUPEN, XRDYEN | RRDYEN);
 			omap_hwmod_enable_wakeup(mcbsp->oh[0]);
 			omap_hwmod_set_slave_idlemode(mcbsp->oh[0],
 						HWMOD_IDLEMODE_SMART);
@@ -710,8 +716,6 @@ static inline void omap34xx_mcbsp_free(struct omap_mcbsp *mcbsp)
 #else
 static inline void omap34xx_mcbsp_request(struct omap_mcbsp *mcbsp) {}
 static inline void omap34xx_mcbsp_free(struct omap_mcbsp *mcbsp) {}
-static inline void omap_st_start(struct omap_mcbsp *mcbsp) {}
-static inline void omap_st_stop(struct omap_mcbsp *mcbsp) {}
 #endif
 
 /*

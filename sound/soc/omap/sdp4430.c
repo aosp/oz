@@ -35,6 +35,7 @@
 #include <asm/mach-types.h>
 #include <plat/hardware.h>
 #include <plat/mux.h>
+#include <plat/mcbsp.h>
 
 #include "omap-mcpdm.h"
 #include "omap-abe.h"
@@ -189,22 +190,19 @@ static int sdp4430_mcbsp_hw_params(struct snd_pcm_substream *substream,
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
+	unsigned int be_id = rtd->dai_link->be_id;
 	int ret = 0;
-	unsigned int be_id;
 
-        be_id = rtd->dai_link->be_id;
-
-	if (be_id == OMAP_ABE_DAI_MM_FM) {
-		/* Set cpu DAI configuration */
-		ret = snd_soc_dai_set_fmt(cpu_dai,
-				  SND_SOC_DAIFMT_I2S |
-				  SND_SOC_DAIFMT_NB_NF |
-				  SND_SOC_DAIFMT_CBM_CFM);
-	} else if (be_id == OMAP_ABE_DAI_BT_VX) {
+	if (be_id == OMAP_ABE_DAI_BT_VX) {
 	        ret = snd_soc_dai_set_fmt(cpu_dai,
                                   SND_SOC_DAIFMT_DSP_B |
                                   SND_SOC_DAIFMT_NB_IF |
                                   SND_SOC_DAIFMT_CBM_CFM);
+	} else {
+		ret = snd_soc_dai_set_fmt(cpu_dai,
+				  SND_SOC_DAIFMT_I2S |
+				  SND_SOC_DAIFMT_NB_NF |
+				  SND_SOC_DAIFMT_CBM_CFM);
 	}
 
 	if (ret < 0) {
@@ -280,30 +278,34 @@ static struct snd_soc_ops sdp4430_dmic_ops = {
 static int mcbsp_be_hw_params_fixup(struct snd_soc_pcm_runtime *rtd,
 			struct snd_pcm_hw_params *params)
 {
+	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
 	struct snd_interval *channels = hw_param_interval(params,
                                        SNDRV_PCM_HW_PARAM_CHANNELS);
-	unsigned int be_id;
-	unsigned int val;
+	unsigned int be_id = rtd->dai_link->be_id;
+	unsigned int threshold;
 
-        be_id = rtd->dai_link->be_id;
 
 	switch (be_id) {
 	case OMAP_ABE_DAI_MM_FM:
 		channels->min = 2;
-		val = SNDRV_PCM_FORMAT_S32_LE;
+		threshold = 2;
 		break;
 	case OMAP_ABE_DAI_BT_VX:
 		channels->min = 1;
-		val = SNDRV_PCM_FORMAT_S16_LE;
+		threshold = 1;
 		break;
 	default:
-		val = SNDRV_PCM_FORMAT_S16_LE;
+		threshold = 1;
 		break;
 	}
 
 	snd_mask_set(&params->masks[SNDRV_PCM_HW_PARAM_FORMAT -
 				    SNDRV_PCM_HW_PARAM_FIRST_MASK],
-		     val);
+		     SNDRV_PCM_FORMAT_S16_LE);
+
+	omap_mcbsp_set_tx_threshold(cpu_dai->id, threshold);
+	omap_mcbsp_set_rx_threshold(cpu_dai->id, threshold);
+
 	return 0;
 }
 

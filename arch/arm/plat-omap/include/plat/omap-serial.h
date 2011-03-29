@@ -122,6 +122,9 @@ struct omap_uart_port_info {
 	u16			padconf_wake_ev;
 	u32			wk_mask;
 	u16			padconf;
+
+	u16			cts_padconf;
+	u32			cts_padvalue;
 };
 
 struct uart_omap_dma {
@@ -172,6 +175,7 @@ struct uart_omap_port {
 	unsigned char		msr_saved_flags;
 	char			name[20];
 	unsigned long		port_activity;
+	unsigned int		baud_rate;
 	void			(*plat_hold_wakelock)(void *up, int flag);
 };
 
@@ -184,6 +188,7 @@ enum {
 
 int omap_uart_active(int num, u32 timeout);
 void omap_uart_update_jiffies(int num);
+void omap_uart_recalibrate_baud(unsigned int enable);
 #ifdef CONFIG_PM
 void omap_uart_enable_clock_from_irq(int uart_num);
 #endif
