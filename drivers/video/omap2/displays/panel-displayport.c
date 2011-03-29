@@ -19,7 +19,8 @@
  */
 
 /* TODO:
-- Detect monitor capabilities together with supported video timings choose the best resolution.
+- Detect monitor capabilities together with supported
+	video timings choose the best resolution.
 - Use PLLs to get the proper pixel clocks, compare if it is a better option.
 - Implement a polling strategic for hot-plug monitor detection.
 - Add routines to attend DP501 ISRs (synchronization, training, etc).
@@ -40,10 +41,10 @@
 #include <linux/slab.h>
 
 /* uncomment this line if you want debug prints: */
-//#define DP501_DEBUG
+/* #define DP501_DEBUG */
 
 #define DRIVER_DESC       "DP501 DisplayPort Driver"
-#define DRIVER_NAME       "displayport_panel" /* name equal to defined in board file */
+#define DRIVER_NAME       "displayport_panel"
 
 
 /********************************/
@@ -55,7 +56,8 @@ int dp501_12c_device_write(struct displayport *sdp, u8 reg, u8 val, char *msg)
 	/* write a byte (val) through i2c smbus to (reg) */
 	int ret = i2c_smbus_write_byte_data(sdp->client, reg, val);
 	if (ret < 0)
-		dev_err(&sdp->client->dev, "i2c_smbus_write_byte_data failed (%s)\n", msg);
+		dev_err(&sdp->client->dev,
+			"i2c_smbus_write_byte_data failed (%s)\n", msg);
 	return ret;
 }
 
@@ -64,7 +66,8 @@ int dp501_12c_device_read(struct displayport *sdp, u8 reg, char *msg)
 	/* read a byte (ret) through i2c smbus from (reg) */
 	int ret = i2c_smbus_read_byte_data(sdp->client, reg);
 	if (ret < 0)
-		dev_err(&sdp->client->dev, "i2c_smbus_read_byte_data failed (%s)\n", msg);
+		dev_err(&sdp->client->dev,
+			"i2c_smbus_read_byte_data failed (%s)\n", msg);
 	return ret;
 }
 
@@ -80,7 +83,7 @@ static void dp501_init(struct displayport *sdp)
 {
 	unsigned char data, Val1, Val2;
 #ifdef DP501_DEBUG
-	printk("%s:%s\n",__FILE__,__FUNCTION__);
+	printk(KERN_INFO "%s:%s\\n", __FILE__, __func__);
 #endif
 	printk(KERN_ALERT "DisplaytPort: Initializing DP501\n");
 
@@ -90,7 +93,8 @@ static void dp501_init(struct displayport *sdp)
 #ifdef DP501_DEBUG
 	printk(KERN_ALERT "DP: CHIP_VER_L P2.82h = 0x%08X\n", data);
 #endif
-	dp501_12c_device_write(sdp, SEL_PIO1, 0x02, "SEL_PIO1"); /* single ended input, high active */
+	/* single ended input, high active */
+	dp501_12c_device_write(sdp, SEL_PIO1, 0x02, "SEL_PIO1");
 	dp501_12c_device_write(sdp, SEL_PIO2, 0x04, "SEL_PIO2");
 	dp501_12c_device_write(sdp, SEL_PIO3, 0x10, "SEL_PIO3");
 
@@ -98,14 +102,20 @@ static void dp501_init(struct displayport *sdp)
 	/* Configuring on Page 0 */
 	sdp->client->addr = 0x08;
 
-	dp501_12c_device_write(sdp, VCAPCTRL3, 0x30, "VCAPCTRL3"); /* auto detect DVO timing*/
-	dp501_12c_device_write(sdp, LINK_CTRL0, 0x82, "LINK_CTRL0"); /* reset tpfifo at v blank */
-	dp501_12c_device_write(sdp, VCAPCTRL0, 0x00, "VCAPCTRL0"); /* RGB24, DVO mapping,crtc mode */
-	dp501_12c_device_write(sdp, VCAPCTRL4, 0x00, "VCAPCTRL4"); /* crtc follow mode */
+	/* auto detect DVO timing*/
+	dp501_12c_device_write(sdp, VCAPCTRL3, 0x30, "VCAPCTRL3");
+	/* reset tpfifo at v blank */
+	dp501_12c_device_write(sdp, LINK_CTRL0, 0x82, "LINK_CTRL0");
+	/* RGB24, DVO mapping,crtc mode */
+	dp501_12c_device_write(sdp, VCAPCTRL0, 0x00, "VCAPCTRL0");
+	/* crtc follow mode */
+	dp501_12c_device_write(sdp, VCAPCTRL4, 0x00, "VCAPCTRL4");
 	/*set color depth 8bit (0x00: 6bit; 0x20: 8bit ; 0x40:10bit) */
 	dp501_12c_device_write(sdp, MISC0, 0x20, "MISC0");
-	dp501_12c_device_write(sdp, HPDCTL0, 0xa9, "HPDCTL0"); /* DPCD readable */
-	dp501_12c_device_write(sdp, QUALTEST_CTL, 0x00, "QUALTEST_CTL"); /* Scramble on */
+	/* DPCD readable */
+	dp501_12c_device_write(sdp, HPDCTL0, 0xa9, "HPDCTL0");
+	/* Scramble on */
+	dp501_12c_device_write(sdp, QUALTEST_CTL, 0x00, "QUALTEST_CTL");
 	/* SP link rate (0x0a : 2.7G; 0x06 : 1.62G) */
 	dp501_12c_device_write(sdp, LINK_BW, 0x06, "LINK_BW");
 	/*Set lane count to 1 (0x81: 1lane; 0x82: 2 lane; 0x84: 4 lane) */
@@ -113,9 +123,12 @@ static void dp501_init(struct displayport *sdp)
 #ifdef DP501_DEBUG
 	printk(KERN_ALERT "DP: set DP501 drive levels\n");
 #endif
-	dp501_12c_device_write(sdp, SW_TRAIN_CTRL, 0x04, "SW_TRAIN_CTRL"); /* Software trainig enabled */
-	dp501_12c_device_write(sdp, SW_DRV_SET, 0x01, "SW_DRV_SET"); /* Software set DRV level */
-	dp501_12c_device_write(sdp, SW_PRE_SET, 0x01, "SW_PRE_SET"); /* software set PRE level */
+	/* Software trainig enabled */
+	dp501_12c_device_write(sdp, SW_TRAIN_CTRL, 0x04, "SW_TRAIN_CTRL");
+	/* Software set DRV level */
+	dp501_12c_device_write(sdp, SW_DRV_SET, 0x01, "SW_DRV_SET");
+	/* software set PRE level */
+	dp501_12c_device_write(sdp, SW_PRE_SET, 0x01, "SW_PRE_SET");
 #ifdef DP501_DEBUG
 	printk(KERN_ALERT "DP: start DP501 link training\n");
 #endif
@@ -123,21 +136,18 @@ static void dp501_init(struct displayport *sdp)
 	mdelay(100);
 	Val1 = dp501_12c_device_read(sdp, LANE01_STATUS, "LANE01_STATUS");
 	Val2 = dp501_12c_device_read(sdp, LANE23_STATUS, "LANE23_STATUS");
-	if((Val1 == 0x07)&(Val2 == 0x00)) {
+	if ((Val1 == 0x07) & (Val2 == 0x00))
 		printk(KERN_ALERT "Training success, 1 Lane\n");
-	}
-	else if ((Val1 == 0x77)&(Val2 == 0x00)) {
+	else if ((Val1 == 0x77) & (Val2 == 0x00))
 		printk(KERN_ALERT "Training success, 2 lanes\n");
-	}
-	else if ((Val1 == 0x77)&(Val2 == 0x77)) {
+	else if ((Val1 == 0x77) & (Val2 == 0x77))
 		printk(KERN_ALERT "Training success, 4 lanes\n");
-	}
-	else {
+	else
 		printk(KERN_ALERT "Training failed\n");
-	}
+
 #ifdef DP501_DEBUG
-	printk(KERN_ALERT "Val1 = 0x%08X \n",Val1);
-	printk(KERN_ALERT "Val2 = 0x%08X \n",Val2);
+	printk(KERN_ALERT "Val1 = 0x%08X\n", Val1);
+	printk(KERN_ALERT "Val2 = 0x%08X\n", Val2);
 #endif
 	/* Force video on (0xc0: force video on, 0x80: pattern1 video off) */
 	dp501_12c_device_write(sdp, LINK_STATE_CTRL, 0xc0, "LINK_STATE_CTRL");
@@ -181,11 +191,11 @@ static void dp501_init(struct displayport *sdp)
 	return;
 }
 
-static int DP501_PowerDownEncoder (struct displayport *sdp)
+static int DP501_PowerDownEncoder(struct displayport *sdp)
 {
 	s32 ret;
 #ifdef DP501_DEBUG
-	printk("%s:%s\n",__FILE__,__FUNCTION__);
+	printk(KERN_INFO "%s:%s\\n", __FILE__, __func__);
 #endif
 	ret = i2c_smbus_read_byte_data(sdp->client, TOPCFG4);
 	ret = dp501_12c_device_read(sdp, TOPCFG4, "TOPCFG4");
@@ -198,10 +208,10 @@ static int DP501_PowerDownEncoder (struct displayport *sdp)
 static int displayport_power_off(struct displayport *sdp)
 {
 #ifdef DP501_DEBUG
-	printk("%s:%s\n",__FILE__,__FUNCTION__);
+	printk(KERN_INFO "%s:%s\\n", __FILE__, __func__);
 #endif
-	if ( DP501_PowerDownEncoder(sdp) < 0 )
-	    return -1;
+	if (DP501_PowerDownEncoder(sdp) < 0)
+		return -1;
 
 	return 0;
 }
@@ -210,10 +220,11 @@ static int displayport_power_off(struct displayport *sdp)
 /*****      I2C driver section       *****/
 /*****************************************/
 
-static int __devinit displayport_i2c_probe(struct i2c_client *client, const struct i2c_device_id *id)
+static int __devinit displayport_i2c_probe(struct i2c_client *client,
+			const struct i2c_device_id *id)
 {
 #ifdef DP501_DEBUG
-	printk("%s:%s\n",__FILE__,__FUNCTION__);
+	printk(KERN_INFO "%s:%s\\n", __FILE__, __func__);
 #endif
 	sdp = kzalloc(sizeof(struct displayport), GFP_KERNEL);
 	if (sdp == NULL)
@@ -227,7 +238,7 @@ static int __devexit displayport_i2c_remove(struct i2c_client *client)
 {
 	struct displayport *sdp = i2c_get_clientdata(client);
 #ifdef DP501_DEBUG
-	printk("%s:%s\n",__FILE__,__FUNCTION__);
+	printk(KERN_INFO "%s:%s\\n", __FILE__, __func__);
 #endif
 	kfree(sdp);
 	i2c_set_clientdata(client, NULL);
@@ -239,7 +250,7 @@ static int __devexit displayport_i2c_remove(struct i2c_client *client)
 static int displayport_i2c_suspend(struct i2c_client *client, pm_message_t mesg)
 {
 #ifdef DP501_DEBUG
-	printk("%s:%s\n",__FILE__,__FUNCTION__);
+	printk(KERN_INFO "%s:%s\\n", __FILE__, __func__);
 #endif
 	return 0;
 }
@@ -247,7 +258,7 @@ static int displayport_i2c_suspend(struct i2c_client *client, pm_message_t mesg)
 static int displayport_i2c_resume(struct i2c_client *client)
 {
 #ifdef DP501_DEBUG
-	printk("%s:%s\n",__FILE__,__FUNCTION__);
+	printk(KERN_INFO "%s:%s\\n", __FILE__, __func__);
 #endif
 	return 0;
 }
@@ -266,12 +277,13 @@ static int DP501_panel_start(struct omap_dss_device *dssdev)
 {
 	int r = 0;
 #ifdef DP501_DEBUG
-	printk("%s:%s\n",__FILE__,__FUNCTION__);
+	printk(KERN_INFO "%s:%s\\n", __FILE__, __func__);
 #endif
 	if (dssdev->platform_enable) {
 		r = dssdev->platform_enable(dssdev);
 		if (r) {
-			dev_err(&dssdev->dev, "failed to enable DSS platform\n");
+			dev_err(&dssdev->dev,
+				"failed to enable DSS platform\n");
 			return r;
 		}
 	}
@@ -287,7 +299,7 @@ static int DP501_panel_start(struct omap_dss_device *dssdev)
 static int DP501_panel_enable(struct omap_dss_device *dssdev)
 {
 #ifdef DP501_DEBUG
-	printk("%s:%s\n",__FILE__,__FUNCTION__);
+	printk(KERN_INFO "%s:%s\\n", __FILE__, __func__);
 #endif
 	if (dssdev->state != OMAP_DSS_DISPLAY_DISABLED)
 		return -EINVAL;
@@ -299,7 +311,7 @@ static void DP501_get_resolution(struct omap_dss_device *dssdev,
 		u16 *xres, u16 *yres)
 {
 #ifdef DP501_DEBUG
-	printk("%s:%s\n",__FILE__,__FUNCTION__);
+	printk(KERN_INFO "%s:%s\\n", __FILE__, __func__);
 #endif
 	*xres = dssdev->panel.timings.x_res;
 	*yres = dssdev->panel.timings.y_res;
@@ -308,7 +320,7 @@ static void DP501_get_resolution(struct omap_dss_device *dssdev,
 static int DP501_panel_probe(struct omap_dss_device *dssdev)
 {
 #ifdef DP501_DEBUG
-	printk("%s:%s\n",__FILE__,__FUNCTION__);
+	printk(KERN_INFO "%s:%s\\n", __FILE__, __func__);
 #endif
 	dssdev->panel.config &= ~((OMAP_DSS_LCD_IPC) | (OMAP_DSS_LCD_IEO));
 	dssdev->panel.config =  (OMAP_DSS_LCD_TFT) | (OMAP_DSS_LCD_ONOFF) |
@@ -323,14 +335,14 @@ static int DP501_panel_probe(struct omap_dss_device *dssdev)
 static void DP501_panel_remove(struct omap_dss_device *dssdev)
 {
 #ifdef DP501_DEBUG
-	printk("%s:%s\n",__FILE__,__FUNCTION__);
+	printk(KERN_INFO "%s:%s\\n", __FILE__, __func__);
 #endif
 }
 
 static void DP501_panel_stop(struct omap_dss_device *dssdev)
 {
 #ifdef DP501_DEBUG
-	printk("%s:%s\n",__FILE__,__FUNCTION__);
+	printk(KERN_INFO "%s:%s\\n", __FILE__, __func__);
 #endif
 	omapdss_dpi_display_disable(dssdev);
 
@@ -341,7 +353,7 @@ static void DP501_panel_stop(struct omap_dss_device *dssdev)
 static void DP501_panel_disable(struct omap_dss_device *dssdev)
 {
 #ifdef DP501_DEBUG
-	printk("%s:%s\n",__FILE__,__FUNCTION__);
+	printk(KERN_INFO "%s:%s\\n", __FILE__, __func__);
 #endif
 	displayport_power_off(sdp);
 	if (dssdev->state != OMAP_DSS_DISPLAY_ACTIVE)
@@ -352,7 +364,7 @@ static void DP501_panel_disable(struct omap_dss_device *dssdev)
 static int DP501_panel_suspend(struct omap_dss_device *dssdev)
 {
 #ifdef DP501_DEBUG
-	printk("%s:%s\n",__FILE__,__FUNCTION__);
+	printk(KERN_INFO "%s:%s\\n", __FILE__, __func__);
 #endif
 	if (dssdev->state != OMAP_DSS_DISPLAY_ACTIVE)
 		return -EINVAL;
@@ -367,7 +379,7 @@ static int DP501_panel_suspend(struct omap_dss_device *dssdev)
 static int DP501_panel_resume(struct omap_dss_device *dssdev)
 {
 #ifdef DP501_DEBUG
-	printk("%s:%s\n",__FILE__,__FUNCTION__);
+	printk(KERN_INFO "%s:%s\\n", __FILE__, __func__);
 #endif
 	if (dssdev->state != OMAP_DSS_DISPLAY_SUSPENDED)
 		return -EINVAL;
@@ -380,7 +392,7 @@ static void DP501_set_timings(struct omap_dss_device *dssdev,
 		struct omap_video_timings *timings)
 {
 #ifdef DP501_DEBUG
-	printk("%s:%s\n",__FILE__,__FUNCTION__);
+	printk(KERN_INFO "%s:%s\\n", __FILE__, __func__);
 #endif
 	dpi_set_timings(dssdev, timings);
 }
@@ -389,7 +401,7 @@ static void DP501_get_timings(struct omap_dss_device *dssdev,
 		struct omap_video_timings *timings)
 {
 #ifdef DP501_DEBUG
-	printk("%s:%s\n",__FILE__,__FUNCTION__);
+	printk(KERN_INFO "%s:%s\\n", __FILE__, __func__);
 #endif
 	*timings = dssdev->panel.timings;
 }
@@ -398,7 +410,7 @@ static int DP501_check_timings(struct omap_dss_device *dssdev,
 		struct omap_video_timings *timings)
 {
 #ifdef DP501_DEBUG
-	printk("%s:%s\n",__FILE__,__FUNCTION__);
+	printk(KERN_INFO "%s:%s\\n", __FILE__, __func__);
 #endif
 	return dpi_check_timings(dssdev, timings);
 }
@@ -406,7 +418,7 @@ static int DP501_check_timings(struct omap_dss_device *dssdev,
 static int DP501_get_recommended_bpp(struct omap_dss_device *dssdev)
 {
 #ifdef DP501_DEBUG
-	printk("%s:%s\n",__FILE__,__FUNCTION__);
+	printk(KERN_INFO "%s:%s\\n", __FILE__, __func__);
 #endif
 	return 24;
 }
@@ -454,7 +466,7 @@ static int __init displayport_i2c_init(void)
 {
 	int r;
 #ifdef DP501_DEBUG
-	printk("%s:%s\n",__FILE__,__FUNCTION__);
+	printk(KERN_INFO "%s:%s\\n", __FILE__, __func__);
 #endif
 	r = i2c_add_driver(&displayport_i2c_driver);
 	if (r < 0) {
@@ -475,7 +487,7 @@ static int __init displayport_i2c_init(void)
 static void __exit displayport_i2c_exit(void)
 {
 #ifdef DP501_DEBUG
-	printk("%s:%s\n",__FILE__,__FUNCTION__);
+	printk(KERN_INFO "%s:%s\\n", __FILE__, __func__);
 #endif
 	i2c_del_driver(&displayport_i2c_driver);
 	omap_dss_unregister_driver(&DP501_driver);
