@@ -393,6 +393,7 @@ static struct omap_volt_data omap44xx_vdd_mpu_volt_data[] = {
 	{.volt_nominal = 1025000, .sr_errminlimit = 0xF4, .vp_errgain = 0x0C, .abb_type = NOMINAL_OPP},
 	{.volt_nominal = 1200000, .sr_errminlimit = 0xF9, .vp_errgain = 0x16, .abb_type = NOMINAL_OPP},
 	{.volt_nominal = 1313000, .sr_errminlimit = 0xFA, .vp_errgain = 0x23, .abb_type = NOMINAL_OPP},
+	{.volt_nominal = 1374000, .sr_errminlimit = 0xFA, .vp_errgain = 0x27, .abb_type = FAST_OPP},
 	{.volt_nominal = 1375000, .sr_errminlimit = 0xFA, .vp_errgain = 0x27, .abb_type = FAST_OPP},
 };
 
@@ -468,6 +469,7 @@ static struct omap_vdd_dep_volt omap44xx_vddmpu_vddcore_data[] = {
 	{.main_vdd_volt = 1025000, .dep_vdd_volt = 1025000},
 	{.main_vdd_volt = 1200000, .dep_vdd_volt = 1200000},
 	{.main_vdd_volt = 1313000, .dep_vdd_volt = 1200000},
+	{.main_vdd_volt = 1374000, .dep_vdd_volt = 1200000},
 	{.main_vdd_volt = 1375000, .dep_vdd_volt = 1200000},
 	{.main_vdd_volt = 0, .dep_vdd_volt = 0},
 };
@@ -1798,7 +1800,6 @@ static int vp_forceupdate_scale_voltage(struct omap_vdd_info *vdd,
 			omap_get_operation_voltage(target_volt));
 	current_vsel = voltage_read_reg(vdd->vp_offs.voltage);
 	smps_steps = abs(target_vsel - current_vsel);
-
 	/* Setting the ON voltage to the new target voltage */
 	vc_cmdval = voltage_read_reg(vdd->cmdval_reg);
 	vc_cmdval &= ~vc_cmd_on_mask;
