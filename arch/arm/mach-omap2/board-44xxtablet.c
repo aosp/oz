@@ -101,7 +101,7 @@ static struct platform_device sdp4430_hdmi_audio_device = {
 /* GPIO_KEY for Tablet */
 static struct gpio_keys_button tablet_gpio_keys_buttons[] = {
 	[0] = {
-		.code			= KEY_BACK,
+		.code			= KEY_VOLUMEUP,
 		.gpio			= 43,
 		.desc			= "SW1",
 		.active_low		= 1,
@@ -117,7 +117,7 @@ static struct gpio_keys_button tablet_gpio_keys_buttons[] = {
 		.debounce_interval	= 5,
 	},
 	[2] = {
-		.code			= KEY_F1,
+		.code			= KEY_VOLUMEDOWN,
 		.gpio			= 47,
 		.desc			= "SW3",
 		.active_low		= 1,
