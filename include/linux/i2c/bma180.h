@@ -48,6 +48,8 @@
 #define BMA_BITMODE_14BITS		0x2000
 #define BMA_BITMODE_12BITS		0x0800
 
+#define BMA180_SLEEP			0x02
+
 struct bma180accel_platform_data {
 	uint8_t method;
 	uint32_t def_poll_rate;
