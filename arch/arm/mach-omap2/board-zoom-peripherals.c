@@ -436,6 +436,7 @@ static struct twl4030_gpio_platform_data zoom_gpio_data = {
 	.irq_base	= TWL4030_GPIO_IRQ_BASE,
 	.irq_end	= TWL4030_GPIO_IRQ_END,
 	.setup		= zoom_twl_gpio_setup,
+	.debounce	= 0x04,
 };
 
 static struct twl4030_madc_platform_data zoom_madc_data = {
