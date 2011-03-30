@@ -409,6 +409,12 @@ struct mem_info *_m_add2area(struct mem_info *mi, struct area_info *ai,
 	return mi;
 }
 
+static inline
+bool area_spans(struct area_info *ai, u16 band)
+{
+	return ((ai->area.p0.x | (ai->area.p1.x + 1)) & (band - 1)) == 0;
+}
+
 static struct mem_info *get_2d_area(u16 w, u16 h, u16 align, u16 offs, u16 band,
 					struct gid_info *gi, struct tcm *tcm)
 {
@@ -425,6 +431,9 @@ static struct mem_info *get_2d_area(u16 w, u16 h, u16 align, u16 offs, u16 band,
 		if (mi->area.tcm == tcm &&
 		    tcm_aheight(mi->area) == h &&
 		    tcm_awidth(mi->area) == w &&
+		    /* area should span full bands for security */
+		    area_spans(mi->parent, band) &&
+		    !((mi->area.p0.x | (mi->area.p1.x + 1)) & (band - 1)) &&
 		    (mi->area.p0.x & (align - 1)) == offs) {
 			/* this area is already set up */
 
@@ -447,6 +456,9 @@ static struct mem_info *get_2d_area(u16 w, u16 h, u16 align, u16 offs, u16 band,
 	list_for_each_entry(ai, &gi->areas, by_gid) {
 		if (ai->area.tcm == tcm &&
 		    tcm_aheight(ai->area) == h) {
+			/* area should span full bands for security */
+			if (!area_spans(ai, band))
+				continue;
 			x = _m_blk_find_fit(w, align, offs, ai, &before);
 			if (x) {
 				_m_add2area(mi, ai, x - w, w, before);
@@ -1000,7 +1012,8 @@ static s32 map_block(enum tiler_fmt fmt, u32 width, u32 height,
 		return -ENOMEM;
 
 	/* reserve area in tiler container */
-	mi = __get_area(fmt, width, height, 0, 0, gi);
+	mi = __get_area(fmt, width, height, PAGE_SIZE,
+						usr_addr & (PAGE_SIZE - 1), gi);
 	if (!mi) {
 		mutex_lock(&mtx);
 		gi->refs--;
@@ -1115,6 +1128,7 @@ static s32 __init tiler_init(void)
 	struct tcm_pt div_pt;
 	struct tcm *sita = NULL;
 	struct tmm *tmm_pat = NULL;
+	struct pat_area area = {0};
 
 	tiler.alloc = alloc_block;
 	tiler.map = map_block;
@@ -1161,11 +1175,14 @@ static s32 __init tiler_init(void)
 	tcm[TILFMT_PAGE]  = sita;
 
 	/* Allocate tiler memory manager (must have 1 unique TMM per TCM ) */
-	tmm_pat = tmm_pat_init(0);
+	tmm_pat = tmm_pat_init(0, dmac_va, dmac_pa);
 	tmm[TILFMT_8BIT]  = tmm_pat;
 	tmm[TILFMT_16BIT] = tmm_pat;
 	tmm[TILFMT_32BIT] = tmm_pat;
 	tmm[TILFMT_PAGE]  = tmm_pat;
+	area.x1 = tiler.width - 1;
+	area.y1 = tiler.height - 1;
+	tmm_clear(tmm_pat, area);
 
 	tiler.nv12_packed = tcm[TILFMT_8BIT] == tcm[TILFMT_16BIT];
 

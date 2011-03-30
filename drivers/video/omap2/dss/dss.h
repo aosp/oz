@@ -379,7 +379,7 @@ void dispc_set_channel_out(enum omap_plane plane,
 		enum omap_channel channel_out);
 
 int dispc_setup_plane(enum omap_plane plane,
-		      u32 paddr, u16 screen_width,
+		      u32 paddr, u32 puv_addr, u16 screen_width,
 		      u16 pos_x, u16 pos_y,
 		      u16 width, u16 height,
 		      u16 out_width, u16 out_height,

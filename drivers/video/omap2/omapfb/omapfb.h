@@ -31,6 +31,8 @@
 
 #include <plat/display.h>
 
+#include <mach/tiler.h>
+
 #ifdef DEBUG
 extern unsigned int omapfb_debug;
 #define DBG(format, ...) \
@@ -57,6 +59,7 @@ struct omapfb2_mem_region {
 	atomic_t	map_count;
 	struct rw_semaphore lock;
 	atomic_t	lock_count;
+	struct tiler_block_t block;
 };
 
 /* appended to fb_info */
@@ -69,6 +72,7 @@ struct omapfb_info {
 	enum omap_dss_rotation_type rotation_type;
 	u8 rotation[OMAPFB_MAX_OVL_PER_FB];
 	bool mirror;
+	bool fit_to_screen;
 };
 
 struct omapfb2_device {

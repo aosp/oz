@@ -418,6 +418,7 @@ struct overlay_cache_data {
 
 	bool manual_update;
 	enum omap_overlay_zorder zorder;
+	u32 puv_addr; /* relevent for NV12 format only */
 };
 
 struct manager_cache_data {
@@ -785,8 +786,17 @@ static int configure_overlay(enum omap_plane plane)
 		}
 
 		switch (c->color_mode) {
+		case OMAP_DSS_COLOR_NV12:
+			bpp = 8;
+			break;
+
 		case OMAP_DSS_COLOR_RGB16:
 		case OMAP_DSS_COLOR_ARGB16:
+		case OMAP_DSS_COLOR_RGBA16:
+		case OMAP_DSS_COLOR_RGB12U:
+		case OMAP_DSS_COLOR_RGBX12:
+		case OMAP_DSS_COLOR_XRGB15:
+		case OMAP_DSS_COLOR_ARGB16_1555:
 		case OMAP_DSS_COLOR_YUV2:
 		case OMAP_DSS_COLOR_UYVY:
 			bpp = 16;
@@ -799,7 +809,7 @@ static int configure_overlay(enum omap_plane plane)
 		case OMAP_DSS_COLOR_RGB24U:
 		case OMAP_DSS_COLOR_ARGB32:
 		case OMAP_DSS_COLOR_RGBA32:
-		case OMAP_DSS_COLOR_RGBX32:
+		case OMAP_DSS_COLOR_RGBX24:
 			bpp = 32;
 			break;
 
@@ -853,6 +863,7 @@ static int configure_overlay(enum omap_plane plane)
 
 	r = dispc_setup_plane(plane,
 			paddr,
+			c->puv_addr,
 			c->screen_width,
 			x, y,
 			w, h,
@@ -1161,6 +1172,8 @@ void dss_start_update(struct omap_dss_device *dssdev)
 	struct omap_overlay_manager *mgr;
 	int i;
 
+	dss_hybrid_update_programmed(dssdev);
+
 	mgr = dssdev->manager;
 
 	for (i = 0; i < num_ovls; ++i) {
@@ -1290,6 +1303,7 @@ static int omap_dss_mgr_apply(struct omap_overlay_manager *mgr)
 		oc->dirty = true;
 
 		oc->paddr = ovl->info.paddr;
+		oc->puv_addr = ovl->info.puv_addr;
 		oc->vaddr = ovl->info.vaddr;
 		oc->screen_width = ovl->info.screen_width;
 		oc->width = ovl->info.width;

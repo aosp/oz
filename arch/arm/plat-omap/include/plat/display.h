@@ -23,6 +23,7 @@
 #include <linux/list.h>
 #include <linux/kobject.h>
 #include <linux/device.h>
+#include <linux/semaphore.h>
 #include <asm/atomic.h>
 #include <plat/omap_hwmod.h>
 #include <plat/omap_device.h>
@@ -77,26 +78,36 @@ enum omap_channel {
 };
 
 enum omap_color_mode {
-	OMAP_DSS_COLOR_CLUT1	= 1 << 0,  /* BITMAP 1 */
-	OMAP_DSS_COLOR_CLUT2	= 1 << 1,  /* BITMAP 2 */
-	OMAP_DSS_COLOR_CLUT4	= 1 << 2,  /* BITMAP 4 */
-	OMAP_DSS_COLOR_CLUT8	= 1 << 3,  /* BITMAP 8 */
-	OMAP_DSS_COLOR_RGB12U	= 1 << 4,  /* RGB12, 16-bit container */
-	OMAP_DSS_COLOR_ARGB16	= 1 << 5,  /* ARGB16 */
-	OMAP_DSS_COLOR_RGB16	= 1 << 6,  /* RGB16 */
-	OMAP_DSS_COLOR_RGB24U	= 1 << 7,  /* RGB24, 32-bit container */
-	OMAP_DSS_COLOR_RGB24P	= 1 << 8,  /* RGB24, 24-bit container */
-	OMAP_DSS_COLOR_YUV2	= 1 << 9,  /* YUV2 4:2:2 co-sited */
-	OMAP_DSS_COLOR_UYVY	= 1 << 10, /* UYVY 4:2:2 co-sited */
-	OMAP_DSS_COLOR_ARGB32	= 1 << 11, /* ARGB32 */
-	OMAP_DSS_COLOR_RGBA32	= 1 << 12, /* RGBA32 */
-	OMAP_DSS_COLOR_RGBX32	= 1 << 13, /* RGBx32 */
+	OMAP_DSS_COLOR_CLUT1		= 1 << 0,  /* BITMAP 1 */
+	OMAP_DSS_COLOR_CLUT2		= 1 << 1,  /* BITMAP 2 */
+	OMAP_DSS_COLOR_CLUT4		= 1 << 2,  /* BITMAP 4 */
+	OMAP_DSS_COLOR_CLUT8		= 1 << 3,  /* BITMAP 8 */
+
+	/* also referred to as RGB 12-BPP, 16-bit container  */
+	OMAP_DSS_COLOR_RGB12U		= 1 << 4,  /* xRGB12-4444 */
+	OMAP_DSS_COLOR_ARGB16		= 1 << 5,  /* ARGB16-4444 */
+	OMAP_DSS_COLOR_RGB16		= 1 << 6,  /* RGB16-565 */
+
+	/* also referred to as RGB 24-BPP, 32-bit container */
+	OMAP_DSS_COLOR_RGB24U		= 1 << 7,  /* xRGB24-8888 */
+	OMAP_DSS_COLOR_RGB24P		= 1 << 8,  /* RGB24-888 */
+	OMAP_DSS_COLOR_YUV2		= 1 << 9,  /* YUV2 4:2:2 co-sited */
+	OMAP_DSS_COLOR_UYVY		= 1 << 10, /* UYVY 4:2:2 co-sited */
+	OMAP_DSS_COLOR_ARGB32		= 1 << 11, /* ARGB32-8888 */
+	OMAP_DSS_COLOR_RGBA32		= 1 << 12, /* RGBA32-8888 */
+
+	/* also referred to as RGBx 32 in TRM */
+	OMAP_DSS_COLOR_RGBX24		= 1 << 13, /* RGBx24-8888 */
 	OMAP_DSS_COLOR_NV12		= 1 << 14, /* NV12 format: YUV 4:2:0 */
-	OMAP_DSS_COLOR_RGBA12		= 1 << 15, /* RGBA12 - 4444 */
-	OMAP_DSS_COLOR_XRGB12		= 1 << 16, /* xRGB12, 16-bit cont. */
+
+	/* also referred to as RGBA12-4444 in TRM */
+	OMAP_DSS_COLOR_RGBA16		= 1 << 15, /* RGBA16-4444 */
+
+	OMAP_DSS_COLOR_RGBX12		= 1 << 16, /* RGBx12-4444 */
 	OMAP_DSS_COLOR_ARGB16_1555	= 1 << 17, /* ARGB16-1555 */
-	OMAP_DSS_COLOR_RGBX24_32_ALGN	= 1 << 18, /* 32-msb aligned 24bit */
-	OMAP_DSS_COLOR_XRGB15		= 1 << 19, /* xRGB15: 1555*/
+
+	/* also referred to as xRGB16-555 in TRM */
+	OMAP_DSS_COLOR_XRGB15		= 1 << 18, /* xRGB15-1555 */
 };
 
 enum omap_lcd_display_type {
@@ -164,6 +175,7 @@ enum omap_dss_overlay_managers {
 enum omap_dss_rotation_type {
 	OMAP_DSS_ROT_DMA = 0,
 	OMAP_DSS_ROT_VRFB = 1,
+	OMAP_DSS_ROT_TILER = 2,
 };
 
 /* clockwise rotation angle */
@@ -188,6 +200,29 @@ enum omap_overlay_zorder {
 	OMAP_DSS_OVL_ZORDER_1	= 1,
 	OMAP_DSS_OVL_ZORDER_2	= 2,
 	OMAP_DSS_OVL_ZORDER_3	= 3,
+};
+
+enum dss_hybrid_update_state {
+	/* manual update mode */
+	HYBRID_UPDATE_STATE_MANUAL,
+	/* auto update mode */
+	HYBRID_UPDATE_STATE_IDLE,	/* waiting for update request */
+	HYBRID_UPDATE_STATE_PREPARING,	/* request has been made */
+	HYBRID_UPDATE_STATE_UPDATING,	/* update is in progress */
+	HYBRID_UPDATE_STATE_DEFINED,	/* update region defined */
+	HYBRID_UPDATE_STATE_PROGRAMMED,	/* shadow registers programmed */
+};
+
+struct dss_hybrid_updater {
+	spinlock_t lock;
+	struct semaphore semaphore;
+	u16 x, y, w, h;
+	enum dss_hybrid_update_state state;
+	int (*update)(struct omap_dss_device *dssdev,
+			       u16 x, u16 y, u16 w, u16 h);
+	bool quit;
+	struct task_struct *thread;
+	ktime_t stamp;
 };
 
 /* RFBI */
@@ -317,6 +352,7 @@ struct omap_overlay_info {
 	u8 global_alpha;
 	u8 pre_mult_alpha;
 	enum omap_overlay_zorder zorder;
+	u32 puv_addr;	/* for NV12 format */
 };
 
 struct omap_overlay {
@@ -487,6 +523,8 @@ struct omap_dss_device {
 
 	enum omap_dss_display_state state;
 
+	struct dss_hybrid_updater hybrid_update;
+
 	/* platform specific  */
 	int (*platform_enable)(struct omap_dss_device *dssdev);
 	void (*platform_disable)(struct omap_dss_device *dssdev);
@@ -618,5 +656,17 @@ int omap_rfbi_update(struct omap_dss_device *dssdev,
 
 void dsi_videomode_panel_preinit(struct omap_dss_device *dssdev);
 void dsi_videomode_panel_postinit(struct omap_dss_device *dssdev);
+
+/* dss features used by v4l2 */
+bool dss_feat_color_mode_supported(enum omap_plane plane,
+		enum omap_color_mode color_mode);
+
+int dss_hybrid_update_init(struct omap_dss_device *dssdev);
+void dss_hybrid_update_exit(struct omap_dss_device *dssdev);
+void dss_hybrid_update_defined(struct omap_dss_device *dssdev,
+					u16 *x, u16 *y, u16 *w, u16 *h);
+void dss_hybrid_update_programmed(struct omap_dss_device *dssdev);
+int dss_hybrid_update(struct omap_dss_device *dssdev,
+					u16 x, u16 y, u16 w, u16 h);
 
 #endif

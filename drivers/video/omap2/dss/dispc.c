@@ -40,6 +40,7 @@
 
 #include "dss.h"
 #include "dss_features.h"
+#include <mach/tiler.h>
 
 #define DISPC_SZ_REGS			SZ_16K
 
@@ -131,6 +132,18 @@ struct dispc_reg { u16 idx; };
 
 #define DISPC_VID_PRELOAD(n)		DISPC_REG(0x230 + (n)*0x04)
 
+/* UV support registers for VID1/VID2 (OMAP4) */
+/* coef index i = {0, 1, 2, 3, 4, 5, 6, 7} */
+#define DISPC_VID_FIR_COEF_H2(n, i)    DISPC_REG(0x0648 + (n)*0x6C + (i)*0x8)
+/* coef index i = {0, 1, 2, 3, 4, 5, 6, 7} */
+#define DISPC_VID_FIR_COEF_HV2(n, i)   DISPC_REG(0x064C + (n)*0x6C + (i)*0x8)
+/* coef index i = {0, 1, 2, 3, 4, 5, 6, 7} */
+#define DISPC_VID_FIR_COEF_V2(n, i)    DISPC_REG(0x0688 + (n)*0x6C + (i)*0x4)
+
+#define DISPC_VID_FIR2(n)	      DISPC_REG(0x063C + (n)*0x6C)
+#define DISPC_VID_ACCU2_0(n)	   DISPC_REG(0x0640 + (n)*0x6C)
+#define DISPC_VID_ACCU2_1(n)	   DISPC_REG(0x0644 + (n)*0x6C)
+
 /*
  * DISPC VID3 and WB register offset definitions are shared, register names
  * for VID3 and WB in the TRM are of the form DISPC_VID3_x and DISPC_WB_x
@@ -164,6 +177,25 @@ struct dispc_reg { u16 idx; };
 #define DISPC_VID3_POSITION		DISPC_REG(0x039C)
 #define DISPC_VID3_PRELOAD		DISPC_REG(0x03A0)
 
+#define DISPC_VID3_WB_FIR2(n)		DISPC_REG(0x0724 + (n)*0x6C)
+
+#define DISPC_VID3_WB_ACCU2_0(n)     DISPC_REG(0x0728 + (n)*0x6C)
+#define DISPC_VID3_WB_ACCU2_1(n)     DISPC_REG(0x072C + (n)*0x6C)
+
+/* coef index i = {0, 1, 2, 3, 4, 5, 6, 7} */
+#define DISPC_VID3_WB_FIR_COEF_H2(n, i) DISPC_REG(0x0730 + (n)*0x70 + (i)*0x8)
+/* coef index i = {0, 1, 2, 3, 4, 5, 6, 7} */
+#define DISPC_VID3_WB_FIR_COEF_HV2(n, i) DISPC_REG(0x0734 + (n)*0x70 + (i)*0x8)
+/* coef index i = {0, 1, 2, 3, 4, 5, 6, 7} */
+#define DISPC_VID3_WB_FIR_COEF_V2(n, i) DISPC_REG(0x0770 + (n)*0x70 + (i)*0x4)
+
+/* OMAP4 introduced VID registers */
+/* n = 0 for VID1, n = 1 for VID2, n = 2 for VID3, n = 3 for WB */
+#define DISPC_VID_BA_UV0(n)		DISPC_REG(0x0600 + (n)*0x08)
+#define DISPC_VID_BA_UV1(n)		DISPC_REG(0x0604 + (n)*0x08)
+
+#define DISPC_VID_ATTRIBUTES2(n)	DISPC_REG(0x0624 + (n)*0x04)
+
 /*
  * The OMAP4 DISPC_DIVISOR1 is backward compatible to OMAP3xxx DISPC_DIVISOR.
  * However DISPC_DIVISOR is also provided in OMAP4, to control DISPC_CORE_CLK.
@@ -191,20 +223,12 @@ struct omap_dispc_isr_data {
 	u32			mask;
 };
 
-struct dispc_h_coef {
-	s8 hc4;
-	s8 hc3;
-	u8 hc2;
-	s8 hc1;
-	s8 hc0;
-};
-
-struct dispc_v_coef {
-	s8 vc22;
-	s8 vc2;
-	u8 vc1;
-	s8 vc0;
-	s8 vc00;
+struct dispc_hv_coef {
+	s8 hc4;	/* also vc22 */
+	s8 hc3;	/* also vc2 */
+	u8 hc2;	/* also vc1 */
+	s8 hc1;	/* also vc0 */
+	s8 hc0;	/* also vc00 */
 };
 
 #define REG_GET(idx, start, end) \
@@ -374,6 +398,41 @@ void dispc_save_context(void)
 
 	SR(VID_PRELOAD(0));
 
+	if (dss_has_feature(FEAT_FMT_NV12)) {
+		SR(VID_BA_UV0(0));
+		SR(VID_BA_UV1(0));
+		SR(VID_FIR2(0));
+		SR(VID_ACCU2_0(0));
+		SR(VID_ACCU2_1(0));
+
+		SR(VID_FIR_COEF_H2(0, 0));
+		SR(VID_FIR_COEF_H2(0, 1));
+		SR(VID_FIR_COEF_H2(0, 2));
+		SR(VID_FIR_COEF_H2(0, 3));
+		SR(VID_FIR_COEF_H2(0, 4));
+		SR(VID_FIR_COEF_H2(0, 5));
+		SR(VID_FIR_COEF_H2(0, 6));
+		SR(VID_FIR_COEF_H2(0, 7));
+
+		SR(VID_FIR_COEF_HV2(0, 0));
+		SR(VID_FIR_COEF_HV2(0, 1));
+		SR(VID_FIR_COEF_HV2(0, 2));
+		SR(VID_FIR_COEF_HV2(0, 3));
+		SR(VID_FIR_COEF_HV2(0, 4));
+		SR(VID_FIR_COEF_HV2(0, 5));
+		SR(VID_FIR_COEF_HV2(0, 6));
+		SR(VID_FIR_COEF_HV2(0, 7));
+
+		SR(VID_FIR_COEF_V2(0, 0));
+		SR(VID_FIR_COEF_V2(0, 1));
+		SR(VID_FIR_COEF_V2(0, 2));
+		SR(VID_FIR_COEF_V2(0, 3));
+		SR(VID_FIR_COEF_V2(0, 4));
+		SR(VID_FIR_COEF_V2(0, 5));
+		SR(VID_FIR_COEF_V2(0, 6));
+		SR(VID_FIR_COEF_V2(0, 7));
+	}
+
 	/* VID2 */
 	SR(VID_BA0(1));
 	SR(VID_BA1(1));
@@ -422,6 +481,41 @@ void dispc_save_context(void)
 	SR(VID_FIR_COEF_V(1, 7));
 
 	SR(VID_PRELOAD(1));
+
+	if (dss_has_feature(FEAT_FMT_NV12)) {
+		SR(VID_BA_UV0(1));
+		SR(VID_BA_UV1(1));
+		SR(VID_FIR2(1));
+		SR(VID_ACCU2_0(1));
+		SR(VID_ACCU2_1(1));
+
+		SR(VID_FIR_COEF_H2(1, 0));
+		SR(VID_FIR_COEF_H2(1, 1));
+		SR(VID_FIR_COEF_H2(1, 2));
+		SR(VID_FIR_COEF_H2(1, 3));
+		SR(VID_FIR_COEF_H2(1, 4));
+		SR(VID_FIR_COEF_H2(1, 5));
+		SR(VID_FIR_COEF_H2(1, 6));
+		SR(VID_FIR_COEF_H2(1, 7));
+
+		SR(VID_FIR_COEF_HV2(1, 0));
+		SR(VID_FIR_COEF_HV2(1, 1));
+		SR(VID_FIR_COEF_HV2(1, 2));
+		SR(VID_FIR_COEF_HV2(1, 3));
+		SR(VID_FIR_COEF_HV2(1, 4));
+		SR(VID_FIR_COEF_HV2(1, 5));
+		SR(VID_FIR_COEF_HV2(1, 6));
+		SR(VID_FIR_COEF_HV2(1, 7));
+
+		SR(VID_FIR_COEF_V2(1, 0));
+		SR(VID_FIR_COEF_V2(1, 1));
+		SR(VID_FIR_COEF_V2(1, 2));
+		SR(VID_FIR_COEF_V2(1, 3));
+		SR(VID_FIR_COEF_V2(1, 4));
+		SR(VID_FIR_COEF_V2(1, 5));
+		SR(VID_FIR_COEF_V2(1, 6));
+		SR(VID_FIR_COEF_V2(1, 7));
+	}
 
 	/* VID3 */
 	if (dss_has_feature(FEAT_OVL_VID3)) {
@@ -473,6 +567,40 @@ void dispc_save_context(void)
 		SR(VID3_WB_FIR_COEF_V(0, 7));
 
 		SR(VID3_PRELOAD);
+		if (dss_has_feature(FEAT_FMT_NV12)) {
+			SR(VID_BA_UV0(2));
+			SR(VID_BA_UV1(2));
+			SR(VID3_WB_ACCU2_0(1));
+			SR(VID3_WB_ACCU2_1(1));
+			SR(VID3_WB_FIR2(1));
+
+			SR(VID3_WB_FIR_COEF_H2(1, 0));
+			SR(VID3_WB_FIR_COEF_H2(1, 1));
+			SR(VID3_WB_FIR_COEF_H2(1, 2));
+			SR(VID3_WB_FIR_COEF_H2(1, 3));
+			SR(VID3_WB_FIR_COEF_H2(1, 4));
+			SR(VID3_WB_FIR_COEF_H2(1, 5));
+			SR(VID3_WB_FIR_COEF_H2(1, 6));
+			SR(VID3_WB_FIR_COEF_H2(1, 7));
+
+			SR(VID3_WB_FIR_COEF_HV2(1, 0));
+			SR(VID3_WB_FIR_COEF_HV2(1, 1));
+			SR(VID3_WB_FIR_COEF_HV2(1, 2));
+			SR(VID3_WB_FIR_COEF_HV2(1, 3));
+			SR(VID3_WB_FIR_COEF_HV2(1, 4));
+			SR(VID3_WB_FIR_COEF_HV2(1, 5));
+			SR(VID3_WB_FIR_COEF_HV2(1, 6));
+			SR(VID3_WB_FIR_COEF_HV2(1, 7));
+
+			SR(VID3_WB_FIR_COEF_V2(1, 0));
+			SR(VID3_WB_FIR_COEF_V2(1, 1));
+			SR(VID3_WB_FIR_COEF_V2(1, 2));
+			SR(VID3_WB_FIR_COEF_V2(1, 3));
+			SR(VID3_WB_FIR_COEF_V2(1, 4));
+			SR(VID3_WB_FIR_COEF_V2(1, 5));
+			SR(VID3_WB_FIR_COEF_V2(1, 6));
+			SR(VID3_WB_FIR_COEF_V2(1, 7));
+		}
 	}
 }
 
@@ -584,6 +712,41 @@ void dispc_restore_context(void)
 
 	RR(VID_PRELOAD(0));
 
+	if (dss_has_feature(FEAT_FMT_NV12)) {
+		RR(VID_BA_UV0(0));
+		RR(VID_BA_UV1(0));
+		RR(VID_ACCU2_0(0));
+		RR(VID_ACCU2_1(0));
+		RR(VID_FIR2(0));
+
+		RR(VID_FIR_COEF_H2(0, 0));
+		RR(VID_FIR_COEF_H2(0, 1));
+		RR(VID_FIR_COEF_H2(0, 2));
+		RR(VID_FIR_COEF_H2(0, 3));
+		RR(VID_FIR_COEF_H2(0, 4));
+		RR(VID_FIR_COEF_H2(0, 5));
+		RR(VID_FIR_COEF_H2(0, 6));
+		RR(VID_FIR_COEF_H2(0, 7));
+
+		RR(VID_FIR_COEF_HV2(0, 0));
+		RR(VID_FIR_COEF_HV2(0, 1));
+		RR(VID_FIR_COEF_HV2(0, 2));
+		RR(VID_FIR_COEF_HV2(0, 3));
+		RR(VID_FIR_COEF_HV2(0, 4));
+		RR(VID_FIR_COEF_HV2(0, 5));
+		RR(VID_FIR_COEF_HV2(0, 6));
+		RR(VID_FIR_COEF_HV2(0, 7));
+
+		RR(VID_FIR_COEF_V2(0, 0));
+		RR(VID_FIR_COEF_V2(0, 1));
+		RR(VID_FIR_COEF_V2(0, 2));
+		RR(VID_FIR_COEF_V2(0, 3));
+		RR(VID_FIR_COEF_V2(0, 4));
+		RR(VID_FIR_COEF_V2(0, 5));
+		RR(VID_FIR_COEF_V2(0, 6));
+		RR(VID_FIR_COEF_V2(0, 7));
+	}
+
 	/* VID2 */
 	RR(VID_BA0(1));
 	RR(VID_BA1(1));
@@ -632,6 +795,41 @@ void dispc_restore_context(void)
 	RR(VID_FIR_COEF_V(1, 7));
 
 	RR(VID_PRELOAD(1));
+
+	if (dss_has_feature(FEAT_FMT_NV12)) {
+		RR(VID_BA_UV0(1));
+		RR(VID_BA_UV1(1));
+		RR(VID_ACCU2_0(1));
+		RR(VID_ACCU2_1(1));
+		RR(VID_FIR2(1));
+
+		RR(VID_FIR_COEF_H2(1, 0));
+		RR(VID_FIR_COEF_H2(1, 1));
+		RR(VID_FIR_COEF_H2(1, 2));
+		RR(VID_FIR_COEF_H2(1, 3));
+		RR(VID_FIR_COEF_H2(1, 4));
+		RR(VID_FIR_COEF_H2(1, 5));
+		RR(VID_FIR_COEF_H2(1, 6));
+		RR(VID_FIR_COEF_H2(1, 7));
+
+		RR(VID_FIR_COEF_HV2(1, 0));
+		RR(VID_FIR_COEF_HV2(1, 1));
+		RR(VID_FIR_COEF_HV2(1, 2));
+		RR(VID_FIR_COEF_HV2(1, 3));
+		RR(VID_FIR_COEF_HV2(1, 4));
+		RR(VID_FIR_COEF_HV2(1, 5));
+		RR(VID_FIR_COEF_HV2(1, 6));
+		RR(VID_FIR_COEF_HV2(1, 7));
+
+		RR(VID_FIR_COEF_V2(1, 0));
+		RR(VID_FIR_COEF_V2(1, 1));
+		RR(VID_FIR_COEF_V2(1, 2));
+		RR(VID_FIR_COEF_V2(1, 3));
+		RR(VID_FIR_COEF_V2(1, 4));
+		RR(VID_FIR_COEF_V2(1, 5));
+		RR(VID_FIR_COEF_V2(1, 6));
+		RR(VID_FIR_COEF_V2(1, 7));
+	}
 
 	/* VID3 */
 	if (dss_has_feature(FEAT_OVL_VID3)) {
@@ -683,6 +881,41 @@ void dispc_restore_context(void)
 		RR(VID3_WB_FIR_COEF_V(0, 7));
 
 		RR(VID3_PRELOAD);
+
+		if (dss_has_feature(FEAT_FMT_NV12)) {
+			RR(VID_BA_UV0(2));
+			RR(VID_BA_UV1(2));
+			RR(VID3_WB_ACCU2_0(1));
+			RR(VID3_WB_ACCU2_1(1));
+			RR(VID3_WB_FIR2(1));
+
+			RR(VID3_WB_FIR_COEF_H2(1, 0));
+			RR(VID3_WB_FIR_COEF_H2(1, 1));
+			RR(VID3_WB_FIR_COEF_H2(1, 2));
+			RR(VID3_WB_FIR_COEF_H2(1, 3));
+			RR(VID3_WB_FIR_COEF_H2(1, 4));
+			RR(VID3_WB_FIR_COEF_H2(1, 5));
+			RR(VID3_WB_FIR_COEF_H2(1, 6));
+			RR(VID3_WB_FIR_COEF_H2(1, 7));
+
+			RR(VID3_WB_FIR_COEF_HV2(1, 0));
+			RR(VID3_WB_FIR_COEF_HV2(1, 1));
+			RR(VID3_WB_FIR_COEF_HV2(1, 2));
+			RR(VID3_WB_FIR_COEF_HV2(1, 3));
+			RR(VID3_WB_FIR_COEF_HV2(1, 4));
+			RR(VID3_WB_FIR_COEF_HV2(1, 5));
+			RR(VID3_WB_FIR_COEF_HV2(1, 6));
+			RR(VID3_WB_FIR_COEF_HV2(1, 7));
+
+			RR(VID3_WB_FIR_COEF_V2(1, 0));
+			RR(VID3_WB_FIR_COEF_V2(1, 1));
+			RR(VID3_WB_FIR_COEF_V2(1, 2));
+			RR(VID3_WB_FIR_COEF_V2(1, 3));
+			RR(VID3_WB_FIR_COEF_V2(1, 4));
+			RR(VID3_WB_FIR_COEF_V2(1, 5));
+			RR(VID3_WB_FIR_COEF_V2(1, 6));
+			RR(VID3_WB_FIR_COEF_V2(1, 7));
+		}
 	}
 
 	/* enable last, because LCD & DIGIT enable are here */
@@ -811,92 +1044,50 @@ static void _dispc_write_firv_reg(enum omap_plane plane, int reg, u32 value)
 	dispc_write_reg(firv_reg[plane - 1], value);
 }
 
-static void _dispc_set_scale_coef(enum omap_plane plane, int hscaleup,
-		int vscaleup, int five_taps)
+static void _dispc_write_firh2_reg(enum omap_plane plane, int reg, u32 value)
 {
-	/* Coefficients for horizontal up-sampling */
-	static const struct dispc_h_coef coef_hup[8] = {
-		{  0,   0, 128,   0,  0 },
-		{ -1,  13, 124,  -8,  0 },
-		{ -2,  30, 112, -11, -1 },
-		{ -5,  51,  95, -11, -2 },
-		{  0,  -9,  73,  73, -9 },
-		{ -2, -11,  95,  51, -5 },
-		{ -1, -11, 112,  30, -2 },
-		{  0,  -8, 124,  13, -1 },
+	const struct dispc_reg firh2_reg[] = {
+				DISPC_VID_FIR_COEF_H2(0, reg),
+				DISPC_VID_FIR_COEF_H2(1, reg),
+				DISPC_VID3_WB_FIR_COEF_H2(0, reg),
 	};
 
-	/* Coefficients for vertical up-sampling */
-	static const struct dispc_v_coef coef_vup_3tap[8] = {
-		{ 0,  0, 128,  0, 0 },
-		{ 0,  3, 123,  2, 0 },
-		{ 0, 12, 111,  5, 0 },
-		{ 0, 32,  89,  7, 0 },
-		{ 0,  0,  64, 64, 0 },
-		{ 0,  7,  89, 32, 0 },
-		{ 0,  5, 111, 12, 0 },
-		{ 0,  2, 123,  3, 0 },
+	BUG_ON(plane == OMAP_DSS_GFX);
+
+	dispc_write_reg(firh2_reg[plane - 1], value);
+}
+
+static void _dispc_write_firhv2_reg(enum omap_plane plane, int reg, u32 value)
+{
+	const struct dispc_reg firhv2_reg[] = {
+				DISPC_VID_FIR_COEF_HV2(0, reg),
+				DISPC_VID_FIR_COEF_HV2(1, reg),
+				DISPC_VID3_WB_FIR_COEF_HV2(0, reg),
 	};
 
-	static const struct dispc_v_coef coef_vup_5tap[8] = {
-		{  0,   0, 128,   0,  0 },
-		{ -1,  13, 124,  -8,  0 },
-		{ -2,  30, 112, -11, -1 },
-		{ -5,  51,  95, -11, -2 },
-		{  0,  -9,  73,  73, -9 },
-		{ -2, -11,  95,  51, -5 },
-		{ -1, -11, 112,  30, -2 },
-		{  0,  -8, 124,  13, -1 },
+	BUG_ON(plane == OMAP_DSS_GFX);
+
+	dispc_write_reg(firhv2_reg[plane - 1], value);
+}
+
+static void _dispc_write_firv2_reg(enum omap_plane plane, int reg, u32 value)
+{
+	const struct dispc_reg firv2_reg[] = {
+				DISPC_VID_FIR_COEF_V2(0, reg),
+				DISPC_VID_FIR_COEF_V2(1, reg),
+				DISPC_VID3_WB_FIR_COEF_V2(0, reg),
 	};
 
-	/* Coefficients for horizontal down-sampling */
-	static const struct dispc_h_coef coef_hdown[8] = {
-		{   0, 36, 56, 36,  0 },
-		{   4, 40, 55, 31, -2 },
-		{   8, 44, 54, 27, -5 },
-		{  12, 48, 53, 22, -7 },
-		{  -9, 17, 52, 51, 17 },
-		{  -7, 22, 53, 48, 12 },
-		{  -5, 27, 54, 44,  8 },
-		{  -2, 31, 55, 40,  4 },
-	};
+	BUG_ON(plane == OMAP_DSS_GFX);
 
-	/* Coefficients for vertical down-sampling */
-	static const struct dispc_v_coef coef_vdown_3tap[8] = {
-		{ 0, 36, 56, 36, 0 },
-		{ 0, 40, 57, 31, 0 },
-		{ 0, 45, 56, 27, 0 },
-		{ 0, 50, 55, 23, 0 },
-		{ 0, 18, 55, 55, 0 },
-		{ 0, 23, 55, 50, 0 },
-		{ 0, 27, 56, 45, 0 },
-		{ 0, 31, 57, 40, 0 },
-	};
+	dispc_write_reg(firv2_reg[plane - 1], value);
+}
 
-	static const struct dispc_v_coef coef_vdown_5tap[8] = {
-		{   0, 36, 56, 36,  0 },
-		{   4, 40, 55, 31, -2 },
-		{   8, 44, 54, 27, -5 },
-		{  12, 48, 53, 22, -7 },
-		{  -9, 17, 52, 51, 17 },
-		{  -7, 22, 53, 48, 12 },
-		{  -5, 27, 54, 44,  8 },
-		{  -2, 31, 55, 40,  4 },
-	};
-
-	const struct dispc_h_coef *h_coef;
-	const struct dispc_v_coef *v_coef;
+static void _dispc_set_scale_coef(enum omap_plane plane,
+		const struct dispc_hv_coef *h_coef,
+		const struct dispc_hv_coef *v_coef, int five_taps)
+{
 	int i;
-
-	if (hscaleup)
-		h_coef = coef_hup;
-	else
-		h_coef = coef_hdown;
-
-	if (vscaleup)
-		v_coef = five_taps ? coef_vup_5tap : coef_vup_3tap;
-	else
-		v_coef = five_taps ? coef_vdown_5tap : coef_vdown_3tap;
 
 	for (i = 0; i < 8; i++) {
 		u32 h, hv;
@@ -906,9 +1097,9 @@ static void _dispc_set_scale_coef(enum omap_plane plane, int hscaleup,
 			| FLD_VAL(h_coef[i].hc2, 23, 16)
 			| FLD_VAL(h_coef[i].hc3, 31, 24);
 		hv = FLD_VAL(h_coef[i].hc4, 7, 0)
-			| FLD_VAL(v_coef[i].vc0, 15, 8)
-			| FLD_VAL(v_coef[i].vc1, 23, 16)
-			| FLD_VAL(v_coef[i].vc2, 31, 24);
+			| FLD_VAL(v_coef[i].hc1, 15, 8)
+			| FLD_VAL(v_coef[i].hc2, 23, 16)
+			| FLD_VAL(v_coef[i].hc3, 31, 24);
 
 		_dispc_write_firh_reg(plane, i, h);
 		_dispc_write_firhv_reg(plane, i, hv);
@@ -917,9 +1108,41 @@ static void _dispc_set_scale_coef(enum omap_plane plane, int hscaleup,
 	if (five_taps) {
 		for (i = 0; i < 8; i++) {
 			u32 v;
-			v = FLD_VAL(v_coef[i].vc00, 7, 0)
-				| FLD_VAL(v_coef[i].vc22, 15, 8);
+			v = FLD_VAL(v_coef[i].hc0, 7, 0)
+				| FLD_VAL(v_coef[i].hc4, 15, 8);
 			_dispc_write_firv_reg(plane, i, v);
+		}
+	}
+}
+
+static void _dispc_set_scale_uv_coef(enum omap_plane plane,
+		const struct dispc_hv_coef *h_coef,
+		const struct dispc_hv_coef *v_coef, int five_taps)
+{
+	int i;
+
+	for (i = 0; i < 8; i++) {
+		u32 h, hv;
+
+		h = FLD_VAL(h_coef[i].hc0, 7, 0)
+			| FLD_VAL(h_coef[i].hc1, 15, 8)
+			| FLD_VAL(h_coef[i].hc2, 23, 16)
+			| FLD_VAL(h_coef[i].hc3, 31, 24);
+		hv = FLD_VAL(h_coef[i].hc4, 7, 0)
+			| FLD_VAL(v_coef[i].hc1, 15, 8)
+			| FLD_VAL(v_coef[i].hc2, 23, 16)
+			| FLD_VAL(v_coef[i].hc3, 31, 24);
+
+		_dispc_write_firh2_reg(plane, i, h);
+		_dispc_write_firhv2_reg(plane, i, hv);
+	}
+
+	if (five_taps) {
+		for (i = 0; i < 8; i++) {
+			u32 v;
+			v = FLD_VAL(v_coef[i].hc0, 7, 0)
+				| FLD_VAL(v_coef[i].hc4, 15, 8);
+			_dispc_write_firv2_reg(plane, i, v);
 		}
 	}
 }
@@ -992,6 +1215,34 @@ static void _dispc_set_plane_ba1(enum omap_plane plane, u32 paddr)
 	dispc_write_reg(ba1_reg[plane], paddr);
 }
 
+static void _dispc_set_plane_ba_uv0(enum omap_plane plane, u32 paddr)
+{
+	const struct dispc_reg ba_uv0_reg[] = { DISPC_VID_BA_UV0(0),
+				DISPC_VID_BA_UV0(1),
+				DISPC_VID_BA_UV0(2),
+	};
+
+	BUG_ON(plane == OMAP_DSS_GFX);
+
+	dispc_write_reg(ba_uv0_reg[plane - 1], paddr);
+	/* plane - 1 => no UV_BA for GFX*/
+
+}
+
+static void _dispc_set_plane_ba_uv1(enum omap_plane plane, u32 paddr)
+{
+	const struct dispc_reg ba_uv1_reg[] = { DISPC_VID_BA_UV1(0),
+				DISPC_VID_BA_UV1(1),
+				DISPC_VID_BA_UV1(2)
+	};
+
+	BUG_ON(plane == OMAP_DSS_GFX);
+
+	dispc_write_reg(ba_uv1_reg[plane - 1], paddr);
+	/* plane - 1 => no UV_BA for GFX*/
+}
+
+
 static void _dispc_set_plane_pos(enum omap_plane plane, int x, int y)
 {
 	const struct dispc_reg pos_reg[] = { DISPC_GFX_POSITION,
@@ -1049,6 +1300,8 @@ static void _dispc_setup_global_alpha(enum omap_plane plane, u8 global_alpha)
 
 	if (plane == OMAP_DSS_GFX)
 		REG_FLD_MOD(DISPC_GLOBAL_ALPHA, global_alpha, 7, 0);
+	else if (plane == OMAP_DSS_VIDEO1)
+		REG_FLD_MOD(DISPC_GLOBAL_ALPHA, global_alpha, 15, 8);
 	else if (plane == OMAP_DSS_VIDEO2)
 		REG_FLD_MOD(DISPC_GLOBAL_ALPHA, global_alpha, 23, 16);
 	else if (plane == OMAP_DSS_VIDEO3)
@@ -1096,20 +1349,26 @@ static void _dispc_set_color_mode(enum omap_plane plane,
 			m = 0x5; break;
 		case OMAP_DSS_COLOR_RGB16:
 			m = 0x6; break;
+		case OMAP_DSS_COLOR_ARGB16_1555:
+			m = 0x7; break;
 		case OMAP_DSS_COLOR_RGB24U:
 			m = 0x8; break;
 		case OMAP_DSS_COLOR_RGB24P:
 			m = 0x9; break;
 		case OMAP_DSS_COLOR_YUV2:
+		case OMAP_DSS_COLOR_RGBX12:
 			m = 0xa; break;
 		case OMAP_DSS_COLOR_UYVY:
+		case OMAP_DSS_COLOR_RGBA16:
 			m = 0xb; break;
 		case OMAP_DSS_COLOR_ARGB32:
 			m = 0xc; break;
 		case OMAP_DSS_COLOR_RGBA32:
 			m = 0xd; break;
-		case OMAP_DSS_COLOR_RGBX32:
+		case OMAP_DSS_COLOR_RGBX24:
 			m = 0xe; break;
+		case OMAP_DSS_COLOR_XRGB15:
+			m = 0xf; break;
 		default:
 			BUG(); break;
 		}
@@ -1117,11 +1376,11 @@ static void _dispc_set_color_mode(enum omap_plane plane,
 		switch (color_mode) {
 		case OMAP_DSS_COLOR_NV12:
 			m = 0x0; break;
-		case OMAP_DSS_COLOR_RGB12U:
+		case OMAP_DSS_COLOR_RGBX12:
 			m = 0x1; break;
-		case OMAP_DSS_COLOR_RGBA12:
+		case OMAP_DSS_COLOR_RGBA16:
 			m = 0x2; break;
-		case OMAP_DSS_COLOR_XRGB12:
+		case OMAP_DSS_COLOR_RGB12U:
 			m = 0x4; break;
 		case OMAP_DSS_COLOR_ARGB16:
 			m = 0x5; break;
@@ -1141,7 +1400,7 @@ static void _dispc_set_color_mode(enum omap_plane plane,
 			m = 0xC; break;
 		case OMAP_DSS_COLOR_RGBA32:
 			m = 0xD; break;
-		case OMAP_DSS_COLOR_RGBX24_32_ALGN:
+		case OMAP_DSS_COLOR_RGBX24:
 			m = 0xE; break;
 		case OMAP_DSS_COLOR_XRGB15:
 			m = 0xF; break;
@@ -1420,52 +1679,294 @@ static void _dispc_set_vid_accu1(enum omap_plane plane, int haccu, int vaccu)
 	dispc_write_reg(ac1_reg[plane-1], val);
 }
 
+static void _dispc_set_fir2(enum omap_plane plane, int hinc, int vinc)
+{
+	u32 val;
+	const struct dispc_reg fir_reg[] = { DISPC_VID_FIR2(0),
+						DISPC_VID_FIR2(1),
+						DISPC_VID3_WB_FIR2(0),
+	};
+
+	BUG_ON(plane == OMAP_DSS_GFX);
+
+	val = FLD_VAL(vinc, 28, 16) | FLD_VAL(hinc, 12, 0);
+
+	dispc_write_reg(fir_reg[plane-1], val);
+}
+
+static void _dispc_set_vid_accu2_0(enum omap_plane plane, int haccu, int vaccu)
+{
+	u32 val;
+	const struct dispc_reg ac0_reg[] = { DISPC_VID_ACCU2_0(0),
+					DISPC_VID_ACCU2_0(1),
+					DISPC_VID3_WB_ACCU2_0(0),
+	};
+
+	BUG_ON(plane == OMAP_DSS_GFX);
+
+	val = FLD_VAL(vaccu, 26, 16) | FLD_VAL(haccu, 10, 0);
+	dispc_write_reg(ac0_reg[plane-1], val);
+}
+
+static void _dispc_set_vid_accu2_1(enum omap_plane plane, int haccu, int vaccu)
+{
+	u32 val;
+	const struct dispc_reg ac1_reg[] = { DISPC_VID_ACCU2_1(0),
+					DISPC_VID_ACCU2_1(1),
+					DISPC_VID3_WB_ACCU2_1(0),
+	};
+
+	BUG_ON(plane == OMAP_DSS_GFX);
+
+	val = FLD_VAL(vaccu, 26, 16) | FLD_VAL(haccu, 10, 0);
+	dispc_write_reg(ac1_reg[plane-1], val);
+}
+
+static const struct dispc_hv_coef fir5_zero[] = {
+	{  0,    0,    0,    0,    0   },
+	{  0,    0,    0,    0,    0   },
+	{  0,    0,    0,    0,    0   },
+	{  0,    0,    0,    0,    0   },
+	{  0,    0,    0,    0,    0   },
+	{  0,    0,    0,    0,    0   },
+	{  0,    0,    0,    0,    0   },
+	{  0,    0,    0,    0,    0   },
+};
+static const struct dispc_hv_coef fir3_m8[] = {
+	{  0,    0,    128,  0,    0   },
+	{  0,    2,    123,  3,    0   },
+	{  0,    5,    111,  12,   0   },
+	{  0,    7,    89,   32,   0   },
+	{  0,    64,   64,   0,    0   },
+	{  0,    32,   89,   7,    0   },
+	{  0,    12,   111,  5,    0   },
+	{  0,    3,    123,  2,    0   },
+};
+static const struct dispc_hv_coef fir5_m8[] = {
+	{  17,  -20,   134, -20,   17  },
+	{  18,  -27,   127, -4,    14  },
+	{  15,  -30,   121,  17,   5   },
+	{  9,   -27,   105,  47,  -6   },
+	{ -18,   81,   81,  -18,   2   },
+	{ -6,    47,   105, -27,   9   },
+	{  5,    17,   121, -30,   15  },
+	{  13,  -4,    127, -27,   19  },
+};
+static const struct dispc_hv_coef fir5_m8b[] = {
+	{  0,    0,    128,  0,    0   },
+	{  0,   -8,    124,  13,  -1   },
+	{ -1,   -11,   112,  30,  -2   },
+	{ -2,   -11,   95,   51,  -5   },
+	{ -9,    73,   73,  -9,    0   },
+	{ -5,    51,   95,  -11,  -2   },
+	{ -2,    30,   112, -11,  -1   },
+	{ -1,    13,   124, -8,    0   },
+};
+static const struct dispc_hv_coef fir5_m9[] = {
+	{  8,   -8,    128, -8,    8   },
+	{  14,  -21,   126,  8,    1   },
+	{  17,  -27,   117,  30,  -9   },
+	{  17,  -30,   103,  56,  -18  },
+	{ -26,   83,   83,  -26,   14  },
+	{ -18,   56,   103, -30,   17  },
+	{ -9,    30,   117, -27,   17  },
+	{  1,    8,    126, -21,   14  },
+};
+static const struct dispc_hv_coef fir5_m10[] = {
+	{ -2,    2,    128,  2,   -2   },
+	{  5,   -12,   125,  20,  -10  },
+	{  11,  -22,   116,  41,  -18  },
+	{  15,  -27,   102,  62,  -24  },
+	{ -28,   83,   83,  -28,   18  },
+	{ -24,   62,   102, -27,   15  },
+	{ -18,   41,   116, -22,   11  },
+	{ -10,   20,   125, -12,   5   },
+};
+static const struct dispc_hv_coef fir5_m11[] = {
+	{ -12,   12,   128,  12,  -12  },
+	{ -4,   -3,    124,  30,  -19  },
+	{  3,   -15,   115,  49,  -24  },
+	{  9,   -22,   101,  67,  -27  },
+	{ -26,   83,   83,  -26,   14  },
+	{ -27,   67,   101, -22,   9   },
+	{ -24,   49,   115, -15,   3   },
+	{ -19,   30,   124, -3,   -4   },
+};
+static const struct dispc_hv_coef fir5_m12[] = {
+	{ -19,   21,   124,  21,  -19  },
+	{ -12,   6,    120,  38,  -24  },
+	{ -6,   -7,    112,  55,  -26  },
+	{  1,   -16,   98,   70,  -25  },
+	{ -21,   82,   82,  -21,   6   },
+	{ -25,   70,   98,  -16,   1   },
+	{ -26,   55,   112, -7,   -6   },
+	{ -24,   38,   120,  6,   -12  },
+};
+static const struct dispc_hv_coef fir5_m13[] = {
+	{ -22,   27,   118,  27,  -22  },
+	{ -18,   13,   115,  43,  -25  },
+	{ -12,   0,    107,  58,  -25  },
+	{ -6,   -10,   95,   71,  -22  },
+	{ -17,   81,   81,  -17,   0   },
+	{ -22,   71,   95,  -10,  -6   },
+	{ -25,   58,   107,  0,   -12  },
+	{ -25,   43,   115,  13,  -18  },
+};
+static const struct dispc_hv_coef fir5_m14[] = {
+	{ -23,   32,   110,  32,  -23  },
+	{ -20,   18,   108,  46,  -24  },
+	{ -16,   6,    101,  59,  -22  },
+	{ -11,  -4,    91,   70,  -18  },
+	{ -11,   78,   78,  -11,  -6   },
+	{ -18,   70,   91,  -4,   -11  },
+};
+static const struct dispc_hv_coef fir3_m16[] = {
+	{  0,    36,   56,   36,   0   },
+	{  0,    31,   57,   40,   0   },
+	{  0,    27,   56,   45,   0   },
+	{  0,    23,   55,   50,   0   },
+	{  0,    55,   55,   18,   0   },
+	{  0,    50,   55,   23,   0   },
+	{  0,    45,   56,   27,   0   },
+	{  0,    40,   57,   31,   0   },
+};
+static const struct dispc_hv_coef fir5_m16[] = {
+	{ -20,   37,   94,   37,  -20  },
+	{ -21,   26,   93,   48,  -18  },
+	{ -19,   15,   88,   58,  -14  },
+	{ -17,   6,    82,   66,  -9   },
+	{ -2,    73,   73,  -2,   -14  },
+	{ -9,    66,   82,   6,   -17  },
+	{ -14,   58,   88,   15,  -19  },
+	{ -18,   48,   93,   26,  -21  },
+};
+static const struct dispc_hv_coef fir5_m19[] = {
+	{ -12,   38,   76,   38,  -12  },
+	{ -14,   31,   72,   47,  -8   },
+	{ -16,   22,   73,   53,  -4   },
+	{ -16,   15,   69,   59,   1   },
+	{  8,    64,   64,   8,   -16  },
+	{  1,    59,   69,   15,  -16  },
+	{ -4,    53,   73,   22,  -16  },
+	{ -9,    47,   72,   31,  -13  },
+};
+static const struct dispc_hv_coef fir5_m22[] = {
+	{ -6,    37,   66,   37,  -6   },
+	{ -8,    32,   61,   44,  -1   },
+	{ -11,   25,   63,   48,   3   },
+	{ -13,   19,   61,   53,   8   },
+	{  13,   58,   58,   13,  -14  },
+	{  8,    53,   61,   19,  -13  },
+	{  3,    48,   63,   25,  -11  },
+	{ -2,    44,   61,   32,  -7   },
+};
+static const struct dispc_hv_coef fir5_m26[] = {
+	{  1,    36,   54,   36,   1   },
+	{ -2,    31,   55,   40,   4   },
+	{ -5,    27,   54,   44,   8   },
+	{ -8,    22,   53,   48,   13  },
+	{  18,   51,   51,   18,  -10  },
+	{  13,   48,   53,   22,  -8   },
+	{  8,    44,   54,   27,  -5   },
+	{  4,    40,   55,   31,  -2   },
+};
+static const struct dispc_hv_coef fir5_m32[] = {
+	{  7,    34,   46,   34,   7   },
+	{  4,    31,   46,   37,   10  },
+	{  1,    27,   46,   39,   14  },
+	{ -1,    24,   46,   42,   17  },
+	{  21,   45,   45,   21,  -4   },
+	{  17,   42,   46,   24,  -1   },
+	{  14,   39,   46,   28,   1   },
+	{  10,   37,   46,   31,   4   },
+};
+
+static const struct dispc_hv_coef *get_scaling_coef(int orig_size, int out_size,
+				int orig_ilaced, int out_ilaced, int five_taps)
+{
+	/* ranges from 2 to 32 */
+	int two_m = 16 * orig_size / out_size;
+
+	if (orig_size > 4 * out_size)
+		return fir5_zero;
+
+	if (out_size > 8 * orig_size)
+		return five_taps ? fir5_m8 : fir3_m8;
+
+	/* interlaced output needs at least M = 16 */
+	if (out_ilaced) {
+		if (two_m < 32)
+			two_m = 32;
+	}
+
+	if (five_taps)
+		return orig_size < out_size ? fir5_m8b :
+			two_m < 17 ? fir5_m8 :
+			two_m < 19 ? fir5_m9 :
+			two_m < 21 ? fir5_m10 :
+			two_m < 23 ? fir5_m11 :
+			two_m < 25 ? fir5_m12 :
+			two_m < 27 ? fir5_m13 :
+			two_m < 30 ? fir5_m14 :
+			two_m < 35 ? fir5_m16 :
+			two_m < 41 ? fir5_m19 :
+			two_m < 48 ? fir5_m22 :
+			two_m < 58 ? fir5_m26 :
+			fir5_m32;
+	else
+		return two_m < 24 ? fir3_m8 : fir3_m16;
+}
+
+const struct dispc_hv_coef *_dispc_calculate_scaling(u16 orig_size,
+	u16 out_size, bool ilace, bool five_taps, int scale, int *fir_inc)
+{
+	/* be neat and clear FIR if not scaling */
+	if (!scale) {
+		*fir_inc = 0;
+		return fir5_zero;
+	}
+
+	*fir_inc = (1024 * orig_size) / out_size;
+	if (*fir_inc > 4095)
+		*fir_inc = 4095;
+	return get_scaling_coef(orig_size, out_size, 0, ilace, five_taps);
+}
 
 static void _dispc_set_scaling(enum omap_plane plane,
 		u16 orig_width, u16 orig_height,
 		u16 out_width, u16 out_height,
 		bool ilace, bool five_taps,
-		bool fieldmode)
+		bool fieldmode, int scale_x, int scale_y)
 {
 	int fir_hinc;
 	int fir_vinc;
-	int hscaleup, vscaleup;
+	const struct dispc_hv_coef *hfir, *vfir;
 	int accu0 = 0;
 	int accu1 = 0;
 	u32 l;
 
 	BUG_ON(plane == OMAP_DSS_GFX);
 
-	hscaleup = orig_width <= out_width;
-	vscaleup = orig_height <= out_height;
-
-	_dispc_set_scale_coef(plane, hscaleup, vscaleup, five_taps);
-
-	if (!orig_width || orig_width == out_width)
-		fir_hinc = 0;
-	else
-		fir_hinc = 1024 * orig_width / out_width;
-
-	if (!orig_height || orig_height == out_height)
-		fir_vinc = 0;
-	else
-		fir_vinc = 1024 * orig_height / out_height;
-
+	hfir = _dispc_calculate_scaling(orig_width, out_width, false,
+					true, scale_x, &fir_hinc);
+	vfir = _dispc_calculate_scaling(orig_height, out_height, ilace,
+					five_taps, scale_y, &fir_vinc);
+	_dispc_set_scale_coef(plane, hfir, vfir, five_taps);
 	_dispc_set_fir(plane, fir_hinc, fir_vinc);
 
 	l = dispc_read_reg(dispc_reg_att[plane]);
 
 	/* RESIZEENABLE and VERTICALTAPS */
 	l &= ~((0x3 << 5) | (0x1 << 21));
-	l |= fir_hinc ? (1 << 5) : 0;
-	l |= fir_vinc ? (1 << 6) : 0;
+	l |= scale_x ? (1 << 5) : 0;
+	l |= scale_y ? (1 << 6) : 0;
 	l |= five_taps ? (1 << 21) : 0;
 
 	/* VRESIZECONF and HRESIZECONF */
 	if (dss_has_feature(FEAT_RESIZECONF)) {
 		l &= ~(0x3 << 7);
-		l |= hscaleup ? 0 : (1 << 7);
-		l |= vscaleup ? 0 : (1 << 8);
+		l |= out_width  > orig_width  ? 0 : (1 << 7);
+		l |= out_height > orig_height ? 0 : (1 << 8);
 	}
 
 	/* LINEBUFFERSPLIT */
@@ -1491,6 +1992,43 @@ static void _dispc_set_scaling(enum omap_plane plane,
 
 	_dispc_set_vid_accu0(plane, 0, accu0);
 	_dispc_set_vid_accu1(plane, 0, accu1);
+}
+
+static void _dispc_set_scaling_uv(enum omap_plane plane,
+		u16 orig_width, u16 orig_height,
+		u16 out_width, u16 out_height,
+		bool ilace, bool five_taps,
+		bool fieldmode, int scale_x, int scale_y)
+{
+	int fir_hinc = 0, fir_vinc = 0;
+	int accu0, accu1, accuh;
+	const struct dispc_hv_coef *hfir, *vfir;
+
+	hfir = _dispc_calculate_scaling(orig_width, out_width, false,
+					true, scale_x, &fir_hinc);
+	vfir = _dispc_calculate_scaling(orig_height, out_height, ilace,
+					five_taps, scale_y, &fir_vinc);
+
+	_dispc_set_scale_uv_coef(plane, hfir, vfir, five_taps);
+	_dispc_set_fir2(plane, fir_hinc, fir_vinc);
+
+	/* chroma resampling */
+	REG_FLD_MOD(DISPC_VID_ATTRIBUTES2(plane - 1),
+		(scale_x || scale_y), 8, 8);
+
+	if (ilace) {
+		accu0 = (-3 * fir_vinc / 4) % 1024;
+		accu1 = (-fir_vinc / 4) % 1024;
+	} else {
+		accu0 = accu1 = (-fir_vinc / 2) % 1024;
+	}
+
+	accuh = (-fir_hinc / 2) % 1024;
+
+	_dispc_set_vid_accu2_0(plane, 0x80, 0);
+	_dispc_set_vid_accu2_1(plane, 0x80, 0);
+	/* _dispc_set_vid_accu2_0(plane, accuh, accu0);
+	   _dispc_set_vid_accu2_1(plane, accuh, accu1); */
 }
 
 static void _dispc_set_rotation_attrs(enum omap_plane plane, u8 rotation,
@@ -1543,6 +2081,14 @@ static void _dispc_set_rotation_attrs(enum omap_plane plane, u8 rotation,
 	REG_FLD_MOD(dispc_reg_att[plane], vidrot, 13, 12);
 	if (dss_has_feature(FEAT_ROWREPEATENABLE))
 		REG_FLD_MOD(dispc_reg_att[plane], row_repeat ? 1 : 0, 18, 18);
+
+	if (color_mode == OMAP_DSS_COLOR_NV12) {
+		/* this will never happen for GFX */
+		bool doublestride = (rotation == OMAP_DSS_ROT_0 ||
+				     rotation == OMAP_DSS_ROT_180);
+		/* DOUBLESTRIDE */
+		REG_FLD_MOD(dispc_reg_att[plane], doublestride, 22, 22);
+	}
 }
 
 static int color_mode_to_bpp(enum omap_color_mode color_mode)
@@ -1555,10 +2101,15 @@ static int color_mode_to_bpp(enum omap_color_mode color_mode)
 	case OMAP_DSS_COLOR_CLUT4:
 		return 4;
 	case OMAP_DSS_COLOR_CLUT8:
+	case OMAP_DSS_COLOR_NV12:
 		return 8;
 	case OMAP_DSS_COLOR_RGB12U:
+	case OMAP_DSS_COLOR_RGBX12:
 	case OMAP_DSS_COLOR_RGB16:
+	case OMAP_DSS_COLOR_ARGB16_1555:
 	case OMAP_DSS_COLOR_ARGB16:
+	case OMAP_DSS_COLOR_RGBA16:
+	case OMAP_DSS_COLOR_XRGB15:
 	case OMAP_DSS_COLOR_YUV2:
 	case OMAP_DSS_COLOR_UYVY:
 		return 16;
@@ -1567,7 +2118,7 @@ static int color_mode_to_bpp(enum omap_color_mode color_mode)
 	case OMAP_DSS_COLOR_RGB24U:
 	case OMAP_DSS_COLOR_ARGB32:
 	case OMAP_DSS_COLOR_RGBA32:
-	case OMAP_DSS_COLOR_RGBX32:
+	case OMAP_DSS_COLOR_RGBX24:
 		return 32;
 	default:
 		BUG();
@@ -1584,6 +2135,26 @@ static s32 pixinc(int pixels, u8 ps)
 		return 1 - (-pixels + 1) * ps;
 	else
 		BUG();
+}
+
+static void calc_tiler_row_rotation(struct tiler_view_t *view,
+		s32 *row_inc, unsigned *offset1, bool ilace)
+{
+	/* assume TB. We worry about swapping top/bottom outside of this call */
+
+	if (ilace) {
+		/* even and odd frames are interleaved */
+
+		/* offset1 is always at an odd line */
+		*offset1 = view->v_inc;
+	}
+	*row_inc = view->v_inc + 1 - view->width * view->bpp;
+
+	DSSDBG(" ps: %d, width: %d, offset1: %d,"
+		" height: %d, row_inc:%d\n",
+		view->bpp, view->width, *offset1, view->height, *row_inc);
+
+	return;
 }
 
 static void calc_vrfb_rotation_offset(u8 rotation, bool mirror,
@@ -1884,7 +2455,7 @@ void dispc_set_channel_out(enum omap_plane plane, enum omap_channel channel_out)
 }
 
 static int _dispc_setup_plane(enum omap_plane plane,
-		u32 paddr, u16 screen_width,
+		u32 paddr, u32 puv_addr, u16 screen_width,
 		u16 pos_x, u16 pos_y,
 		u16 width, u16 height,
 		u16 out_width, u16 out_height,
@@ -1904,6 +2475,7 @@ static int _dispc_setup_plane(enum omap_plane plane,
 	s32 pix_inc;
 	u16 frame_height = height;
 	unsigned int field_offset = 0;
+	bool scale_x, scale_y, scale_uv;
 
 	if (paddr == 0)
 		return -EINVAL;
@@ -1997,16 +2569,56 @@ static int _dispc_setup_plane(enum omap_plane plane,
 	if (fieldmode)
 		field_offset = 1;
 
-	if (rotation_type == OMAP_DSS_ROT_DMA)
+	/* default values */
+	row_inc = pix_inc = 0x1;
+	offset0 = offset1 = 0x0;
+
+	if (cpu_is_omap44xx()) {
+		/* set BURSTTYPE */
+		bool use_tiler = rotation_type == OMAP_DSS_ROT_TILER;
+		REG_FLD_MOD(dispc_reg_att[plane], use_tiler, 29, 29);
+	}
+
+	if (rotation_type == OMAP_DSS_ROT_TILER) {
+		struct tiler_view_t view = {0};
+		unsigned long tiler_width = width, tiler_height = height;
+		/* tiler needs 0-degree width & height */
+		if (rotation & 1)
+			swap(tiler_width, tiler_height);
+
+		if (color_mode == OMAP_DSS_COLOR_YUV2 ||
+			color_mode == OMAP_DSS_COLOR_UYVY)
+			tiler_width /= 2;
+
+		tilview_create(&view, paddr, tiler_width, tiler_height);
+		tilview_rotate(&view, rotation * 90);
+		tilview_flip(&view, mirror, false);
+		paddr = view.tsptr;
+
+		/* we cannot do TB field interlaced in rotated view */
+		calc_tiler_row_rotation(&view, &row_inc,
+					&offset1, ilace);
+
+		DSSDBG("w, h = %ld %ld\n", tiler_width, tiler_height);
+
+		if (puv_addr) {
+			tilview_create(&view, puv_addr, tiler_width / 2,
+						tiler_height / 2);
+			tilview_rotate(&view, rotation * 90);
+			tilview_flip(&view, mirror, false);
+			puv_addr = view.tsptr;
+		}
+	} else if (rotation_type == OMAP_DSS_ROT_DMA) {
 		calc_dma_rotation_offset(rotation, mirror,
 				screen_width, width, frame_height, color_mode,
 				fieldmode, field_offset,
 				&offset0, &offset1, &row_inc, &pix_inc);
-	else
+	} else {
 		calc_vrfb_rotation_offset(rotation, mirror,
 				screen_width, width, frame_height, color_mode,
 				fieldmode, field_offset,
 				&offset0, &offset1, &row_inc, &pix_inc);
+	}
 
 	DSSDBG("offset0 %u, offset1 %u, row_inc %d, pix_inc %d\n",
 			offset0, offset1, row_inc, pix_inc);
@@ -2015,6 +2627,11 @@ static int _dispc_setup_plane(enum omap_plane plane,
 
 	_dispc_set_plane_ba0(plane, paddr + offset0);
 	_dispc_set_plane_ba1(plane, paddr + offset1);
+
+	if (OMAP_DSS_COLOR_NV12 == color_mode) {
+		_dispc_set_plane_ba_uv0(plane, puv_addr + offset0);
+		_dispc_set_plane_ba_uv1(plane, puv_addr + offset1);
+	}
 
 	_dispc_set_row_inc(plane, row_inc);
 	_dispc_set_pix_inc(plane, pix_inc);
@@ -2025,19 +2642,72 @@ static int _dispc_setup_plane(enum omap_plane plane,
 	_dispc_set_plane_pos(plane, pos_x, pos_y);
 
 	_dispc_set_pic_size(plane, width, height);
-
-	if (plane != OMAP_DSS_GFX) {
-		_dispc_set_scaling(plane, width, height,
-				   out_width, out_height,
-				   ilace, five_taps, fieldmode);
-		_dispc_set_vid_size(plane, out_width, out_height);
-		_dispc_set_vid_color_conv(plane, cconv);
-	}
-
 	_dispc_set_rotation_attrs(plane, rotation, mirror, color_mode);
 
 	_dispc_set_pre_mult_alpha(plane, pre_mult_alpha);
 	_dispc_setup_global_alpha(plane, global_alpha);
+
+	/* rest of the setup is for VID pipelines */
+	if (plane == OMAP_DSS_GFX)
+		return 0;
+
+	/* scale only if we need to */
+	scale_x = width != out_width;
+	scale_y = height != out_height;
+
+	if (!dss_has_feature(FEAT_RESIZECONF)) {
+		/* OMAP4 scales UV (chroma) using its UV scaler */
+		u16 out_ch_height = out_height;
+		u16 out_ch_width = out_width;
+		u16 ch_height = height;
+		u16 ch_width = width;
+
+		/* account for chroma decimation */
+		switch (color_mode) {
+		case OMAP_DSS_COLOR_NV12: /* YUV420 */
+			/* UV is subsampled vertically & horizontally */
+			ch_height >>= 1;
+			ch_width >>= 1;
+			scale_uv = true;
+			break;
+
+		case OMAP_DSS_COLOR_YUV2:
+		case OMAP_DSS_COLOR_UYVY: /* YUV422 */
+			/* chroma is not subsampled if rotated by 90 or 270 */
+			if (!(rotation & 1))
+				ch_width >>= 1; /* UV is subsampled horiz. */
+
+			/* must use FIR for YUV422 if rotated */
+			if (rotation % 4)
+				scale_x = scale_y = true;
+
+			scale_uv = true;
+			break;
+
+		default:
+			/* no UV scaling for RGB formats for now */
+			scale_uv = false;
+			break;
+		}
+
+		/* scale also if chroma is scaled */
+		if (out_ch_width != ch_width)
+			scale_x = true;
+		if (out_ch_height != ch_height)
+			scale_y = true;
+
+		/* set up UV scaling */
+		_dispc_set_scaling_uv(plane, ch_width, ch_height,
+			out_ch_width, out_ch_height, ilace,
+			five_taps, fieldmode, scale_uv && scale_x,
+			scale_uv && scale_y);
+	}
+
+	_dispc_set_scaling(plane, width, height,
+			   out_width, out_height,
+			   ilace, five_taps, fieldmode, scale_x, scale_y);
+	_dispc_set_vid_size(plane, out_width, out_height);
+	_dispc_set_vid_color_conv(plane, cconv);
 
 	return 0;
 }
@@ -3717,7 +4387,7 @@ int dispc_enable_plane(enum omap_plane plane, bool enable)
 }
 
 int dispc_setup_plane(enum omap_plane plane,
-		       u32 paddr, u16 screen_width,
+		       u32 paddr, u32 puv_addr, u16 screen_width,
 		       u16 pos_x, u16 pos_y,
 		       u16 width, u16 height,
 		       u16 out_width, u16 out_height,
@@ -3729,9 +4399,9 @@ int dispc_setup_plane(enum omap_plane plane,
 {
 	int r = 0;
 
-	DSSDBG("dispc_setup_plane %d, pa %x, sw %d, %d,%d, %dx%d -> "
+	DSSDBG("dispc_setup_plane %d, pa %x/%x, sw %d, %d,%d, %dx%d -> "
 	       "%dx%d, ilace %d, cmode %x, rot %d, mir %d chan %d\n",
-	       plane, paddr, screen_width, pos_x, pos_y,
+	       plane, paddr, puv_addr, screen_width, pos_x, pos_y,
 	       width, height,
 	       out_width, out_height,
 	       ilace, color_mode,
@@ -3740,7 +4410,7 @@ int dispc_setup_plane(enum omap_plane plane,
 	enable_clocks(1);
 
 	r = _dispc_setup_plane(plane,
-			   paddr, screen_width,
+			   paddr, puv_addr, screen_width,
 			   pos_x, pos_y,
 			   width, height,
 			   out_width, out_height,

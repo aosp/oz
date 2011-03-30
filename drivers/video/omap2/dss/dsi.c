@@ -3178,6 +3178,8 @@ int omap_dsi_update(struct omap_dss_device *dssdev,
 {
 	struct dsi_struct *ds = dss2dsi(dssdev);
 
+	dss_hybrid_update_defined(dssdev, &x, &y, &w, &h);
+
 	ds->update_channel = channel;
 
 	/* OMAP DSS cannot send updates of odd widths.
