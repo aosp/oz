@@ -658,12 +658,18 @@ static struct platform_device wl128x_device = {
 	.dev.platform_data = &wilink_pdata,
 };
 
+static struct platform_device btwilink_device = {
+	.name = "btwilink",
+	.id = -1,
+};
+
 static struct platform_device *blazetablet_devices[] __initdata = {
 	&sdp4430_disp_led,
 	/* TODO. Review button LEDs functionality
 	&sdp4430_leds_pwm, */
 	&sdp4430_leds_gpio,
 	&wl128x_device,
+	&btwilink_device,
 	&sdp4430_hdmi_audio_device,
 	&tablet_gpio_keys_device,
 };
