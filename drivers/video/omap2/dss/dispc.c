@@ -2570,9 +2570,6 @@ static void calc_tiler_row_rotation(u8 rotation,
 	switch (rotation) {
 	case 0:
 	case 2:
-		if (color_mode == OMAP_DSS_COLOR_YUV2 ||
-			color_mode == OMAP_DSS_COLOR_UYVY)
-			width /= 2;
 		line_size = (1 == ps) ? 16384 : 32768 ;
 		break;
 
@@ -2711,6 +2708,15 @@ static void calc_dma_rotation_offset(u8 rotation, bool mirror,
 	case OMAP_DSS_COLOR_CLUT4:
 	case OMAP_DSS_COLOR_CLUT8:
 		return;
+	case OMAP_DSS_COLOR_YUV2:
+	case OMAP_DSS_COLOR_UYVY:
+		if (cpu_is_omap44xx()) {
+			/* on OMAP4 YUYV is handled as 32-bit data */
+			ps = 4;
+			screen_width /= 2;
+			break;
+		}
+		/* fall through */
 	default:
 		ps = color_mode_to_bpp(color_mode) / 8;
 		break;
@@ -3094,6 +3100,8 @@ static int _dispc_setup_plane(enum omap_plane plane,
 	unsigned int field_offset = 0;
 	u32 color_mask;
 	u32 fifo_high, fifo_low;
+	int pixpg = (color_mode &
+		(OMAP_DSS_COLOR_YUV2 | OMAP_DSS_COLOR_UYVY)) ? 2 : 1;
 
 	if (paddr == 0)
 		return -EINVAL;
@@ -3154,6 +3162,13 @@ static int _dispc_setup_plane(enum omap_plane plane,
 				OMAP_DSS_COLOR_NV12)) != 0;
 
 	/* predecimate */
+
+	/* adjust for group-of-pixels*/
+	if (rotation & 1)
+		height /= pixpg;
+	else
+		width /= pixpg;
+
 	width = DIV_ROUND_UP(width, x_decim);
 	height = DIV_ROUND_UP(height, y_decim);
 
@@ -3191,7 +3206,7 @@ static int _dispc_setup_plane(enum omap_plane plane,
 		u8 mir_x = 0, mir_y = 0;
 		u8 tiler_rotation = rotation;
 
-		pix_inc = 1 + (x_decim - 1) * bpp;
+		pix_inc = 1 + (x_decim - 1) * bpp * pixpg;
 		calc_tiler_row_rotation(rotation, width * x_decim,
 					color_mode, y_decim, &row_inc,
 					&offset1, ilace, pic_height);
@@ -3219,10 +3234,6 @@ static int _dispc_setup_plane(enum omap_plane plane,
 
 		if (orient.rotate_90 & 1)
 			swap(tiler_width, tiler_height);
-
-		if (color_mode == OMAP_DSS_COLOR_YUV2 ||
-			color_mode == OMAP_DSS_COLOR_UYVY)
-			tiler_width /= 2;
 
 		DSSDBG("w, h = %ld %ld\n", tiler_width, tiler_height);
 
@@ -3266,6 +3277,11 @@ static int _dispc_setup_plane(enum omap_plane plane,
 				fieldmode, field_offset,
 				&offset0, &offset1, &row_inc, &pix_inc);
 	}
+	/* adjust back to pixels */
+	if (rotation & 1)
+		height *= pixpg;
+	else
+		width *= pixpg;
 	DSSDBG("offset0 %u, offset1 %u, row_inc %d, pix_inc %d\n",
 			offset0, offset1, row_inc, pix_inc);
 
