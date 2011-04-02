@@ -498,6 +498,10 @@ static struct omap_dss_device blazetablet_lcd_device = {
 			.lp_clk_div	= 5,	/* LPDIV */
 		},
 	},
+	.panel			= {
+		.width_in_mm = 210,
+		.height_in_mm = 158,
+	},
 	.channel		= OMAP_DSS_CHANNEL_LCD,
 };
 
