@@ -1084,6 +1084,7 @@ int omapdss_default_get_recommended_bpp(struct omap_dss_device *dssdev);
 bool dispc_go_busy(enum omap_channel channel);
 void dispc_go(enum omap_channel channel);
 bool dispc_is_vsync_fake(void);
+void dispc_enable_channel(enum omap_channel channel, bool enable);
 typedef void (*omap_dispc_isr_t) (void *arg, u32 mask);
 int omap_dispc_register_isr(omap_dispc_isr_t isr, void *arg, u32 mask);
 int omap_dispc_unregister_isr(omap_dispc_isr_t isr, void *arg, u32 mask);

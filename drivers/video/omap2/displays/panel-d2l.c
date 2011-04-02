@@ -712,8 +712,10 @@ err:
 
 static void d2l_power_off(struct omap_dss_device *dssdev)
 {
+	struct d2l_data *d2d = dev_get_drvdata(&dssdev->dev);
 	msleep(10);
 
+	d2d->enabled = 0;
 	omapdss_dsi_display_disable(dssdev);
 }
 
@@ -738,6 +740,7 @@ static int d2l_start(struct omap_dss_device *dssdev)
 		dssdev->state = OMAP_DSS_DISPLAY_DISABLED;
 	} else {
 		dssdev->state = OMAP_DSS_DISPLAY_ACTIVE;
+		dispc_enable_channel(dssdev->channel, true);
 	}
 
 	mutex_unlock(&d2d->lock);
@@ -752,6 +755,8 @@ static void d2l_stop(struct omap_dss_device *dssdev)
 	lcd_ix = DSI1;
 
 	mutex_lock(&d2d->lock);
+
+	dispc_enable_channel(dssdev->channel, false);
 
 	dsi_bus_lock(lcd_ix);
 
@@ -869,46 +874,26 @@ static enum omap_dss_update_mode d2l_get_update_mode(struct omap_dss_device
 #ifdef CONFIG_PM
 static int d2l_resume(struct omap_dss_device *dssdev)
 {
-/*	struct d2l_data *td = dev_get_drvdata(&dssdev->dev); */
-	int r = 0;
-/*
 	dev_dbg(&dssdev->dev, "resume\n");
 
-	mutex_lock(&td->lock);
+	if (dssdev->state != OMAP_DSS_DISPLAY_SUSPENDED)
+		return -EINVAL;
 
-	if (dssdev->state != OMAP_DSS_DISPLAY_SUSPENDED) {
-		r = -EINVAL;
-		goto err;
-	}
-
-	r = d2l_start(dssdev);
-err:
-	mutex_unlock(&td->lock);
-*/
-	return r;
+	return d2l_start(dssdev);
 }
 
 static int d2l_suspend(struct omap_dss_device *dssdev)
 {
-/*	struct d2l_data *td = dev_get_drvdata(&dssdev->dev); */
-	int r = 0;
-/*
 	dev_dbg(&dssdev->dev, "suspend\n");
 
-	mutex_lock(&td->lock);
-
-	if (dssdev->state != OMAP_DSS_DISPLAY_ACTIVE) {
-		r = -EINVAL;
-		goto err;
-	}
+	if (dssdev->state != OMAP_DSS_DISPLAY_ACTIVE)
+		return -EINVAL;
 
 	d2l_stop(dssdev);
 
 	dssdev->state = OMAP_DSS_DISPLAY_SUSPENDED;
-err:
-	mutex_unlock(&td->lock);
-*/
-	return r;
+
+	return 0;
 }
 #endif
 
