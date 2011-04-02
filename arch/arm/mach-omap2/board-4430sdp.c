@@ -612,6 +612,10 @@ static struct omap_dss_device sdp4430_lcd_device = {
 			.lp_clk_div	= 8,
 		},
 	},
+	.panel			= {
+		.width_in_mm = 84,
+		.height_in_mm = 47,
+	},
 	.channel		= OMAP_DSS_CHANNEL_LCD,
 };
 
@@ -636,6 +640,10 @@ static struct omap_dss_device sdp4430_lcd2_device = {
 			.regm_dsi	= 4,
 			.lp_clk_div	= 8,
 		},
+	},
+	.panel			= {
+		.width_in_mm = 84,
+		.height_in_mm = 47,
 	},
 	.channel		= OMAP_DSS_CHANNEL_LCD2,
 };
