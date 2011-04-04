@@ -120,6 +120,58 @@ static int g_range_table[7] = {
 	8000,
 	16000,
 };
+#ifdef BMA180_DEBUG
+struct bma180_reg {
+	const char *name;
+	uint8_t reg;
+	int writeable;
+} bma180_regs[] = {
+	{ "CHIP_ID",       	BMA180_CHIP_ID, 0 },
+	{ "VERSION",       	BMA180_VERSION, 0 },
+	{ "X_LSB",        	BMA180_ACC_X_LSB, 0 },
+	{ "X_MSB",       	BMA180_ACC_X_MSB, 0 },
+	{ "Y_LSB",       	BMA180_ACC_Y_LSB, 0 },
+	{ "Y_MSB",       	BMA180_ACC_Y_MSB, 0 },
+	{ "Z_LSB",       	BMA180_ACC_Z_LSB, 0 },
+	{ "Z_MSB",       	BMA180_ACC_Z_MSB, 0 },
+	{ "TEMP",       	BMA180_TEMP, 0 },
+	{ "STATUS1",       	BMA180_STATUS_REG1, 0 },
+	{ "STATUS2",       	BMA180_STATUS_REG2, 0 },
+	{ "STATUS3",       	BMA180_STATUS_REG3, 0 },
+	{ "STATUS4",       	BMA180_STATUS_REG4, 0 },
+	{ "CTRL0",       	BMA180_CTRL_REG0, 1 },
+	{ "CTRL1",       	BMA180_CTRL_REG1, 1 },
+	{ "CTRL2",       	BMA180_CTRL_REG2, 1 },
+	{ "RESET",       	BMA180_RESET, 1 },
+	{ "BW_TCS",       	BMA180_BW_TCS, 1 },
+	{ "CTRL3",       	BMA180_CTRL_REG3, 1 },
+	{ "CTRL4",       	BMA180_CTRL_REG4, 1 },
+	{ "HY",       		BMA180_HY, 1 },
+	{ "TAP_INFO",       	BMA180_SLOPE_TAPSENS_INFO, 1 },
+	{ "HI_LOW_INFO",       	BMA180_HIGH_LOW_INFO, 1 },
+	{ "LOW_DUR",       	BMA180_LOW_DUR, 1 },
+	{ "HIGH_DUR",       	BMA180_HIGH_DUR, 1 },
+	{ "TAP_THRESH",       	BMA180_TAPSENS_TH, 1 },
+	{ "LOW_THRESH",       	BMA180_LOW_TH, 1 },
+	{ "HIGH_THRESH",       	BMA180_HIGH_TH, 1 },
+	{ "SLOPE_THRESH",       BMA180_SLOPE_TH, 1 },
+	{ "CD1",       		BMA180_CD1, 1 },
+	{ "CD2",       		BMA180_CD2, 1 },
+	{ "TCO_X",       	BMA180_TCO_X, 1 },
+	{ "TCO_Y",       	BMA180_TCO_Y, 1 },
+	{ "TCO_Z",       	BMA180_TCO_Z, 1 },
+	{ "GAIN_T",       	BMA180_GAIN_T, 1 },
+	{ "GAIN_X",       	BMA180_GAIN_X, 1 },
+	{ "GAIN_Y",       	BMA180_GAIN_Y, 1 },
+	{ "GAIN_Z",       	BMA180_GAIN_Z, 1 },
+	{ "OFFSET_LSB1",       	BMA180_OFFSET_LSB1, 1 },
+	{ "OFFSET_LSB2",       	BMA180_OFFSET_LSB2, 1 },
+	{ "OFFSET_T",       	BMA180_OFFSET_T, 1 },
+	{ "OFFSET_X",       	BMA180_OFFSET_X, 1 },
+	{ "OFFSET_Y",       	BMA180_OFFSET_Y, 1 },
+	{ "OFFSET_Z",       	BMA180_OFFSET_Z, 1 },
+};
+#endif
 
 static int bma180_write(struct bma180_accel_data *data, u8 reg, u8 val)
 {
@@ -276,7 +328,75 @@ static ssize_t bma180_store_attr_delay(struct device *dev,
 	return count;
 
 }
+#ifdef BMA180_DEBUG
+static ssize_t bma180_registers_show(struct device *dev,
+			      struct device_attribute *attr, char *buf)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct bma180_accel_data *data = platform_get_drvdata(pdev);
+	unsigned i, n, reg_count;
+	uint8_t value;
 
+	reg_count = sizeof(bma180_regs) / sizeof(bma180_regs[0]);
+	for (i = 0, n = 0; i < reg_count; i++) {
+		value = bma180_read(data, bma180_regs[i].reg);
+		n += scnprintf(buf + n, PAGE_SIZE - n,
+			       "%-20s = 0x%02X\n",
+			       bma180_regs[i].name,
+			       value);
+	}
+
+	return n;
+}
+
+static ssize_t bma180_registers_store(struct device *dev,
+			       struct device_attribute *attr,
+			       const char *buf, size_t count)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct bma180_accel_data *data = platform_get_drvdata(pdev);
+	unsigned i, reg_count, value;
+	int error = 0;
+	char name[30];
+
+	if (count >= 30) {
+		pr_err("%s:input too long\n", __func__);
+		return -1;
+	}
+
+	if (sscanf(buf, "%s %x", name, &value) != 2) {
+		pr_err("%s:unable to parse input\n", __func__);
+		return -1;
+	}
+
+	reg_count = sizeof(bma180_regs) / sizeof(bma180_regs[0]);
+	for (i = 0; i < reg_count; i++) {
+		if (!strcmp(name, bma180_regs[i].name)) {
+			if (bma180_regs[i].writeable) {
+				error = bma180_write(data,
+					bma180_regs[i].reg,
+					value);
+				if (error) {
+					pr_err("%s:Failed to write %s\n",
+						__func__, name);
+					return -1;
+				}
+			} else {
+				pr_err("%s:Register %s is not writeable\n",
+						__func__, name);
+					return -1;
+			}
+			return count;
+		}
+	}
+
+	pr_err("%s:no such register %s\n", __func__, name);
+	return -1;
+}
+
+static DEVICE_ATTR(registers, S_IWUSR | S_IRUGO,
+		bma180_registers_show, bma180_registers_store);
+#endif
 static DEVICE_ATTR(enable, S_IWUSR | S_IRUGO,
 		bma180_show_attr_enable, bma180_store_attr_enable);
 
@@ -286,6 +406,9 @@ static DEVICE_ATTR(delay, S_IWUSR | S_IRUGO,
 static struct attribute *bma180_accel_attrs[] = {
 	&dev_attr_enable.attr,
 	&dev_attr_delay.attr,
+#ifdef BMA180_DEBUG
+	&dev_attr_registers.attr,
+#endif
 	NULL
 };
 
