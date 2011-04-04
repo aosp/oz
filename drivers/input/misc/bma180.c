@@ -30,10 +30,10 @@
 #include <linux/i2c/bma180.h>
 #include <linux/gpio.h>
 
+#define BMA180_DEBUG 1
+
 #define DEVICE_NAME "bma180"
 #define DRIVER_NAME "bma180_accel"
-#define INPUT_WORKQUEUE_SIZE 1
-#define BMA180_DEBUG 1
 
 #define BMA180_OFFSET_Z			0x3A
 #define BMA180_OFFSET_Y			0x39
@@ -89,24 +89,7 @@ struct bma180_accel_data {
 	struct delayed_work worklogic;
 	struct mutex mutex;
 
-	bool interrupts_enabled;
-
-	uint8_t method;
 	uint32_t def_poll_rate;
-	uint16_t fuzz_x;
-	uint16_t fuzz_y;
-	uint16_t fuzz_z;
-	uint16_t bandwidth;
-	uint8_t g_range;
-	uint8_t mode;
-	uint8_t bit_mode;
-	uint8_t smp_skip;
-	uint16_t LSB_per_half_range;
-
-	int16_t accel_x;
-	int16_t accel_y;
-	int16_t accel_z;
-	int16_t temperature;
 };
 
 static uint32_t accl_debug;
@@ -127,50 +110,50 @@ struct bma180_reg {
 	uint8_t reg;
 	int writeable;
 } bma180_regs[] = {
-	{ "CHIP_ID",       	BMA180_CHIP_ID, 0 },
-	{ "VERSION",       	BMA180_VERSION, 0 },
-	{ "X_LSB",        	BMA180_ACC_X_LSB, 0 },
-	{ "X_MSB",       	BMA180_ACC_X_MSB, 0 },
-	{ "Y_LSB",       	BMA180_ACC_Y_LSB, 0 },
-	{ "Y_MSB",       	BMA180_ACC_Y_MSB, 0 },
-	{ "Z_LSB",       	BMA180_ACC_Z_LSB, 0 },
-	{ "Z_MSB",       	BMA180_ACC_Z_MSB, 0 },
-	{ "TEMP",       	BMA180_TEMP, 0 },
-	{ "STATUS1",       	BMA180_STATUS_REG1, 0 },
-	{ "STATUS2",       	BMA180_STATUS_REG2, 0 },
-	{ "STATUS3",       	BMA180_STATUS_REG3, 0 },
-	{ "STATUS4",       	BMA180_STATUS_REG4, 0 },
-	{ "CTRL0",       	BMA180_CTRL_REG0, 1 },
-	{ "CTRL1",       	BMA180_CTRL_REG1, 1 },
-	{ "CTRL2",       	BMA180_CTRL_REG2, 1 },
-	{ "RESET",       	BMA180_RESET, 1 },
-	{ "BW_TCS",       	BMA180_BW_TCS, 1 },
-	{ "CTRL3",       	BMA180_CTRL_REG3, 1 },
-	{ "CTRL4",       	BMA180_CTRL_REG4, 1 },
-	{ "HY",       		BMA180_HY, 1 },
-	{ "TAP_INFO",       	BMA180_SLOPE_TAPSENS_INFO, 1 },
-	{ "HI_LOW_INFO",       	BMA180_HIGH_LOW_INFO, 1 },
-	{ "LOW_DUR",       	BMA180_LOW_DUR, 1 },
-	{ "HIGH_DUR",       	BMA180_HIGH_DUR, 1 },
-	{ "TAP_THRESH",       	BMA180_TAPSENS_TH, 1 },
-	{ "LOW_THRESH",       	BMA180_LOW_TH, 1 },
-	{ "HIGH_THRESH",       	BMA180_HIGH_TH, 1 },
+	{ "CHIP_ID",		BMA180_CHIP_ID, 0 },
+	{ "VERSION",		BMA180_VERSION, 0 },
+	{ "X_LSB",		BMA180_ACC_X_LSB, 0 },
+	{ "X_MSB",		BMA180_ACC_X_MSB, 0 },
+	{ "Y_LSB",		BMA180_ACC_Y_LSB, 0 },
+	{ "Y_MSB",		BMA180_ACC_Y_MSB, 0 },
+	{ "Z_LSB",		BMA180_ACC_Z_LSB, 0 },
+	{ "Z_MSB",		BMA180_ACC_Z_MSB, 0 },
+	{ "TEMP",		BMA180_TEMP, 0 },
+	{ "STATUS1",		BMA180_STATUS_REG1, 0 },
+	{ "STATUS2",		BMA180_STATUS_REG2, 0 },
+	{ "STATUS3",		BMA180_STATUS_REG3, 0 },
+	{ "STATUS4",		BMA180_STATUS_REG4, 0 },
+	{ "CTRL0",		BMA180_CTRL_REG0, 1 },
+	{ "CTRL1",		BMA180_CTRL_REG1, 1 },
+	{ "CTRL2",		BMA180_CTRL_REG2, 1 },
+	{ "RESET",		BMA180_RESET, 1 },
+	{ "BW_TCS",		BMA180_BW_TCS, 1 },
+	{ "CTRL3",		BMA180_CTRL_REG3, 1 },
+	{ "CTRL4",		BMA180_CTRL_REG4, 1 },
+	{ "HY",			BMA180_HY, 1 },
+	{ "TAP_INFO",		BMA180_SLOPE_TAPSENS_INFO, 1 },
+	{ "HI_LOW_INFO",	BMA180_HIGH_LOW_INFO, 1 },
+	{ "LOW_DUR",		BMA180_LOW_DUR, 1 },
+	{ "HIGH_DUR",		BMA180_HIGH_DUR, 1 },
+	{ "TAP_THRESH",		BMA180_TAPSENS_TH, 1 },
+	{ "LOW_THRESH",		BMA180_LOW_TH, 1 },
+	{ "HIGH_THRESH",	BMA180_HIGH_TH, 1 },
 	{ "SLOPE_THRESH",       BMA180_SLOPE_TH, 1 },
-	{ "CD1",       		BMA180_CD1, 1 },
-	{ "CD2",       		BMA180_CD2, 1 },
-	{ "TCO_X",       	BMA180_TCO_X, 1 },
-	{ "TCO_Y",       	BMA180_TCO_Y, 1 },
-	{ "TCO_Z",       	BMA180_TCO_Z, 1 },
-	{ "GAIN_T",       	BMA180_GAIN_T, 1 },
-	{ "GAIN_X",       	BMA180_GAIN_X, 1 },
-	{ "GAIN_Y",       	BMA180_GAIN_Y, 1 },
-	{ "GAIN_Z",       	BMA180_GAIN_Z, 1 },
-	{ "OFFSET_LSB1",       	BMA180_OFFSET_LSB1, 1 },
-	{ "OFFSET_LSB2",       	BMA180_OFFSET_LSB2, 1 },
-	{ "OFFSET_T",       	BMA180_OFFSET_T, 1 },
-	{ "OFFSET_X",       	BMA180_OFFSET_X, 1 },
-	{ "OFFSET_Y",       	BMA180_OFFSET_Y, 1 },
-	{ "OFFSET_Z",       	BMA180_OFFSET_Z, 1 },
+	{ "CD1",		BMA180_CD1, 1 },
+	{ "CD2",		BMA180_CD2, 1 },
+	{ "TCO_X",		BMA180_TCO_X, 1 },
+	{ "TCO_Y",		BMA180_TCO_Y, 1 },
+	{ "TCO_Z",		BMA180_TCO_Z, 1 },
+	{ "GAIN_T",		BMA180_GAIN_T, 1 },
+	{ "GAIN_X",		BMA180_GAIN_X, 1 },
+	{ "GAIN_Y",		BMA180_GAIN_Y, 1 },
+	{ "GAIN_Z",		BMA180_GAIN_Z, 1 },
+	{ "OFFSET_LSB1",	BMA180_OFFSET_LSB1, 1 },
+	{ "OFFSET_LSB2",	BMA180_OFFSET_LSB2, 1 },
+	{ "OFFSET_T",		BMA180_OFFSET_T, 1 },
+	{ "OFFSET_X",		BMA180_OFFSET_X, 1 },
+	{ "OFFSET_Y",		BMA180_OFFSET_Y, 1 },
+	{ "OFFSET_Z",		BMA180_OFFSET_Z, 1 },
 };
 #endif
 
@@ -196,10 +179,10 @@ static irqreturn_t bma180_accel_thread_irq(int irq, void *dev_data)
 {
 	struct bma180_accel_data *data = (struct bma180_accel_data *) dev_data;
 
-	if (!data->interrupts_enabled)
+	if (data->client->irq)
 		return IRQ_NONE;
 
-	if (data->wq != NULL)
+	if (data->wq)
 		queue_delayed_work(data->wq, &data->worklogic, 0);
 
 	else
@@ -211,36 +194,51 @@ static irqreturn_t bma180_accel_thread_irq(int irq, void *dev_data)
 static int bma180_accel_data_ready(struct bma180_accel_data *data)
 {
 	uint8_t data_val_h, data_val_l;
+	int x = 0;
+	int y = 0;
+	int z = 0;
+	int t = 0;
 
-	/* get temperature data and save it on platform data struct */
 	data_val_l = bma180_read(data, BMA180_TEMP);
-	data->temperature = (short int) data_val_l;
+	t = (short int) data_val_l;
 
-	/* get accel x data and save it on platform data struct */
 	data_val_l = bma180_read(data, BMA180_ACC_X_LSB);
 	data_val_h = bma180_read(data, BMA180_ACC_X_MSB);
-	data->accel_x = (short int) ((data_val_h << 8) | data_val_l);
-	data->accel_x = (data->accel_x >> 2);
+	if (accl_debug)
+		pr_info("%s: X low 0x%X X high 0x%X\n",
+		__func__, data_val_l, data_val_h);
+	x = ((data_val_h << 8) | data_val_l);
+	x = (x >> 2);
 
-	/* get accel y data and save it on platform data struct */
 	data_val_l = bma180_read(data, BMA180_ACC_Y_LSB);
 	data_val_h = bma180_read(data, BMA180_ACC_Y_MSB);
-	data->accel_y = (short int) ((data_val_h << 8) | data_val_l);
-	data->accel_y = (data->accel_y >> 2);
+	if (accl_debug)
+		pr_info("%s: Y low 0x%X Y high 0x%X\n",
+		__func__, data_val_l, data_val_h);
 
-	/* get accel z data and save it on platform data struct */
+	y = ((data_val_h << 8) | data_val_l);
+	y = (y >> 2);
+
 	data_val_l = bma180_read(data, BMA180_ACC_Z_LSB);
 	data_val_h = bma180_read(data, BMA180_ACC_Z_MSB);
-	data->accel_z = (short int) ((data_val_h << 8) | data_val_l);
-	data->accel_z = (data->accel_z >> 2);
+	if (accl_debug)
+		pr_info("%s: Z low 0x%X Z high 0x%X\n",
+		__func__, data_val_l, data_val_h);
 
-	/* send input report */
+	z = ((data_val_h << 8) | data_val_l);
+	z = (z >> 2);
+
+	if (accl_debug)
+		pr_info("%s: X: 0x%X Y: 0x%X Z: 0x%X\n",
+		__func__, x, y, z);
+	/* TO DO: The driver should report the data not manipulate it.
+	 * data conversion belongs in the sensor HAL */
 	input_report_abs(data->input_dev, ABS_X,
-		((int)data->accel_x)*g_range_table[data->g_range]/data->LSB_per_half_range);
+		x * g_range_table[data->pdata->g_range]/data->pdata->bit_mode);
 	input_report_abs(data->input_dev, ABS_Y,
-		((int)data->accel_y)*g_range_table[data->g_range]/data->LSB_per_half_range);
+		y * g_range_table[data->pdata->g_range]/data->pdata->bit_mode);
 	input_report_abs(data->input_dev, ABS_Z,
-		((int)-data->accel_z)*g_range_table[data->g_range]/data->LSB_per_half_range);
+		-z * g_range_table[data->pdata->g_range]/data->pdata->bit_mode);
 	input_sync(data->input_dev);
 
 	return 0;
@@ -252,8 +250,7 @@ void bma180_accel_device_worklogic(struct work_struct *work)
 				struct bma180_accel_data, worklogic.work);
 
 	bma180_accel_data_ready(data);
-
-	if (data->method == BMA_METHOD_POLLING)
+	if (!data->client->irq)
 		queue_delayed_work(data->wq, &data->worklogic,
 			msecs_to_jiffies(data->def_poll_rate));
 
@@ -266,7 +263,7 @@ static ssize_t bma180_show_attr_enable(struct device *dev,
 	struct platform_device *pdev = to_platform_device(dev);
 	struct bma180_accel_data *data = platform_get_drvdata(pdev);
 
-	return sprintf(buf, "%d\n", data->mode);
+	return sprintf(buf, "%d\n", data->pdata->mode);
 }
 
 static ssize_t bma180_store_attr_enable(struct device *dev,
@@ -413,7 +410,6 @@ static struct attribute *bma180_accel_attrs[] = {
 	NULL
 };
 
-
 static const struct attribute_group bma180_accel_attr_group = {
 	.attrs = bma180_accel_attrs,
 };
@@ -430,71 +426,47 @@ int bma180_accel_device_hw_reset_int(struct bma180_accel_data *data)
 {
 	uint8_t reg_val;
 
-	/* read old value */
 	reg_val = bma180_read(data, BMA180_CTRL_REG0);
-
-	/* set bit 6 (reset_int) */
 	reg_val |= 0x40;
-
-	/* write new value */
 	bma180_write(data, BMA180_CTRL_REG0, reg_val);
 
 	return 0;
 }
 
-int bma180_accel_device_hw_set_grange(struct bma180_accel_data *data,
+static int bma180_accel_device_hw_set_grange(struct bma180_accel_data *data,
 					int grange)
 {
 	uint8_t reg_val;
 
-	/* read old value */
 	reg_val = bma180_read(data, BMA180_OFFSET_LSB1);
-
-	/* set bits 3:1 (grange) */
 	reg_val = (reg_val & 0xF1) | ((grange << 1) & 0x0E);
-
-	/* write new value */
 	bma180_write(data, BMA180_OFFSET_LSB1, reg_val);
 
 	return 0;
 }
 
-int bma180_accel_device_hw_set_smp_skip(struct bma180_accel_data *data,
+static int bma180_accel_device_hw_set_smp_skip(struct bma180_accel_data *data,
 					int smp_skip)
 {
 	uint8_t reg_val;
 
-	/* read old value */
 	reg_val = bma180_read(data, BMA180_OFFSET_LSB1);
-
-	/* set bit 0 (smp_skip) */
 	reg_val = (reg_val & 0xFE) | ((smp_skip << 0) & 0x01);
-
-	/* write new value */
 	bma180_write(data, BMA180_OFFSET_LSB1, reg_val);
 
 	return 0;
 }
 
-int bma180_accel_device_hw_set_bandwidth(struct bma180_accel_data *data,
+static int bma180_accel_device_hw_set_bandwidth(struct bma180_accel_data *data,
 					int bandwidth)
 {
 	uint8_t reg_val;
 	uint8_t int_val;
 
-	/* save int register */
 	int_val = bma180_read(data, BMA180_CTRL_REG3);
-
-	/* clear int register */
 	bma180_write(data, BMA180_CTRL_REG3, 0x00);
-
-	/* read old value */
 	reg_val = bma180_read(data, BMA180_BW_TCS);
-
-	/* set bits 7:4 (bandwidth) */
 	reg_val = (reg_val & 0x0F) | ((bandwidth << 4) & 0xF0);
-
-	/* write new value */
 	bma180_write(data, BMA180_BW_TCS, reg_val);
 	msleep(10);
 	bma180_write(data, BMA180_CTRL_REG3, int_val);
@@ -502,131 +474,51 @@ int bma180_accel_device_hw_set_bandwidth(struct bma180_accel_data *data,
 	return 0;
 }
 
-int bma180_accel_device_hw_set_mode(struct bma180_accel_data *data, int mode)
+static int bma180_accel_device_hw_set_mode(struct bma180_accel_data *data,
+					int mode)
 {
 	uint8_t reg_val;
 
-	/* read old value */
 	reg_val = bma180_read(data, BMA180_TCO_Z);
-
-	/* set bits 1:0 (mode) */
 	reg_val = (reg_val & 0xFC) | ((mode << 0) & 0x03);
-
-	/* write new value */
 	bma180_write(data, BMA180_TCO_Z, reg_val);
 
 	return 0;
 }
 
 
-int bma180_accel_device_hw_set_12bits(struct bma180_accel_data *data, int mode)
+static int bma180_accel_device_hw_set_12bits(struct bma180_accel_data *data,
+					int mode)
 {
 	uint8_t reg_val;
 
-	/* read old value */
 	reg_val = bma180_read(data, BMA180_OFFSET_T);
-
-	/* set bit 0 (readout_12bit) */
 	reg_val = (reg_val & 0xFE) | ((mode << 0) & 0x01);
-
-	/* write new value */
 	bma180_write(data, BMA180_OFFSET_T, reg_val);
 
 	return 0;
 }
 
-int bma180_accel_device_hw_init(struct bma180_accel_data *data)
+static int bma180_accel_device_hw_init(struct bma180_accel_data *data)
 {
 	int ret = 0;
 
 	bma180_accel_device_hw_reset(data);
 	msleep(1);
-	bma180_write(data, BMA180_CTRL_REG0, 0x11);
+	bma180_write(data, BMA180_CTRL_REG0, data->pdata->ctrl_reg0);
 	bma180_write(data, BMA180_CTRL_REG3, 0x00);
 	bma180_write(data, BMA180_HIGH_LOW_INFO, 0x00);
 	bma180_write(data, BMA180_SLOPE_TAPSENS_INFO, 0x00);
 	bma180_write(data, BMA180_GAIN_Y, 0xA9);
 	bma180_write(data, BMA180_HIGH_DUR, 0x00);
-	bma180_accel_device_hw_set_grange(data, data->g_range);
-	bma180_accel_device_hw_set_bandwidth(data, data->bandwidth);
-	bma180_accel_device_hw_set_mode(data, data->mode);
-	bma180_accel_device_hw_set_smp_skip(data, data->smp_skip);
-	bma180_accel_device_hw_set_12bits(data, data->bit_mode);
+	bma180_accel_device_hw_set_grange(data, data->pdata->g_range);
+	bma180_accel_device_hw_set_bandwidth(data, data->pdata->bandwidth);
+	bma180_accel_device_hw_set_mode(data, data->pdata->mode);
+	bma180_accel_device_hw_set_smp_skip(data, data->pdata->smp_skip);
+	bma180_accel_device_hw_set_12bits(data, data->pdata->bit_mode);
 	bma180_write(data, BMA180_CTRL_REG3, 0x02);
 
-	/* enable interrupt handling */
-	data->interrupts_enabled = 1;
-
-	/* reset status */
 	bma180_accel_device_hw_reset_int(data);
-
-	return ret;
-}
-
-/* init device function */
-int bma180_accel_device_init(struct bma180_accel_data *data)
-{
-	int ret = 0;
-
-	/* init work queue for interrupt service routine */
-	INIT_DELAYED_WORK(&data->worklogic, bma180_accel_device_worklogic);
-
-	/* init variables */
-	data->method = data->pdata->method;
-	data->g_range = data->pdata->g_range;
-	data->bandwidth = data->pdata->bandwidth;
-	data->mode = data->pdata->mode;
-	data->bit_mode = data->pdata->bit_mode;
-	data->smp_skip = data->pdata->smp_skip;
-	data->def_poll_rate = data->pdata->def_poll_rate;
-	data->fuzz_x = data->pdata->fuzz_x;
-	data->fuzz_y = data->pdata->fuzz_y;
-	data->fuzz_z = data->pdata->fuzz_z;
-
-	/* set LSB per half range variable */
-	if (data->bit_mode == BMA_BITMODE_14BITS)
-		data->LSB_per_half_range = 8192;
-	else
-		data->LSB_per_half_range = 2048;
-
-
-	/* set interrupt service routine */
-	if (data->method == BMA_METHOD_INTERRUPTS) {
-		mutex_init(&data->mutex);
-		if (data->client->irq) {
-			ret = request_threaded_irq(gpio_to_irq(data->client->irq), NULL,
-						bma180_accel_thread_irq,
-						IRQF_TRIGGER_RISING | IRQF_ONESHOT,
-						data->client->name, data);
-			if (ret < 0) {
-				dev_err(&data->client->dev,
-					"request_threaded_irq failed\n");
-				mutex_destroy(&data->mutex);
-				goto error;
-			}
-		}
-		mutex_destroy(&data->mutex);
-	}
-
-	bma180_accel_device_hw_init(data);
-
-error:
-	if (data->input_dev != NULL)
-		input_free_device(data->input_dev);
-	return ret;
-}
-
-int bma180_accel_device_deinit(struct bma180_accel_data *data)
-{
-	int ret = 0;
-
-	if (data->client->irq)
-		free_irq(data->client->irq, data);
-
-	cancel_delayed_work_sync(&data->worklogic);
-
-	if (data->input_dev != NULL)
-		input_free_device(data->input_dev);
 
 	return ret;
 }
@@ -652,12 +544,11 @@ static int __devinit bma180_accel_driver_probe(struct i2c_client *client,
 
 	/* alloc memory for data structure */
 	data = kzalloc(sizeof(struct bma180_accel_data), GFP_KERNEL);
-	if (data == NULL) {
+	if (!data) {
 		ret = -ENOMEM;
 		goto error;
 	}
 
-	/* create worker thread for isr routine */
 	data->wq = create_freezeable_workqueue("bma180");
 	if (!data->wq) {
 		ret = -ENOMEM;
@@ -676,19 +567,26 @@ static int __devinit bma180_accel_driver_probe(struct i2c_client *client,
 		goto error;
 	}
 
+	INIT_DELAYED_WORK(&data->worklogic, bma180_accel_device_worklogic);
+
+	mutex_init(&data->mutex);
+
 	data->input_dev->name = "bma180";
 	data->input_dev->id.bustype = BUS_I2C;
 
 	__set_bit(EV_ABS, data->input_dev->evbit);
 	input_set_abs_params(data->input_dev, ABS_X,
-				-g_range_table[data->g_range],
-				g_range_table[data->g_range], data->fuzz_x, 0);
+				-g_range_table[data->pdata->g_range],
+				g_range_table[data->pdata->g_range],
+				data->pdata->fuzz_x, 0);
 	input_set_abs_params(data->input_dev, ABS_Y,
-				-g_range_table[data->g_range],
-				g_range_table[data->g_range], data->fuzz_y, 0);
+				-g_range_table[data->pdata->g_range],
+				g_range_table[data->pdata->g_range],
+				data->pdata->fuzz_y, 0);
 	input_set_abs_params(data->input_dev, ABS_Z,
-				-g_range_table[data->g_range],
-				g_range_table[data->g_range], data->fuzz_z, 0);
+				-g_range_table[data->pdata->g_range],
+				g_range_table[data->pdata->g_range],
+				data->pdata->fuzz_z, 0);
 
 	data->input_dev->dev.parent = &data->client->dev;
 	input_set_drvdata(data->input_dev, data);
@@ -699,37 +597,52 @@ static int __devinit bma180_accel_driver_probe(struct i2c_client *client,
 			"Unable to register input device\n");
 	}
 
-	ret = bma180_accel_device_init(data);
+	if (data->client->irq) {
+		ret = request_threaded_irq(data->client->irq, NULL,
+					bma180_accel_thread_irq,
+					IRQF_TRIGGER_RISING | IRQF_ONESHOT,
+					data->client->name, data);
+		if (ret < 0) {
+			dev_err(&data->client->dev,
+				"request_threaded_irq failed\n");
+				goto error_1;
+		}
+	}
+
+	ret = bma180_accel_device_hw_init(data);
 	if (ret)
 		goto error_1;
 
 	ret = sysfs_create_group(&client->dev.kobj, &bma180_accel_attr_group);
 	if (ret)
-		goto error_2;
+		goto error_1;
 
 	return 0;
 
-error_2:
-	bma180_accel_device_deinit(data);
 error_1:
-	if (data)
-		kfree(data);
+	input_free_device(data->input_dev);
+	mutex_destroy(&data->mutex);
+	kfree(data);
 error:
+	destroy_workqueue(data->wq);
 	return ret;
 }
 
 static int __devexit bma180_accel_driver_remove(struct i2c_client *client)
 {
-	int ret;
-
-	/* get private data structure pointer from i2c_client */
 	struct bma180_accel_data *data = i2c_get_clientdata(client);
+	int ret = 0;
 
-	/* remove sysfs group */
 	sysfs_remove_group(&client->dev.kobj, &bma180_accel_attr_group);
 
-	/* deinit device function */
-	ret = bma180_accel_device_deinit(data);
+	if (data->client->irq)
+		free_irq(data->client->irq, data);
+
+	cancel_delayed_work_sync(&data->worklogic);
+
+	if (data->input_dev)
+		input_free_device(data->input_dev);
+
 	i2c_set_clientdata(client, NULL);
 	flush_workqueue(data->wq);
 	destroy_workqueue(data->wq);

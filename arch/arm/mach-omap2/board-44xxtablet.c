@@ -321,7 +321,7 @@ static struct platform_device sdp4430_disp_led = {
 };
 
 static struct bma180accel_platform_data bma180accel_platform_data = {
-	.method		= BMA_METHOD_POLLING,
+	.ctrl_reg0	= 0x11,
 	.g_range	= BMA_GRANGE_2G,
 	.bandwidth	= BMA_BW_10HZ,
 	.mode		= BMA_MODE_LOW_NOISE,
@@ -1161,7 +1161,6 @@ static struct i2c_board_info __initdata tablet_i2c_4_boardinfo[] = {
 	{
 		I2C_BOARD_INFO("bma180_accel", 0x40),
 		.platform_data = &bma180accel_platform_data,
-		.irq = OMAP4_BMA180ACCEL_GPIO,
 	},
 };
 
