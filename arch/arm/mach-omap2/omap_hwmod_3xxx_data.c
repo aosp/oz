@@ -570,11 +570,12 @@ static struct omap_hwmod_class_sysconfig omap3xxx_timer_sysc = {
 	.rev_offs	= 0x0000,
 	.sysc_offs	= 0x0010,
 	.syss_offs	= 0x0014,
-	.sysc_flags	= (SYSC_HAS_SIDLEMODE | SYSC_HAS_ENAWAKEUP |
-			   SYSC_HAS_SOFTRESET | SYSC_HAS_AUTOIDLE |
-			   SYSS_HAS_RESET_STATUS),
+	.sysc_flags	= (SYSC_HAS_SIDLEMODE | SYSC_HAS_CLOCKACTIVITY |
+				SYSC_HAS_ENAWAKEUP | SYSC_HAS_SOFTRESET |
+				SYSC_HAS_EMUFREE | SYSC_HAS_AUTOIDLE |
+				SYSS_HAS_RESET_STATUS),
 	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
-	.sysc_fields	= &omap_hwmod_sysc_type2,
+	.sysc_fields	= &omap_hwmod_sysc_type1,
 };
 
 static struct omap_hwmod_class omap3xxx_timer_hwmod_class = {
@@ -626,10 +627,10 @@ static struct omap_hwmod omap3xxx_timer10_hwmod = {
 	.prcm		= {
 		.omap2 = {
 			.prcm_reg_id = 1,
-			.module_bit = OMAP24XX_EN_GPT10_SHIFT,
+			.module_bit = OMAP3430_EN_GPT10_SHIFT,
 			.module_offs = CORE_MOD,
 			.idlest_reg_id = 1,
-			.idlest_idle_bit = OMAP24XX_EN_GPT10_SHIFT,
+			.idlest_idle_bit = OMAP3430_EN_GPT10_SHIFT,
 		},
 	},
 	.masters	= omap3xxx_timer10_masters,
@@ -683,10 +684,10 @@ static struct omap_hwmod omap3xxx_timer11_hwmod = {
 	.prcm		= {
 		.omap2 = {
 			.prcm_reg_id = 1,
-			.module_bit = OMAP24XX_EN_GPT11_SHIFT,
+			.module_bit = OMAP3430_EN_GPT11_SHIFT,
 			.module_offs = CORE_MOD,
 			.idlest_reg_id = 1,
-			.idlest_idle_bit = OMAP24XX_EN_GPT11_SHIFT,
+			.idlest_idle_bit = OMAP3430_EN_GPT11_SHIFT,
 		},
 	},
 	.masters	= omap3xxx_timer11_masters,
@@ -2673,7 +2674,9 @@ static struct omap_hwmod omap36xx_sr1_hwmod = {
 	.slaves		= omap3_sr1_slaves,
 	.slaves_cnt	= ARRAY_SIZE(omap3_sr1_slaves),
 	.dev_attr	= &omap36xx_sr1_dev_attr,
-	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP3630ES1),
+	.omap_chip      = OMAP_CHIP_INIT(CHIP_IS_OMAP3630ES1|
+					CHIP_IS_OMAP3630ES1_1|
+					CHIP_IS_OMAP3630ES1_2),
 };
 
 /* SR2 */
@@ -2755,7 +2758,9 @@ static struct omap_hwmod omap36xx_sr2_hwmod = {
 	.slaves		= omap3_sr2_slaves,
 	.slaves_cnt	= ARRAY_SIZE(omap3_sr2_slaves),
 	.dev_attr	= &omap36xx_sr2_dev_attr,
-	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP3630ES1),
+	.omap_chip      = OMAP_CHIP_INIT(CHIP_IS_OMAP3630ES1|
+					CHIP_IS_OMAP3630ES1_1|
+					CHIP_IS_OMAP3630ES1_2),
 };
 
 /*
@@ -3179,7 +3184,8 @@ static struct omap_hwmod_class_sysconfig omap3xxx_dss_sysc = {
 	.rev_offs	= 0x0000,
 	.sysc_offs	= 0x0010,
 	.syss_offs	= 0x0014,
-	.sysc_flags	= (SYSC_HAS_SOFTRESET | SYSC_HAS_AUTOIDLE),
+	.sysc_flags	= (SYSC_HAS_SOFTRESET | SYSC_HAS_AUTOIDLE |
+				   SYSS_HAS_RESET_STATUS),
 	.sysc_fields	= &omap_hwmod_sysc_type1,
 };
 
