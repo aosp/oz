@@ -33,6 +33,7 @@
 #define DEVICE_NAME "bma180"
 #define DRIVER_NAME "bma180_accel"
 #define INPUT_WORKQUEUE_SIZE 1
+#define BMA180_DEBUG 1
 
 #define BMA180_OFFSET_Z			0x3A
 #define BMA180_OFFSET_Y			0x39
