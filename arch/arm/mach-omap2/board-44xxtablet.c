@@ -909,6 +909,29 @@ static int __init tablet_i2c_init(void)
 	return 0;
 }
 
+static void enable_board_wakeup_source(void)
+{
+	omap_mux_init_signal("gpmc_a22.gpio_46",
+			OMAP_PULL_ENA | OMAP_PULL_UP |
+			OMAP_WAKEUP_EN | OMAP_MUX_MODE3 |
+			OMAP_INPUT_EN);
+	omap_mux_init_signal("gpmc_a23.gpio_47",
+			OMAP_PULL_ENA | OMAP_PULL_UP |
+			OMAP_WAKEUP_EN | OMAP_MUX_MODE3 |
+			OMAP_INPUT_EN);
+	omap_mux_init_signal("gpmc_a19.gpio_43",
+			OMAP_PULL_ENA | OMAP_PULL_UP |
+			OMAP_WAKEUP_EN | OMAP_MUX_MODE3 |
+			OMAP_INPUT_EN);
+
+	omap_mux_init_signal("sys_nirq1",
+			OMAP_PULL_ENA | OMAP_PULL_UP |
+			OMAP_WAKEUP_EN | OMAP_INPUT_EN);
+	omap_mux_init_signal("sys_nirq2",
+			OMAP_PULL_ENA | OMAP_PULL_UP |
+			OMAP_WAKEUP_EN | OMAP_INPUT_EN);
+}
+
 static struct platform_device *blazetablet_devices[] __initdata = {
 	&sdp4430_disp_led,
 	/* TODO. Review button LEDs functionality
@@ -966,6 +989,8 @@ void omap_44xxtablet_init(void)
 				ARRAY_SIZE(sdp4430_spi_board_info));
 	}
 	omap_display_init(&blazetablet_dss_data);
+
+	enable_board_wakeup_source();
 }
 
 static void __init omap_4430sdp_map_io(void)
