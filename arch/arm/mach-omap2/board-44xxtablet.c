@@ -27,6 +27,7 @@
 #include <linux/leds-omap4430sdp-display.h>
 #include <linux/delay.h>
 #include <linux/input/sfh7741.h>
+#include <linux/i2c/bma180.h>
 #include <linux/qtouch_obp_ts.h>
 #include <linux/i2c/cma3000.h>
 
@@ -59,6 +60,7 @@
 #define DSI2_GPIO_59	59
 #define DP_4430_GPIO_59         59
 #define OMAP4_TOUCH_IRQ_1		35
+#define OMAP4_BMA180ACCEL_GPIO		178
 
 #define LED_PWM2ON		0x03
 #define LED_PWM2OFF		0x04
@@ -384,6 +386,22 @@ static struct omap_dss_board_info blazetablet_dss_data = {
 	.devices	=	blazetablet_dss_devices,
 	.default_device =	&blazetablet_lcd_device,
 };
+
+/* BMA180 Accelerometer Start */
+static struct bma180accel_platform_data bma180accel_platform_data = {
+	.ctrl_reg0	= 0x11,
+	.g_range	= BMA_GRANGE_2G,
+	.bandwidth	= BMA_BW_10HZ,
+	.mode		= BMA_MODE_LOW_NOISE,
+	.bit_mode	= BMA_BITMODE_14BITS,
+	.smp_skip	= 1,
+	.def_poll_rate	= 200,
+	.fuzz_x		= 25,
+	.fuzz_y		= 25,
+	.fuzz_z		= 25,
+};
+
+/* BMA180 Accelerometer End */
 
 /* Atmel MXT224 TouchScreen Begin */
 static struct qtm_touch_keyarray_cfg blaze_tablet_key_array_data[] = {
@@ -867,6 +885,10 @@ static struct i2c_board_info __initdata tablet_i2c_4_boardinfo[] = {
 	},
 	{
 		I2C_BOARD_INFO("hmc5843", 0x1e),
+	},
+	{
+		I2C_BOARD_INFO("bma180_accel", 0x40),
+		.platform_data = &bma180accel_platform_data,
 	},
 };
 
