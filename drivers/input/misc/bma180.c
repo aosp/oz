@@ -80,7 +80,6 @@
 #define BMA180_VERSION			0x01
 #define BMA180_CHIP_ID			0x00
 
-
 struct bma180_accel_data {
 	struct bma180accel_platform_data *pdata;
 	struct i2c_client *client;
@@ -159,19 +158,28 @@ struct bma180_reg {
 
 static int bma180_write(struct bma180_accel_data *data, u8 reg, u8 val)
 {
-	int ret = i2c_smbus_write_byte_data(data->client, reg, val);
+	int ret = 0;
+	mutex_lock(&data->mutex);
+	ret = i2c_smbus_write_byte_data(data->client, reg, val);
 	if (ret < 0)
 		dev_err(&data->client->dev,
 			"i2c_smbus_write_byte_data failed\n");
+	mutex_unlock(&data->mutex);
+
 	return ret;
 }
 
 static int bma180_read(struct bma180_accel_data *data, u8 reg)
 {
-	int ret = i2c_smbus_read_byte_data(data->client, reg);
+	int ret = 0;
+
+	mutex_lock(&data->mutex);
+	ret = i2c_smbus_read_byte_data(data->client, reg);
 	if (ret < 0)
 		dev_err(&data->client->dev,
 			"i2c_smbus_read_byte_data failed\n");
+	mutex_unlock(&data->mutex);
+
 	return ret;
 }
 
@@ -523,6 +531,7 @@ static int bma180_accel_device_hw_init(struct bma180_accel_data *data)
 	return ret;
 }
 
+
 static int __devinit bma180_accel_driver_probe(struct i2c_client *client,
 		const struct i2c_device_id *id)
 {
@@ -653,16 +662,43 @@ static int __devexit bma180_accel_driver_remove(struct i2c_client *client)
 
 
 #ifdef CONFIG_PM
+static void bma180_accel_device_sleep(struct bma180_accel_data *data)
+{
+	uint8_t reg_val;
+
+	reg_val = bma180_read(data, BMA180_CTRL_REG0);
+	reg_val |= BMA180_SLEEP;
+	bma180_write(data, BMA180_CTRL_REG0, reg_val);
+
+
+}
+
+static void bma180_accel_device_wakeup(struct bma180_accel_data *data)
+{
+	uint8_t reg_val;
+
+	reg_val = bma180_read(data, BMA180_CTRL_REG0);
+	reg_val &= ~BMA180_SLEEP;
+	bma180_write(data, BMA180_CTRL_REG0, reg_val);
+	msleep(10);
+}
+
 static int bma180_accel_driver_suspend(struct i2c_client *client,
 				pm_message_t mesg)
 {
-	/* TODO */
+	struct bma180_accel_data *data = i2c_get_clientdata(client);
+
+	bma180_accel_device_sleep(data);
+
 	return 0;
 }
 
 static int bma180_accel_driver_resume(struct i2c_client *client)
 {
-	/* TODO */
+	struct bma180_accel_data *data = i2c_get_clientdata(client);
+
+	bma180_accel_device_wakeup(data);
+
 	return 0;
 }
 #endif
