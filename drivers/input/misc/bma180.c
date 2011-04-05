@@ -84,8 +84,7 @@ struct bma180_accel_data {
 	struct bma180accel_platform_data *pdata;
 	struct i2c_client *client;
 	struct input_dev *input_dev;
-	struct workqueue_struct *wq;
-	struct delayed_work worklogic;
+	struct delayed_work wq;
 	struct mutex mutex;
 
 	uint32_t def_poll_rate;
@@ -187,14 +186,8 @@ static irqreturn_t bma180_accel_thread_irq(int irq, void *dev_data)
 {
 	struct bma180_accel_data *data = (struct bma180_accel_data *) dev_data;
 
-	if (data->client->irq)
-		return IRQ_NONE;
-
-	if (data->wq)
-		queue_delayed_work(data->wq, &data->worklogic, 0);
-
-	else
-		return IRQ_NONE;
+	if (!data->client->irq)
+		schedule_delayed_work(&data->wq, 0);
 
 	return IRQ_HANDLED;
 }
@@ -252,14 +245,14 @@ static int bma180_accel_data_ready(struct bma180_accel_data *data)
 	return 0;
 }
 
-void bma180_accel_device_worklogic(struct work_struct *work)
+static void bma180_accel_device_worklogic(struct work_struct *work)
 {
-	struct bma180_accel_data *data = container_of((struct work_struct *)work,
-				struct bma180_accel_data, worklogic.work);
+	struct bma180_accel_data *data = container_of((struct delayed_work *)work,
+				struct bma180_accel_data, wq);
 
 	bma180_accel_data_ready(data);
 	if (!data->client->irq)
-		queue_delayed_work(data->wq, &data->worklogic,
+		schedule_delayed_work(&data->wq,
 			msecs_to_jiffies(data->def_poll_rate));
 
 }
@@ -292,10 +285,10 @@ static ssize_t bma180_store_attr_enable(struct device *dev,
 	else
 		enable = data->def_poll_rate;
 
-	cancel_delayed_work_sync(&data->worklogic);
+	cancel_delayed_work_sync(&data->wq);
 
 	if (enable)
-		schedule_delayed_work(&data->worklogic, 0);
+		schedule_delayed_work(&data->wq, 0);
 
 	return count;
 }
@@ -326,10 +319,10 @@ static ssize_t bma180_store_attr_delay(struct device *dev,
 	if (interval <= 0 || interval > 200)
 		return -EINVAL;
 
-	cancel_delayed_work_sync(&data->worklogic);
+	cancel_delayed_work_sync(&data->wq);
 	data->def_poll_rate = interval;
 
-	schedule_delayed_work(&data->worklogic, 0);
+	schedule_delayed_work(&data->wq, 0);
 
 	return count;
 
@@ -557,13 +550,6 @@ static int __devinit bma180_accel_driver_probe(struct i2c_client *client,
 		ret = -ENOMEM;
 		goto error;
 	}
-
-	data->wq = create_freezeable_workqueue("bma180");
-	if (!data->wq) {
-		ret = -ENOMEM;
-		goto error_1;
-	}
-
 	data->pdata = pdata;
 	data->client = client;
 	i2c_set_clientdata(client, data);
@@ -576,7 +562,7 @@ static int __devinit bma180_accel_driver_probe(struct i2c_client *client,
 		goto error;
 	}
 
-	INIT_DELAYED_WORK(&data->worklogic, bma180_accel_device_worklogic);
+	INIT_DELAYED_WORK(&data->wq, bma180_accel_device_worklogic);
 
 	mutex_init(&data->mutex);
 
@@ -633,7 +619,6 @@ error_1:
 	mutex_destroy(&data->mutex);
 	kfree(data);
 error:
-	destroy_workqueue(data->wq);
 	return ret;
 }
 
@@ -647,14 +632,12 @@ static int __devexit bma180_accel_driver_remove(struct i2c_client *client)
 	if (data->client->irq)
 		free_irq(data->client->irq, data);
 
-	cancel_delayed_work_sync(&data->worklogic);
+	cancel_delayed_work_sync(&data->wq);
 
 	if (data->input_dev)
 		input_free_device(data->input_dev);
 
 	i2c_set_clientdata(client, NULL);
-	flush_workqueue(data->wq);
-	destroy_workqueue(data->wq);
 	kfree(data);
 
 	return ret;
