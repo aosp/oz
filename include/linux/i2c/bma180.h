@@ -45,11 +45,8 @@
 #define BMA_MODE_ULTRA_LOW_NOISE	0x2
 #define BMA_MODE_LOW_POWER		0x3
 
-#define BMA_METHOD_INTERRUPTS		0x0
-#define BMA_METHOD_POLLING		0x1
-
-#define BMA_BITMODE_14BITS		0x0
-#define BMA_BITMODE_12BITS		0x1
+#define BMA_BITMODE_14BITS		0x2000
+#define BMA_BITMODE_12BITS		0x0800
 
 struct bma180accel_platform_data {
 	uint8_t method;
@@ -57,10 +54,16 @@ struct bma180accel_platform_data {
 	uint16_t fuzz_x;
 	uint16_t fuzz_y;
 	uint16_t fuzz_z;
+	uint8_t ctrl_reg0;
+	uint8_t ctrl_reg1;
+	uint8_t ctrl_reg2;
+	uint8_t ctrl_reg3;
+	uint8_t ctrl_reg4;
+
 	uint16_t bandwidth;
 	uint8_t g_range;
 	uint8_t mode;
-	uint8_t bit_mode;
+	int bit_mode;
 	uint8_t smp_skip;
 };
 
