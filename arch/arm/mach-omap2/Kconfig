@@ -305,7 +305,7 @@ config MACH_OMAP_4430SDP
 	select OMAP_PACKAGE_CBS
 	select TOUCHSCREEN_SYNTM12XX
 
-config MACH_OMAP_44xxTABLET
+config MACH_OMAP_BLAZE
 	bool "OMAP 44XX Tablet"
 	default y
 	depends on ARCH_OMAP4

@@ -22,6 +22,8 @@
 
 #define DSS_SUBSYS_NAME "DISPC"
 
+#include <asm/mach-types.h>
+
 #include <linux/kernel.h>
 #include <linux/dma-mapping.h>
 #include <linux/vmalloc.h>
@@ -2750,7 +2752,7 @@ static void dispc_enable_lcd_out(enum omap_channel channel, bool enable)
 	irq = channel == OMAP_DSS_CHANNEL_LCD2 ? DISPC_IRQ_FRAMEDONE2 :
 			DISPC_IRQ_FRAMEDONE;
 
-	if (omap4_board_rev() == OMAP4_BLAZETABLET_BOARD)
+	if (machine_is_omap_tabletblaze())
 		irq = DISPC_IRQ_VSYNC;
 
 	if (!enable && is_on) {
@@ -2763,7 +2765,7 @@ static void dispc_enable_lcd_out(enum omap_channel channel, bool enable)
 			DSSERR("failed to register FRAMEDONE isr\n");
 	}
 
-	if (omap4_board_rev() == OMAP4_BLAZETABLET_BOARD) {
+	if (machine_is_omap_tabletblaze()) {
 		if ((is_on && !enable) || (!is_on && enable))
 			_enable_lcd_out(channel, enable);
 	} else {
@@ -3133,7 +3135,7 @@ void dispc_set_parallel_interface_mode(enum omap_channel channel,
 
 	case OMAP_DSS_PARALLELMODE_DSI:
 		stallmode = 1;
-		if (omap4_board_rev() == OMAP4_BLAZETABLET_BOARD)
+		if (machine_is_omap_tabletblaze())
 			stallmode = 0;
 		gpout1 = 1;
 		break;

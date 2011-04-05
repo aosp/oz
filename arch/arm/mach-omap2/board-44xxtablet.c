@@ -780,6 +780,16 @@ static struct platform_device *blazetablet_devices[] __initdata = {
 	&tablet_gpio_keys_device,
 };
 
+static void __init omap_4430sdp_init_irq(void)
+{
+	omap2_init_common_infrastructure();
+	omap2_init_common_devices(NULL, NULL);
+#ifdef CONFIG_OMAP_32K_TIMER
+	omap2_gp_clockevent_set_gptimer(1);
+#endif
+	gic_init_irq();
+}
+
 void omap_44xxtablet_init(void)
 {
 	int status;
@@ -819,3 +829,18 @@ void omap_44xxtablet_init(void)
 	}
 	omap_display_init(&blazetablet_dss_data);
 }
+
+static void __init omap_4430sdp_map_io(void)
+{
+	omap2_set_globals_443x();
+	omap44xx_map_common_io();
+}
+
+MACHINE_START(OMAP_BLAZE, "OMAP4430")
+	.boot_params	= 0x80000100,
+	.map_io		= omap_4430sdp_map_io,
+	.reserve	= omap_reserve,
+	.init_irq	= omap_4430sdp_init_irq,
+	.init_machine	= omap_44xxtablet_init,
+	.timer		= &omap_timer,
+MACHINE_END

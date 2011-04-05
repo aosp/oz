@@ -45,7 +45,6 @@
 #include <plat/syntm12xx.h>
 #include <plat/mmc.h>
 #include <plat/nokia-dsi-panel.h>
-#include "board-44xxtablet.h"
 
 #include "mux.h"
 #include "timer-gp.h"
@@ -1033,42 +1032,11 @@ static void __init omap4_display_init(void)
 	gpio_direction_output(dsi2_panel.reset_gpio, 0);
 }
 
-/* Board revision */
-static u8 omap4_board_revision;
-
-u8 omap4_board_rev(void)
-{
-	return omap4_board_revision;
-}
-EXPORT_SYMBOL(omap4_board_rev);
-
-static void __init omap4_get_revision(void)
-{
-
-	switch (system_rev) {
-		case 2143: /* Reading part number instead board revision */
-			omap4_board_revision = OMAP4_BLAZETABLET_BOARD;
-			break;
-		case 0x10: /* 1.0, hardcode in u-boot for Blaze and SDP boards*/
-			omap4_board_revision = OMAP4_BLAZE_BOARD;
-			break;
-		default:
-			omap4_board_revision = OMAP4_BLAZETABLET_BOARD;
-	}
-}
-
 static void __init omap_4430sdp_init(void)
 {
 	int status;
 	int package = OMAP_PACKAGE_CBS;
 
-#ifdef CONFIG_MACH_OMAP_44xxTABLET
-	omap4_get_revision();
-	if (omap4_board_rev() == OMAP4_BLAZETABLET_BOARD) {
-		omap_44xxtablet_init();
-		return;
-	}
-#endif
 	if (omap_rev() == OMAP4430_REV_ES1_0)
 		package = OMAP_PACKAGE_CBL;
 	omap4_mux_init(board_mux, package);
@@ -1114,7 +1082,7 @@ static void __init omap_4430sdp_map_io(void)
 	omap44xx_map_common_io();
 }
 
-MACHINE_START(OMAP_4430SDP, "OMAP4430 4430SDP board")
+MACHINE_START(OMAP_4430SDP, "OMAP4430")
 	/* Maintainer: Santosh Shilimkar - Texas Instruments Inc */
 	.boot_params	= 0x80000100,
 	.map_io		= omap_4430sdp_map_io,

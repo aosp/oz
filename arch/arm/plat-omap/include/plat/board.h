@@ -172,8 +172,6 @@ extern int omap_board_config_size;
 /* for TI reference platforms sharing the same debug card */
 extern int debug_card_init(u32 addr, unsigned gpio);
 
-u8 omap4_board_rev(void);
-
 /* OMAP3EVM revision */
 #if defined(CONFIG_MACH_OMAP3EVM)
 u8 get_omap3_evm_rev(void);

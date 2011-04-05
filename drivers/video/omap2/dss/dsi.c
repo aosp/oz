@@ -19,6 +19,8 @@
 
 #define DSS_SUBSYS_NAME "DSI"
 
+#include <asm/mach-types.h>
+
 #include <linux/kernel.h>
 #include <linux/io.h>
 #include <linux/clk.h>
@@ -684,7 +686,7 @@ static void dsi_vc_enable_bta_irq(struct dsi_struct *ds,
 {
 	u32 l;
 
-	if (omap4_board_rev() == OMAP4_BLAZETABLET_BOARD)
+	if (machine_is_omap_tabletblaze())
 		return;
 
 	dsi_write_reg(ds, DSI_VC_IRQSTATUS(channel), DSI_VC_IRQ_BTA);
@@ -699,7 +701,7 @@ static void dsi_vc_disable_bta_irq(struct dsi_struct *ds,
 {
 	u32 l;
 
-	if (omap4_board_rev() == OMAP4_BLAZETABLET_BOARD)
+	if (machine_is_omap_tabletblaze())
 		return;
 
 	l = dsi_read_reg(ds, DSI_VC_IRQENABLE(channel));
@@ -1565,7 +1567,7 @@ static void dsi_complexio_config(struct omap_dss_device *dssdev)
 	r = FLD_MOD(r, data2_lane, 10, 8);
 	r = FLD_MOD(r, data2_pol, 11, 11);
 
-	if (omap4_board_rev() == OMAP4_BLAZETABLET_BOARD) {
+	if (machine_is_omap_tabletblaze()) {
 		r = FLD_MOD(r, data3_lane, 14, 12);
 		r = FLD_MOD(r, data3_pol, 15, 15);
 		r = FLD_MOD(r, data4_lane, 18, 16);
@@ -2100,7 +2102,7 @@ static u16 dsi_vc_flush_receive_data(struct dsi_struct *ds,
 
 static int dsi_vc_send_bta(struct dsi_struct *ds, int channel)
 {
-	if (omap4_board_rev() == OMAP4_BLAZETABLET_BOARD)
+	if (machine_is_omap_tabletblaze())
 		return 0;
 
 	if (ds->debug_write || ds->debug_read)
@@ -2125,7 +2127,7 @@ int dsi_vc_send_bta_sync(struct omap_dss_device *dssdev, int channel)
 	int r = 0;
 	u32 err;
 
-	if (omap4_board_rev() == OMAP4_BLAZETABLET_BOARD)
+	if (machine_is_omap_tabletblaze())
 		return 0;
 
 	INIT_COMPLETION(ds->bta_completion);
@@ -3199,7 +3201,7 @@ int omap_dsi_update(struct omap_dss_device *dssdev,
 			ds->update_region.h = h;
 			ds->update_region.device = dssdev;
 
-			if (omap4_board_rev() == OMAP4_BLAZETABLET_BOARD)
+			if (machine_is_omap_tabletblaze())
 				dsi_videomode_update_screen_dispc(dssdev,
 					x, y, w, h);
 			else
@@ -3227,7 +3229,7 @@ static int dsi_display_init_dispc(struct omap_dss_device *dssdev)
 	int r;
 	struct dsi_struct *ds = dss2dsi(dssdev);
 
-	if (omap4_board_rev() == OMAP4_BLAZETABLET_BOARD)
+	if (machine_is_omap_tabletblaze())
 		ds->irq_framedone = DISPC_IRQ_VSYNC;
 
 	r = omap_dispc_register_isr(dsi_framedone_irq_callback, ds,
@@ -3245,7 +3247,7 @@ static int dsi_display_init_dispc(struct omap_dss_device *dssdev)
 	dispc_enable_fifohandcheck(dssdev->manager->id, 1);
 
 	dispc_set_tft_data_lines(dssdev->manager->id, dssdev->ctrl.pixel_size);
-	if (omap4_board_rev() == OMAP4_BLAZETABLET_BOARD) {
+	if (machine_is_omap_tabletblaze()) {
 		/* Just set the values on panel-d2l,
 		no need to hardcode them here anymore. */
 		dispc_set_lcd_timings(dssdev->channel, &dssdev->panel.timings);
