@@ -247,6 +247,7 @@ config MACH_OMAP_BLAZE
 	select MISC_DEVICES
 	select INPUT_BMP085
 	select INPUT_BMA180
+	select INPUT_MPU3050
 	select INPUT_TWL6030_PWRBUTTON
 	select STAGING
 	select IIO
