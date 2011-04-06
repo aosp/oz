@@ -195,13 +195,13 @@ static irqreturn_t bma180_accel_thread_irq(int irq, void *dev_data)
 static int bma180_accel_data_ready(struct bma180_accel_data *data)
 {
 	uint8_t data_val_h, data_val_l;
-	int x = 0;
-	int y = 0;
-	int z = 0;
-	int t = 0;
+	short int x = 0;
+	short int y = 0;
+	short int z = 0;
+	short int t = 0;
 
 	data_val_l = bma180_read(data, BMA180_TEMP);
-	t = (short int) data_val_l;
+	t = data_val_l;
 
 	data_val_l = bma180_read(data, BMA180_ACC_X_LSB);
 	data_val_h = bma180_read(data, BMA180_ACC_X_MSB);
