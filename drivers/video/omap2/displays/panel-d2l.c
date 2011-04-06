@@ -641,14 +641,16 @@ static int d2l_power_on(struct omap_dss_device *dssdev)
 	int ret = 0;
 
 	if (d2d->enabled != 1) {
-		/* set Stop state (LP-11) */
-		dsi_set_stop_mode(1);
-		msleep(5);
 		ret = omapdss_dsi_display_enable(dssdev);
 		if (ret) {
 			dev_err(&dssdev->dev, "failed to enable DSI\n");
 			goto err;
 		}
+		msleep(5);
+
+		/* set Stop state (LP-11) */
+		dsi_set_stop_mode(1);
+		msleep(5);
 
 		/* reset d2l bridge */
 		d2l_hw_reset(dssdev);
