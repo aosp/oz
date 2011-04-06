@@ -1120,6 +1120,24 @@ static s32 refill_pat(struct tmm *tmm, struct tcm_area *area, u32 *ptr)
 	return res;
 }
 
+static u32 virt2phys(u32 usr)
+{
+	pmd_t *pmd;
+	pte_t *ptep;
+	pgd_t *pgd = pgd_offset(current->mm, usr);
+	if (pgd_none(*pgd) || pgd_bad(*pgd))
+		return 0;
+	pmd = pmd_offset(pgd, arg);
+	if (pmd_none(*pmd) || pmd_bad(*pmd))
+		return 0;
+
+	ptep = pte_offset_map(pmd, usr);
+	if (ptep && pte_present(*ptep))
+		return (*ptep & PAGE_MASK) | (~PAGE_MASK & usr);
+
+	return 0;
+}
+
 static s32 map_block(enum tiler_fmt fmt, u32 width, u32 height, u32 gid,
 			struct process_info *pi, u32 *sys_addr, u32 usr_addr)
 {
@@ -1370,9 +1388,6 @@ static s32 alloc_block(enum tiler_fmt fmt, u32 width, u32 height,
 static s32 tiler_ioctl(struct inode *ip, struct file *filp, u32 cmd,
 			unsigned long arg)
 {
-	pgd_t *pgd = NULL;
-	pmd_t *pmd = NULL;
-	pte_t *ptep = NULL, pte = 0x0;
 	s32 r = -1;
 	u32 til_addr = 0x0;
 	struct process_info *pi = filp->private_data;
@@ -1427,21 +1442,7 @@ static s32 tiler_ioctl(struct inode *ip, struct file *filp, u32 cmd,
 		break;
 
 	case TILIOC_GSSP:
-		pgd = pgd_offset(current->mm, arg);
-		if (!(pgd_none(*pgd) || pgd_bad(*pgd))) {
-			pmd = pmd_offset(pgd, arg);
-			if (!(pmd_none(*pmd) || pmd_bad(*pmd))) {
-				ptep = pte_offset_map(pmd, arg);
-				if (ptep) {
-					pte = *ptep;
-					if (pte_present(pte))
-						return (pte & PAGE_MASK) |
-							(~PAGE_MASK & arg);
-				}
-			}
-		}
-		/* va not in page table */
-		return 0x0;
+		return virt2phys(arg);
 		break;
 	case TILIOC_MBUF:
 		if (copy_from_user(&block_info, (void __user *)arg,
