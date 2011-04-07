@@ -206,6 +206,7 @@ static int bma180_accel_data_ready(struct bma180_accel_data *data)
 		__func__, data_val_l, data_val_h);
 	x = ((data_val_h << 8) | data_val_l);
 	x = (x >> 2);
+	x = x * g_range_table[data->pdata->g_range]/data->pdata->bit_mode;
 
 	data_val_l = bma180_read(data, BMA180_ACC_Y_LSB);
 	data_val_h = bma180_read(data, BMA180_ACC_Y_MSB);
@@ -215,6 +216,7 @@ static int bma180_accel_data_ready(struct bma180_accel_data *data)
 
 	y = ((data_val_h << 8) | data_val_l);
 	y = (y >> 2);
+	y = y * g_range_table[data->pdata->g_range]/data->pdata->bit_mode;
 
 	data_val_l = bma180_read(data, BMA180_ACC_Z_LSB);
 	data_val_h = bma180_read(data, BMA180_ACC_Z_MSB);
@@ -224,18 +226,15 @@ static int bma180_accel_data_ready(struct bma180_accel_data *data)
 
 	z = ((data_val_h << 8) | data_val_l);
 	z = (z >> 2);
+	z = -z * g_range_table[data->pdata->g_range]/data->pdata->bit_mode;
 
 	if (accl_debug)
 		pr_info("%s: X: 0x%X Y: 0x%X Z: 0x%X\n",
 		__func__, x, y, z);
-	/* TO DO: The driver should report the data not manipulate it.
-	 * data conversion belongs in the sensor HAL */
-	input_report_abs(data->input_dev, ABS_X,
-		x * g_range_table[data->pdata->g_range]/data->pdata->bit_mode);
-	input_report_abs(data->input_dev, ABS_Y,
-		y * g_range_table[data->pdata->g_range]/data->pdata->bit_mode);
-	input_report_abs(data->input_dev, ABS_Z,
-		-z * g_range_table[data->pdata->g_range]/data->pdata->bit_mode);
+
+	input_report_abs(data->input_dev, ABS_X, x);
+	input_report_abs(data->input_dev, ABS_Y, y);
+	input_report_abs(data->input_dev, ABS_Z, z);
 	input_sync(data->input_dev);
 
 	return 0;
