@@ -4254,14 +4254,6 @@ void dsi2_exit(void)
 }
 
 //set extra register hardcoding values for now (according to kozio)
-void dsi_set_stop_mode(bool stop) {
-	//set Stop state (LP-11). FORCE_TX_STOP_MODE_IO = stop
-	REG_FLD_MOD(0, DSI_TIMING1, stop, 15, 15);
-
-}
-EXPORT_SYMBOL(dsi_set_stop_mode);
-
-//set extra register hardcoding values for now (according to kozio)
 void dsi_videomode_panel_preinit(void) {
 
 	enum omap_dsi_index lcd_ix = DSI1;
@@ -4347,6 +4339,7 @@ void dsi_videomode_panel_postinit(void) {
 	u8 ecc;
 	u8 vc_id;
 	u16 pixels_per_line = 1024;
+	u32 r;
 
 	enum omap_dsi_index lcd_ix = DSI1;
 
@@ -4386,8 +4379,9 @@ void dsi_videomode_panel_postinit(void) {
 	msleep(5);
 
 	//unset Stop state (LP-11)
-	dsi_set_stop_mode(0);
-	msleep(5);
+	r = dsi_read_reg(lcd_ix, DSI_TIMING1);
+	r = FLD_MOD(r, 0, 15, 15);	/* FORCE_TX_STOP_MODE_IO */
+	dsi_write_reg(lcd_ix, DSI_TIMING1, r);
 
 }
 EXPORT_SYMBOL(dsi_videomode_panel_postinit);
