@@ -574,14 +574,12 @@ error:
 static int __devexit mpu3050_driver_remove(struct i2c_client *client)
 {
 	struct mpu3050_gyro_data *data = i2c_get_clientdata(client);
-	int ret;
 
 	sysfs_remove_group(&client->dev.kobj, &mpu3050_attr_group);
-	ret = mpu3050_device_deinit(data);
 	i2c_set_clientdata(client, NULL);
 	kfree(data);
 
-	return ret;
+	return 0;
 }
 
 #ifdef CONFIG_PM
