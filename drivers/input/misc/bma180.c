@@ -226,7 +226,7 @@ static int bma180_accel_data_ready(struct bma180_accel_data *data)
 
 	z = ((data_val_h << 8) | data_val_l);
 	z = (z >> 2);
-	z = -z * g_range_table[data->pdata->g_range]/data->pdata->bit_mode;
+	z = z * g_range_table[data->pdata->g_range]/data->pdata->bit_mode;
 
 	if (accl_debug)
 		pr_info("%s: X: 0x%X Y: 0x%X Z: 0x%X\n",
