@@ -411,7 +411,7 @@ static const struct attribute_group bma180_accel_attr_group = {
 	.attrs = bma180_accel_attrs,
 };
 
-int bma180_accel_device_hw_reset(struct bma180_accel_data *data)
+static int bma180_accel_device_hw_reset(struct bma180_accel_data *data)
 {
 	/* write 0xB6 to this register to do a soft-reset */
 	bma180_write(data, BMA180_RESET, 0xB6);
@@ -419,7 +419,7 @@ int bma180_accel_device_hw_reset(struct bma180_accel_data *data)
 	return 0;
 }
 
-int bma180_accel_device_hw_reset_int(struct bma180_accel_data *data)
+static int bma180_accel_device_hw_reset_int(struct bma180_accel_data *data)
 {
 	uint8_t reg_val;
 
