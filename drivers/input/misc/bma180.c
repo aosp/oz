@@ -102,6 +102,13 @@ static int g_range_table[7] = {
 	8000,
 	16000,
 };
+
+/* interval between samples for the different rates, in msecs */
+static const unsigned int bma180_measure_interval[] = {
+	1000 / 10,  1000 / 20,  1000 / 40,  1000 / 75,
+	1000 / 150, 1000 / 300, 1000 / 600, 1000 / 1200
+};
+
 #ifdef BMA180_DEBUG
 struct bma180_reg {
 	const char *name;
@@ -180,6 +187,23 @@ static int bma180_read(struct bma180_accel_data *data, u8 reg)
 	mutex_unlock(&data->mutex);
 
 	return ret;
+}
+
+static int bma180_accel_device_hw_set_bandwidth(struct bma180_accel_data *data,
+					int bandwidth)
+{
+	uint8_t reg_val;
+	uint8_t int_val;
+
+	int_val = bma180_read(data, BMA180_CTRL_REG3);
+	bma180_write(data, BMA180_CTRL_REG3, 0x00);
+	reg_val = bma180_read(data, BMA180_BW_TCS);
+	reg_val = (reg_val & 0x0F) | ((bandwidth << 4) & 0xF0);
+	bma180_write(data, BMA180_BW_TCS, reg_val);
+	msleep(10);
+	bma180_write(data, BMA180_CTRL_REG3, int_val);
+
+	return 0;
 }
 
 static void bma180_accel_device_sleep(struct bma180_accel_data *data)
@@ -293,7 +317,6 @@ static ssize_t bma180_store_attr_enable(struct device *dev,
 	error = strict_strtoul(buf, 0, &val);
 	if (error)
 		return error;
-
 	enable = !!val;
 
 	if (data->pdata->mode == enable)
@@ -330,17 +353,43 @@ static ssize_t bma180_store_attr_delay(struct device *dev,
 	struct bma180_accel_data *data = platform_get_drvdata(pdev);
 	unsigned long interval;
 	int error;
+	int i = 0;
 
 	error = strict_strtoul(buf, 0, &interval);
 	if (error)
 		return error;
 
-	if (interval <= 0 || interval > 200)
+	if (interval < 0)
 		return -EINVAL;
 
 	cancel_delayed_work_sync(&data->wq);
-	data->def_poll_rate = interval;
 
+	if (interval >=
+		bma180_measure_interval[BMA_BW_10HZ])
+		i = BMA_BW_10HZ;
+	else if (interval >=
+		bma180_measure_interval[BMA_BW_20HZ])
+		i = BMA_BW_20HZ;
+	else if (interval >=
+		bma180_measure_interval[BMA_BW_40HZ])
+		i = BMA_BW_40HZ;
+	else if (interval >=
+		bma180_measure_interval[BMA_BW_75HZ])
+		i = BMA_BW_75HZ;
+	else if (interval >=
+		bma180_measure_interval[BMA_BW_150HZ])
+		i = BMA_BW_150HZ;
+	else if (interval >=
+		bma180_measure_interval[BMA_BW_300HZ])
+		i = BMA_BW_300HZ;
+	else if (interval >=
+		bma180_measure_interval[BMA_BW_600HZ])
+		i = BMA_BW_600HZ;
+	else
+		i = BMA_BW_1200HZ;
+
+	data->def_poll_rate = interval;
+	bma180_accel_device_hw_set_bandwidth(data, i);
 	schedule_delayed_work(&data->wq, 0);
 
 	return count;
@@ -477,23 +526,6 @@ static int bma180_accel_device_hw_set_smp_skip(struct bma180_accel_data *data,
 	return 0;
 }
 
-static int bma180_accel_device_hw_set_bandwidth(struct bma180_accel_data *data,
-					int bandwidth)
-{
-	uint8_t reg_val;
-	uint8_t int_val;
-
-	int_val = bma180_read(data, BMA180_CTRL_REG3);
-	bma180_write(data, BMA180_CTRL_REG3, 0x00);
-	reg_val = bma180_read(data, BMA180_BW_TCS);
-	reg_val = (reg_val & 0x0F) | ((bandwidth << 4) & 0xF0);
-	bma180_write(data, BMA180_BW_TCS, reg_val);
-	msleep(10);
-	bma180_write(data, BMA180_CTRL_REG3, int_val);
-
-	return 0;
-}
-
 static int bma180_accel_device_hw_set_mode(struct bma180_accel_data *data,
 					int mode)
 {
@@ -505,7 +537,6 @@ static int bma180_accel_device_hw_set_mode(struct bma180_accel_data *data,
 
 	return 0;
 }
-
 
 static int bma180_accel_device_hw_set_12bits(struct bma180_accel_data *data,
 					int mode)
