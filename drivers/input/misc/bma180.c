@@ -182,6 +182,25 @@ static int bma180_read(struct bma180_accel_data *data, u8 reg)
 	return ret;
 }
 
+static void bma180_accel_device_sleep(struct bma180_accel_data *data)
+{
+	uint8_t reg_val;
+
+	reg_val = bma180_read(data, BMA180_CTRL_REG0);
+	reg_val |= BMA180_SLEEP;
+	bma180_write(data, BMA180_CTRL_REG0, reg_val);
+}
+
+static void bma180_accel_device_wakeup(struct bma180_accel_data *data)
+{
+	uint8_t reg_val;
+
+	reg_val = bma180_read(data, BMA180_CTRL_REG0);
+	reg_val &= ~BMA180_SLEEP;
+	bma180_write(data, BMA180_CTRL_REG0, reg_val);
+	msleep(10);
+}
+
 static irqreturn_t bma180_accel_thread_irq(int irq, void *dev_data)
 {
 	struct bma180_accel_data *data = (struct bma180_accel_data *) dev_data;
@@ -275,15 +294,20 @@ static ssize_t bma180_store_attr_enable(struct device *dev,
 	if (error)
 		return error;
 
-	if (val == 0)
-		enable = val;
-	else
-		enable = data->def_poll_rate;
+	enable = !!val;
 
-	cancel_delayed_work_sync(&data->wq);
+	if (data->pdata->mode == enable)
+		return count;
 
-	if (enable)
+	if (enable) {
+		bma180_accel_device_wakeup(data);
 		schedule_delayed_work(&data->wq, 0);
+	} else {
+		cancel_delayed_work_sync(&data->wq);
+		bma180_accel_device_sleep(data);
+	}
+
+	data->pdata->mode = enable;
 
 	return count;
 }
@@ -643,27 +667,6 @@ static int __devexit bma180_accel_driver_remove(struct i2c_client *client)
 
 
 #ifdef CONFIG_PM
-static void bma180_accel_device_sleep(struct bma180_accel_data *data)
-{
-	uint8_t reg_val;
-
-	reg_val = bma180_read(data, BMA180_CTRL_REG0);
-	reg_val |= BMA180_SLEEP;
-	bma180_write(data, BMA180_CTRL_REG0, reg_val);
-
-
-}
-
-static void bma180_accel_device_wakeup(struct bma180_accel_data *data)
-{
-	uint8_t reg_val;
-
-	reg_val = bma180_read(data, BMA180_CTRL_REG0);
-	reg_val &= ~BMA180_SLEEP;
-	bma180_write(data, BMA180_CTRL_REG0, reg_val);
-	msleep(10);
-}
-
 static int bma180_accel_driver_suspend(struct i2c_client *client,
 				pm_message_t mesg)
 {
