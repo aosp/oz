@@ -384,7 +384,8 @@ static void blaze_tablet_touch_init(void)
 
 static struct qtouch_ts_platform_data atmel_mxt224_ts_platform_data = {
 	.irqflags	= (IRQF_TRIGGER_FALLING | IRQF_TRIGGER_LOW),
-	.flags		= (QTOUCH_USE_MULTITOUCH | QTOUCH_FLIP_Y),
+	.flags		= (QTOUCH_USE_MULTITOUCH | QTOUCH_FLIP_Y |
+			   QTOUCH_CFG_BACKUPNV),
 	.abs_min_x	= 0,
 	.abs_max_x	= 768,
 	.abs_min_y	= 0,
@@ -395,7 +396,7 @@ static struct qtouch_ts_platform_data atmel_mxt224_ts_platform_data = {
 	.abs_max_w	= 15,
 	.x_delta	= 1024,
 	.y_delta	= 768,
-	.nv_checksum	= 0xfaf5,
+	.nv_checksum	= 0x91c1,
 	.fuzz_x		= 0,
 	.fuzz_y		= 0,
 	.fuzz_p		= 2,
