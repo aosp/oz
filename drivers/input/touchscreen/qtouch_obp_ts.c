@@ -517,7 +517,8 @@ static int do_cmd_proc_msg(struct qtouch_ts_data *ts, struct qtm_object *obj,
 			pr_info("%s:EEPROM checksum is 0x%X cnt %i\n",
 				__func__, msg->checksum, ts->checksum_cnt);
 		if (msg->checksum != ts->eeprom_checksum) {
-			if (ts->checksum_cnt > 2) {
+			if (ts->checksum_cnt > 2 &&
+			   (ts->pdata->flags & QTOUCH_CFG_BACKUPNV)) {
 				/* Assume the checksum is what it is, cannot
 				disable the touch screen so set the checksum*/
 				ts->eeprom_checksum = msg->checksum;
