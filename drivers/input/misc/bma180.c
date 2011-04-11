@@ -549,6 +549,7 @@ static int __devinit bma180_accel_driver_probe(struct i2c_client *client,
 
 	data->pdata = pdata;
 	data->client = client;
+	data->def_poll_rate = pdata->def_poll_rate;
 	i2c_set_clientdata(client, data);
 
 	data->input_dev = input_allocate_device();
