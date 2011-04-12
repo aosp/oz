@@ -19,6 +19,7 @@
 
 int omap4_tablet_touch_init(void);
 int omap4_tablet_sensor_init(void);
+int omap4_tablet_panel_init(void);
 
 
 #endif
