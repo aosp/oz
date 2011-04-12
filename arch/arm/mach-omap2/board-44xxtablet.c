@@ -20,7 +20,7 @@
 #include <linux/usb/otg.h>
 #include <linux/spi/spi.h>
 #include <linux/i2c/twl.h>
-#include <linux/gpio_keys.h>
+
 #include <linux/leds.h>
 #include <linux/leds_pwm.h>
 #include <linux/leds-omap4430sdp-display.h>
@@ -55,48 +55,6 @@
 #define LED_PWM2OFF		0x04
 #define LED_TOGGLE3		0x92
 
-
-/* GPIO_KEY for Tablet */
-static struct gpio_keys_button tablet_gpio_keys_buttons[] = {
-	[0] = {
-		.code			= KEY_VOLUMEUP,
-		.gpio			= 43,
-		.desc			= "SW1",
-		.active_low		= 1,
-		.wakeup			= 1,
-		.debounce_interval	= 5,
-	},
-	[1] = {
-		.code			= KEY_HOME,
-		.gpio			= 46,
-		.desc			= "SW2",
-		.active_low		= 1,
-		.wakeup			= 1,
-		.debounce_interval	= 5,
-	},
-	[2] = {
-		.code			= KEY_VOLUMEDOWN,
-		.gpio			= 47,
-		.desc			= "SW3",
-		.active_low		= 1,
-		.wakeup			= 1,
-		.debounce_interval	= 5,
-		},
-	};
-
-static struct gpio_keys_platform_data tablet_gpio_keys = {
-	.buttons		= tablet_gpio_keys_buttons,
-	.nbuttons		= ARRAY_SIZE(tablet_gpio_keys_buttons),
-	.rep			= 0,
-};
-
-static struct platform_device tablet_gpio_keys_device = {
-	.name		= "gpio-keys",
-	.id		= -1,
-	.dev		= {
-		.platform_data	= &tablet_gpio_keys,
-	},
-};
 
 static struct gpio_led sdp4430_gpio_leds[] = {
 	{
@@ -340,18 +298,6 @@ static int __init tablet_i2c_init(void)
 
 static void enable_board_wakeup_source(void)
 {
-	omap_mux_init_signal("gpmc_a22.gpio_46",
-			OMAP_PULL_ENA | OMAP_PULL_UP |
-			OMAP_WAKEUP_EN | OMAP_MUX_MODE3 |
-			OMAP_INPUT_EN);
-	omap_mux_init_signal("gpmc_a23.gpio_47",
-			OMAP_PULL_ENA | OMAP_PULL_UP |
-			OMAP_WAKEUP_EN | OMAP_MUX_MODE3 |
-			OMAP_INPUT_EN);
-	omap_mux_init_signal("gpmc_a19.gpio_43",
-			OMAP_PULL_ENA | OMAP_PULL_UP |
-			OMAP_WAKEUP_EN | OMAP_MUX_MODE3 |
-			OMAP_INPUT_EN);
 
 	omap_mux_init_signal("sys_nirq1",
 			OMAP_PULL_ENA | OMAP_PULL_UP |
@@ -366,7 +312,6 @@ static struct platform_device *blazetablet_devices[] __initdata = {
 	/* TODO. Review button LEDs functionality
 	&sdp4430_leds_pwm, */
 	&sdp4430_leds_gpio,
-	&tablet_gpio_keys_device,
 };
 
 static void __init omap_4430sdp_init_irq(void)
@@ -394,6 +339,7 @@ void omap_44xxtablet_init(void)
 	tablet_i2c_init();
 	omap4_tablet_touch_init();
 	omap4_tablet_sensor_init();
+	omap4_tablet_keypad_init();
 
 	platform_add_devices(blazetablet_devices,
 		ARRAY_SIZE(blazetablet_devices));
