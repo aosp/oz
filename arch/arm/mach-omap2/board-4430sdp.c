@@ -962,6 +962,7 @@ static struct regulator_init_data sdp4430_vaux1 = {
 			.enabled	= false,
 			.disabled	= true,
 		},
+		.always_on	= true,
 	},
 };
 
@@ -996,6 +997,7 @@ static struct regulator_init_data sdp4430_vaux3 = {
 			.enabled	= false,
 			.disabled	= true,
 		},
+		.always_on	= true,
 	},
 	.num_consumer_supplies = 1,
 	.consumer_supplies = sdp4430_cam2_supply,
@@ -1016,6 +1018,7 @@ static struct regulator_init_data sdp4430_vmmc = {
 			.enabled	= false,
 			.disabled	= true,
 		},
+		.always_on	= true,
 	},
 	.num_consumer_supplies  = 1,
 	.consumer_supplies      = sdp4430_vmmc_supply,
@@ -1068,6 +1071,7 @@ static struct regulator_init_data sdp4430_vana = {
 			.enabled	= false,
 			.disabled	= true,
 		},
+		.always_on	= true,
 	},
 };
 
@@ -1084,6 +1088,7 @@ static struct regulator_init_data sdp4430_vcxio = {
 			.enabled	= false,
 			.disabled	= true,
 		},
+		.always_on	= true,
 	},
 };
 
@@ -1100,6 +1105,7 @@ static struct regulator_init_data sdp4430_vdac = {
 			.enabled	= false,
 			.disabled	= true,
 		},
+		.always_on	= true,
 	},
 };
 
@@ -1116,6 +1122,7 @@ static struct regulator_init_data sdp4430_vusb = {
 			.enabled	= false,
 			.disabled	= true,
 		},
+		.always_on	= true,
 	},
 };
 
@@ -1169,6 +1176,12 @@ static struct twl4030_codec_data twl6040_codec = {
 	.irq_base	= TWL6040_CODEC_IRQ_BASE,
 };
 
+static struct regulator_init_data sdp4430_clk32kg = {
+       .constraints = {
+		.valid_ops_mask         = REGULATOR_CHANGE_STATUS,
+       },
+};
+
 static struct twl4030_platform_data sdp4430_twldata = {
 	.irq_base	= TWL6030_IRQ_BASE,
 	.irq_end	= TWL6030_IRQ_END,
@@ -1184,6 +1197,7 @@ static struct twl4030_platform_data sdp4430_twldata = {
 	.vaux1		= &sdp4430_vaux1,
 	.vaux2		= &sdp4430_vaux2,
 	.vaux3		= &sdp4430_vaux3,
+	.clk32kg        = &sdp4430_clk32kg,
 	.madc           = &sdp4430_gpadc_data,
 	.bci            = &sdp4430_bci_data,
 
