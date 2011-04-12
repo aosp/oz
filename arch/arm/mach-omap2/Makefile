@@ -230,7 +230,8 @@ obj-$(CONFIG_MACH_OMAP3_TOUCHBOOK)	+= board-omap3touchbook.o \
 obj-$(CONFIG_MACH_OMAP_4430SDP)		+= board-4430sdp.o \
 					   hsmmc.o \
 					   omap_phy_internal.o
-obj-$(CONFIG_MACH_OMAP_BLAZE)           += board-44xxtablet.o
+obj-$(CONFIG_MACH_OMAP_BLAZE)           += board-44xxtablet.o \
+					   board-44xx-tablet-touch.o
 obj-$(CONFIG_MACH_OMAP4_PANDA)		+= board-omap4panda.o \
 					   hsmmc.o \
 					   omap_phy_internal.o
