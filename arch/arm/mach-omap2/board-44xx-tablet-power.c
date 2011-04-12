@@ -301,6 +301,13 @@ static struct i2c_board_info __initdata omap4xx_i2c_bus3_power_info[] = {
 
 int __init omap4_tablet_power_init(void)
 {
+	omap_mux_init_signal("sys_nirq1",
+			OMAP_PULL_ENA | OMAP_PULL_UP |
+			OMAP_WAKEUP_EN | OMAP_INPUT_EN);
+	omap_mux_init_signal("sys_nirq2",
+			OMAP_PULL_ENA | OMAP_PULL_UP |
+			OMAP_WAKEUP_EN | OMAP_INPUT_EN);
+
 	i2c_register_board_info(1, omap4xx_i2c_bus3_power_info,
 		ARRAY_SIZE(omap4xx_i2c_bus3_power_info));
 
