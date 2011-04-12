@@ -188,7 +188,7 @@ void __iomem *l2cache_base;
 void __iomem *gic_cpu_base_addr;
 void __iomem *gic_dist_base_addr;
 
-#ifndef CONFIG_TF_MSHIELD
+#ifndef CONFIG_SECURITY_MIDDLEWARE_COMPONENT
 static struct clockdomain *l4_secure_clkdm;
 #endif
 
@@ -277,7 +277,7 @@ early_initcall(omap_l2_cache_init);
 #endif
 
 
-#ifndef CONFIG_TF_MSHIELD
+#ifndef CONFIG_SECURITY_MIDDLEWARE_COMPONENT
 /*
  * omap4_sec_dispatcher: Routine to dispatch low power secure
  * service routines

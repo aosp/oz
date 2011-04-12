@@ -262,7 +262,7 @@ static void __init _omap2_map_common_io(void)
 	omap_vram_reserve_sdram();
 	dspbridge_reserve_sdram();
 
-#ifdef CONFIG_TF_MSHIELD
+#ifdef CONFIG_SECURITY_MIDDLEWARE_COMPONENT
 	tf_allocate_workspace();
 #endif
 }
