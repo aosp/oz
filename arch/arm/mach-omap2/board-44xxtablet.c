@@ -21,9 +21,6 @@
 #include <linux/spi/spi.h>
 #include <linux/i2c/twl.h>
 
-#include <linux/leds.h>
-#include <linux/leds_pwm.h>
-
 #include <mach/hardware.h>
 #include <mach/omap4-common.h>
 #include <asm/mach-types.h>
@@ -47,76 +44,6 @@
 #define ETH_KS8851_QUART		138
 #define OMAP4SDP_MDM_PWR_EN_GPIO	157
 
-static struct gpio_led sdp4430_gpio_leds[] = {
-	{
-		.name	= "omap4:green:debug0",
-		.gpio	= 61,
-	},
-	{
-		.name	= "omap4:green:debug1",
-		.gpio	= 30,
-	},
-	{
-		.name	= "omap4:green:debug2",
-		.gpio	= 7,
-	},
-	{
-		.name	= "omap4:green:debug3",
-		.gpio	= 8,
-	},
-	{
-		.name	= "omap4:green:debug4",
-		.gpio	= 50,
-	},
-	{
-		.name	= "omap4:blue:user",
-		.gpio	= 169,
-	},
-	{
-		.name	= "omap4:red:user",
-		.gpio	= 170,
-	},
-	{
-		.name	= "omap4:green:user",
-		.gpio	= 139,
-	},
-
-};
-
-static struct gpio_led_platform_data sdp4430_led_data = {
-	.leds	= sdp4430_gpio_leds,
-	.num_leds	= ARRAY_SIZE(sdp4430_gpio_leds),
-};
-
-static struct led_pwm sdp4430_pwm_leds[] = {
-	{
-		.name		= "omap4:green:chrg",
-		.pwm_id		= 1,
-		.max_brightness	= 255,
-		.pwm_period_ns	= 7812500,
-	},
-};
-
-static struct led_pwm_platform_data sdp4430_pwm_data = {
-	.num_leds	= ARRAY_SIZE(sdp4430_pwm_leds),
-	.leds		= sdp4430_pwm_leds,
-};
-
-static struct platform_device sdp4430_leds_pwm = {
-	.name	= "leds_pwm",
-	.id	= -1,
-	.dev	= {
-		.platform_data = &sdp4430_pwm_data,
-	},
-};
-
-static struct platform_device sdp4430_leds_gpio = {
-	.name	= "leds-gpio",
-	.id	= -1,
-	.dev	= {
-		.platform_data = &sdp4430_led_data,
-	},
-};
 static struct spi_board_info sdp4430_spi_board_info[] __initdata = {
 	{
 		.modalias               = "ks8851",
@@ -223,12 +150,6 @@ static int __init tablet_i2c_init(void)
 	return 0;
 }
 
-static struct platform_device *blazetablet_devices[] __initdata = {
-	/* TODO. Review button LEDs functionality
-	&sdp4430_leds_pwm, */
-	&sdp4430_leds_gpio,
-};
-
 static void __init omap_4430sdp_init_irq(void)
 {
 	omap2_init_common_infrastructure();
@@ -254,10 +175,6 @@ void omap_44xxtablet_init(void)
 	omap4_tablet_touch_init();
 	omap4_tablet_sensor_init();
 	omap4_tablet_keypad_init();
-
-	platform_add_devices(blazetablet_devices,
-		ARRAY_SIZE(blazetablet_devices));
-
 	omap_serial_init();
 
 
