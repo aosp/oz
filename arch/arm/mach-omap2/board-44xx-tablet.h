@@ -18,6 +18,7 @@
 #define _MACH_OMAP_BOARD_44XX_TABLET_H
 
 int omap4_tablet_touch_init(void);
+int omap4_tablet_sensor_init(void);
 
 
 #endif

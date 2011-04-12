@@ -26,9 +26,6 @@
 #include <linux/leds_pwm.h>
 #include <linux/leds-omap4430sdp-display.h>
 #include <linux/delay.h>
-#include <linux/input/sfh7741.h>
-#include <linux/i2c/bma180.h>
-#include <linux/i2c/cma3000.h>
 
 #include <mach/hardware.h>
 #include <mach/omap4-common.h>
@@ -59,7 +56,6 @@
 #define LED_SEC_DISP_GPIO 27
 #define DSI2_GPIO_59	59
 #define DP_4430_GPIO_59         59
-#define OMAP4_BMA180ACCEL_GPIO		178
 
 #define LED_PWM2ON		0x03
 #define LED_PWM2OFF		0x04
@@ -386,21 +382,7 @@ static struct omap_dss_board_info blazetablet_dss_data = {
 	.default_device =	&blazetablet_lcd_device,
 };
 
-/* BMA180 Accelerometer Start */
-static struct bma180accel_platform_data bma180accel_platform_data = {
-	.ctrl_reg0	= 0x11,
-	.g_range	= BMA_GRANGE_2G,
-	.bandwidth	= BMA_BW_10HZ,
-	.mode		= BMA_MODE_LOW_NOISE,
-	.bit_mode	= BMA_BITMODE_14BITS,
-	.smp_skip	= 1,
-	.def_poll_rate	= 200,
-	.fuzz_x		= 25,
-	.fuzz_y		= 25,
-	.fuzz_z		= 25,
-};
 
-/* BMA180 Accelerometer End */
 
 static const struct ehci_hcd_omap_platform_data ehci_pdata __initconst = {
 	.port_mode[0]	= EHCI_HCD_OMAP_MODE_PHY,
@@ -738,24 +720,7 @@ static struct i2c_board_info __initdata tablet_i2c_2_boardinfo[] = {
 	},
 };
 
-static struct i2c_board_info __initdata tablet_i2c_3_boardinfo[] = {
-	{
-		I2C_BOARD_INFO("tmp105", 0x48),
-	},
-};
 
-static struct i2c_board_info __initdata tablet_i2c_4_boardinfo[] = {
-	{
-		I2C_BOARD_INFO("bmp085", 0x77),
-	},
-	{
-		I2C_BOARD_INFO("hmc5843", 0x1e),
-	},
-	{
-		I2C_BOARD_INFO("bma180_accel", 0x40),
-		.platform_data = &bma180accel_platform_data,
-	},
-};
 
 static int __init tablet_i2c_init(void)
 {
@@ -767,10 +732,8 @@ static int __init tablet_i2c_init(void)
 			ARRAY_SIZE(tablet_i2c_boardinfo));
 	omap_register_i2c_bus(2, 400, tablet_i2c_2_boardinfo,
 			ARRAY_SIZE(tablet_i2c_2_boardinfo));
-	omap_register_i2c_bus(3, 400, tablet_i2c_3_boardinfo,
-			ARRAY_SIZE(tablet_i2c_3_boardinfo));
-	omap_register_i2c_bus(4, 400, tablet_i2c_4_boardinfo,
-			ARRAY_SIZE(tablet_i2c_4_boardinfo));
+	omap_register_i2c_bus(3, 400, NULL, 0);
+	omap_register_i2c_bus(4, 400, NULL, 0);
 	return 0;
 }
 
@@ -829,6 +792,7 @@ void omap_44xxtablet_init(void)
 	omap_disp_led_init();
 	tablet_i2c_init();
 	omap4_tablet_touch_init();
+	omap4_tablet_sensor_init();
 
 	platform_add_devices(blazetablet_devices,
 		ARRAY_SIZE(blazetablet_devices));
