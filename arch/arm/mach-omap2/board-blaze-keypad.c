@@ -215,6 +215,19 @@ static struct platform_device blaze_leds_gpio = {
 	},
 };
 
+static struct platform_device blaze_keypad_led = {
+	.name	=	"keypad_led",
+	.id	=	-1,
+	.dev	= {
+		.platform_data = NULL,
+	},
+};
+
+static struct platform_device *blaze_led_devices[] __initdata = {
+	&blaze_leds_gpio,
+	&blaze_keypad_led,
+};
+
 int __init blaze_keypad_init(void)
 {
 	int status = 0;
@@ -223,7 +236,7 @@ int __init blaze_keypad_init(void)
 	if (status)
 		pr_err("Keypad initialization failed: %d\n", status);
 
-	platform_device_register(&blaze_leds_gpio);
+	platform_add_devices(blaze_led_devices, ARRAY_SIZE(blaze_led_devices));
 
 	return 0;
 }
