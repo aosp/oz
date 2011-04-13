@@ -26,8 +26,7 @@
 #include <linux/leds_pwm.h>
 #include <linux/leds-omap4430sdp-display.h>
 #include <linux/delay.h>
-#include <linux/input/sfh7741.h>
-#include <linux/i2c/cma3000.h>
+
 
 #include <mach/hardware.h>
 #include <mach/omap4-common.h>
@@ -46,6 +45,7 @@
 #include <plat/mmc.h>
 #include <plat/nokia-dsi-panel.h>
 
+#include "board-blaze.h"
 #include "mux.h"
 #include "timer-gp.h"
 #include "control.h"
@@ -54,9 +54,7 @@
 #define ETH_KS8851_POWER_ON		48
 #define ETH_KS8851_QUART		138
 #define OMAP4SDP_MDM_PWR_EN_GPIO	157
-#define OMAP4_SFH7741_SENSOR_OUTPUT_GPIO	184
-#define OMAP4_SFH7741_ENABLE_GPIO		188
-#define OMAP4_CMA3000ACCL_GPIO		186
+
 
 #define LED_SEC_DISP_GPIO 27
 #define DSI2_GPIO_59	59
@@ -200,108 +198,6 @@ void keyboard_mux_init(void)
 				OMAP_PULL_ENA | OMAP_PULL_UP |
 				OMAP_WAKEUP_EN | OMAP_MUX_MODE1 |
 				OMAP_INPUT_EN);
-}
-
-/* Proximity Sensor */
-static void omap_prox_activate(int state)
-{
-	gpio_set_value(OMAP4_SFH7741_ENABLE_GPIO , state);
-}
-
-static int omap_prox_read(void)
-{
-	int proximity;
-	proximity = gpio_get_value(OMAP4_SFH7741_SENSOR_OUTPUT_GPIO);
-#ifdef CONFIG_ANDROID
-	/* Invert the output from the prox sensor for Android as 0 should
-	be near and 1 should be far */
-	return !proximity;
-#else
-	return proximity;
-#endif
-}
-
-static void omap_sfh7741prox_init(void)
-{
-	int  error;
-	int  gpio_val;
-
-	error = gpio_request(OMAP4_SFH7741_SENSOR_OUTPUT_GPIO, "sfh7741");
-	if (error < 0) {
-		pr_err("%s: GPIO configuration failed: GPIO %d, error %d\n"
-			, __func__, OMAP4_SFH7741_SENSOR_OUTPUT_GPIO, error);
-		return ;
-	}
-
-	error = gpio_direction_input(OMAP4_SFH7741_SENSOR_OUTPUT_GPIO);
-	if (error < 0) {
-		pr_err("Proximity GPIO input configuration failed\n");
-		goto fail1;
-	}
-
-	error = gpio_request(OMAP4_SFH7741_ENABLE_GPIO, "sfh7741");
-	if (error < 0) {
-		pr_err("failed to request GPIO %d, error %d\n",
-			OMAP4_SFH7741_ENABLE_GPIO, error);
-		goto fail1;
-	}
-
-	error = gpio_direction_output(OMAP4_SFH7741_ENABLE_GPIO , 0);
-	if (error < 0) {
-		pr_err("%s: GPIO configuration failed: GPIO %d,	error %d\n",
-			__func__, OMAP4_SFH7741_ENABLE_GPIO, error);
-		goto fail3;
-	}
-
-	gpio_val = omap_mux_get_gpio(OMAP4_SFH7741_SENSOR_OUTPUT_GPIO);
-	if ((gpio_val & OMAP_WAKEUP_EN) == 0) {
-		gpio_val |= OMAP_WAKEUP_EN;
-		omap_mux_set_gpio(gpio_val, OMAP4_SFH7741_SENSOR_OUTPUT_GPIO);
-	}
-	return;
-
-fail3:
-	gpio_free(OMAP4_SFH7741_ENABLE_GPIO);
-fail1:
-	gpio_free(OMAP4_SFH7741_SENSOR_OUTPUT_GPIO);
-}
-
-static struct sfh7741_platform_data omap_sfh7741_data = {
-	.flags = SFH7741_WAKEABLE_INT,
-	.irq = OMAP_GPIO_IRQ(OMAP4_SFH7741_SENSOR_OUTPUT_GPIO),
-	.prox_enable = 0,
-	.activate_func = omap_prox_activate,
-	.read_prox = omap_prox_read,
-};
-
-static struct platform_device sdp4430_proximity_device = {
-	.name		= SFH7741_NAME,
-	.id		= 1,
-	.dev		= {
-		.platform_data = &omap_sfh7741_data,
-	},
-};
-
-static struct cma3000_platform_data cma3000_platform_data = {
-	.def_poll_rate = 200,
-	.fuzz_x = 25,
-	.fuzz_y = 25,
-	.fuzz_z = 25,
-	.g_range = CMARANGE_8G,
-	.mode = CMAMODE_MEAS400,
-	.mdthr = 0x8,
-	.mdfftmr = 0x33,
-	.ffthr = 0x8,
-	.irqflags = IRQF_TRIGGER_HIGH,
-};
-
-static void omap_cma3000accl_init(void)
-{
-	if (gpio_request(OMAP4_CMA3000ACCL_GPIO, "Accelerometer") < 0) {
-		pr_err("Accelerometer GPIO request failed\n");
-		return;
-	}
-	gpio_direction_input(OMAP4_CMA3000ACCL_GPIO);
 }
 
 static struct gpio_led sdp4430_gpio_leds[] = {
@@ -582,7 +478,6 @@ static struct omap_dss_board_info sdp4430_dss_data = {
 
 static struct platform_device *sdp4430_devices[] __initdata = {
 	&sdp4430_disp_led,
-	&sdp4430_proximity_device,
 	&sdp4430_leds_gpio,
 	&sdp4430_leds_pwm,
 };
@@ -958,25 +853,9 @@ static struct i2c_board_info __initdata sdp4430_i2c_3_boardinfo[] = {
 		I2C_BOARD_INFO("tm12xx_ts_secondary", 0x4b),
 		.platform_data = &tm12xx_platform_data[1],
 	},
-	{
-		I2C_BOARD_INFO("tmp105", 0x48),
-	},
-	{
-		I2C_BOARD_INFO("bh1780", 0x29),
-	},
+
 };
-static struct i2c_board_info __initdata sdp4430_i2c_4_boardinfo[] = {
-	{
-		I2C_BOARD_INFO("bmp085", 0x77),
-	},
-	{
-		I2C_BOARD_INFO("hmc5843", 0x1e),
-	},
-	{
-		I2C_BOARD_INFO("cma3000_accl", 0x1c),
-		.platform_data = &cma3000_platform_data,
-	},
-};
+
 static int __init omap4_i2c_init(void)
 {
 	/*
@@ -987,10 +866,9 @@ static int __init omap4_i2c_init(void)
 			ARRAY_SIZE(sdp4430_i2c_boardinfo));
 	omap_register_i2c_bus(2, 400, sdp4430_i2c_2_boardinfo,
 			ARRAY_SIZE(sdp4430_i2c_2_boardinfo));
-	omap_register_i2c_bus(3, 400, sdp4430_i2c_3_boardinfo,
-				ARRAY_SIZE(sdp4430_i2c_3_boardinfo));
-	omap_register_i2c_bus(4, 400, sdp4430_i2c_4_boardinfo,
-				ARRAY_SIZE(sdp4430_i2c_4_boardinfo));
+	omap_register_i2c_bus(3, 400, NULL, 0);
+	omap_register_i2c_bus(4, 400, NULL, 0);
+
 	return 0;
 }
 
@@ -1043,10 +921,13 @@ static void __init omap_4430sdp_init(void)
 
 	omap4_audio_conf();
 	omap4_i2c_init();
+	blaze_sensor_init();
+	i2c_register_board_info(3, sdp4430_i2c_3_boardinfo,
+		ARRAY_SIZE(sdp4430_i2c_3_boardinfo));
+
 	omap4_display_init();
 	omap_disp_led_init();
-	omap_sfh7741prox_init();
-	omap_cma3000accl_init();
+
 	platform_add_devices(sdp4430_devices, ARRAY_SIZE(sdp4430_devices));
 	omap_serial_init();
 	omap4_twl6030_hsmmc_init(mmc);
