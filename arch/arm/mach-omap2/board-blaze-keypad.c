@@ -163,6 +163,58 @@ void keyboard_mux_init(void)
 				OMAP_INPUT_EN);
 }
 
+static struct gpio_led blaze_gpio_leds[] = {
+	{
+		.name	= "omap4:green:debug0",
+		.gpio	= 61,
+	},
+	{
+		.name	= "omap4:green:debug1",
+		.gpio	= 30,
+	},
+	{
+		.name	= "omap4:green:debug2",
+		.gpio	= 7,
+	},
+	{
+		.name	= "omap4:green:debug3",
+		.gpio	= 8,
+	},
+	{
+		.name	= "omap4:green:debug4",
+		.gpio	= 50,
+	},
+	{
+		.name	= "blue",
+		.default_trigger = "timer",
+		.gpio	= 169,
+	},
+	{
+		.name	= "red",
+		.default_trigger = "timer",
+		.gpio	= 170,
+	},
+	{
+		.name	= "green",
+		.default_trigger = "timer",
+		.gpio	= 139,
+	},
+
+};
+
+static struct gpio_led_platform_data blaze_led_data = {
+	.leds	= blaze_gpio_leds,
+	.num_leds = ARRAY_SIZE(blaze_gpio_leds),
+};
+
+static struct platform_device blaze_leds_gpio = {
+	.name	= "leds-gpio",
+	.id	= -1,
+	.dev	= {
+		.platform_data = &blaze_led_data,
+	},
+};
+
 int __init blaze_keypad_init(void)
 {
 	int status = 0;
@@ -170,6 +222,8 @@ int __init blaze_keypad_init(void)
 	status = omap4_keypad_initialization(&sdp4430_keypad_data);
 	if (status)
 		pr_err("Keypad initialization failed: %d\n", status);
+
+	platform_device_register(&blaze_leds_gpio);
 
 	return 0;
 }

@@ -19,8 +19,6 @@
 #include <linux/gpio.h>
 #include <linux/usb/otg.h>
 #include <linux/spi/spi.h>
-#include <linux/leds.h>
-#include <linux/leds_pwm.h>
 
 #include <mach/hardware.h>
 #include <mach/omap4-common.h>
@@ -43,76 +41,7 @@
 #define ETH_KS8851_QUART		138
 #define OMAP4SDP_MDM_PWR_EN_GPIO	157
 
-static struct gpio_led blaze_gpio_leds[] = {
-	{
-		.name	= "omap4:green:debug0",
-		.gpio	= 61,
-	},
-	{
-		.name	= "omap4:green:debug1",
-		.gpio	= 30,
-	},
-	{
-		.name	= "omap4:green:debug2",
-		.gpio	= 7,
-	},
-	{
-		.name	= "omap4:green:debug3",
-		.gpio	= 8,
-	},
-	{
-		.name	= "omap4:green:debug4",
-		.gpio	= 50,
-	},
-	{
-		.name	= "omap4:blue:user",
-		.gpio	= 169,
-	},
-	{
-		.name	= "omap4:red:user",
-		.gpio	= 170,
-	},
-	{
-		.name	= "omap4:green:user",
-		.gpio	= 139,
-	},
 
-};
-
-static struct gpio_led_platform_data blaze_led_data = {
-	.leds	= blaze_gpio_leds,
-	.num_leds	= ARRAY_SIZE(blaze_gpio_leds),
-};
-
-static struct led_pwm blaze_pwm_leds[] = {
-	{
-		.name		= "omap4:green:chrg",
-		.pwm_id		= 1,
-		.max_brightness	= 255,
-		.pwm_period_ns	= 7812500,
-	},
-};
-
-static struct led_pwm_platform_data blaze_pwm_data = {
-	.num_leds	= ARRAY_SIZE(blaze_pwm_leds),
-	.leds		= blaze_pwm_leds,
-};
-
-static struct platform_device blaze_leds_pwm = {
-	.name	= "leds_pwm",
-	.id	= -1,
-	.dev	= {
-		.platform_data = &blaze_pwm_data,
-	},
-};
-
-static struct platform_device blaze_leds_gpio = {
-	.name	= "leds-gpio",
-	.id	= -1,
-	.dev	= {
-		.platform_data = &blaze_led_data,
-	},
-};
 static struct spi_board_info blaze_spi_board_info[] __initdata = {
 	{
 		.modalias               = "ks8851",
@@ -177,11 +106,6 @@ error1:
 	gpio_free(ETH_KS8851_POWER_ON);
 	return status;
 }
-
-static struct platform_device *blaze_devices[] __initdata = {
-	&blaze_leds_gpio,
-	&blaze_leds_pwm,
-};
 
 static void __init omap_4430sdp_init_irq(void)
 {
@@ -249,8 +173,6 @@ static void __init omap_4430sdp_init(void)
 	blaze_touch_init();
 	blaze_sensor_init();
 	blaze_keypad_init();
-
-	platform_add_devices(blaze_devices, ARRAY_SIZE(blaze_devices));
 	omap_serial_init();
 
 	/* Power on the ULPI PHY */
