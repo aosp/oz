@@ -232,6 +232,7 @@ obj-$(CONFIG_MACH_OMAP_4430SDP)		+= board-4430sdp.o \
 					   board-blaze-touch.o \
 					   board-blaze-power.o \
 					   board-blaze-keypad.o \
+					   board-blaze-panel.o \
 					   hsmmc.o \
 					   omap_phy_internal.o
 obj-$(CONFIG_MACH_OMAP_BLAZE)           += board-44xx-tablet.o \

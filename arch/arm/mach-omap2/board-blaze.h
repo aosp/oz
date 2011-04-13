@@ -19,6 +19,7 @@
 
 int blaze_sensor_init(void);
 int blaze_touch_init(void);
+int blaze_panel_init(void);
 int blaze_power_init(void);
 int blaze_keypad_init(void);
 
