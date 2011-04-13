@@ -19,13 +19,8 @@
 #include <linux/gpio.h>
 #include <linux/usb/otg.h>
 #include <linux/spi/spi.h>
-#include <linux/i2c/twl.h>
-#include <linux/gpio_keys.h>
-#include <linux/regulator/machine.h>
 #include <linux/leds.h>
 #include <linux/leds_pwm.h>
-#include <linux/delay.h>
-
 
 #include <mach/hardware.h>
 #include <mach/omap4-common.h>
@@ -35,31 +30,18 @@
 
 #include <plat/board.h>
 #include <plat/common.h>
-#include <plat/display.h>
 #include <plat/usb.h>
 #include <plat/omap_device.h>
 #include <plat/omap_hwmod.h>
 
-#include <plat/mmc.h>
-
-
 #include "board-blaze.h"
 #include "mux.h"
 #include "timer-gp.h"
-#include "control.h"
 
 #define ETH_KS8851_IRQ			34
 #define ETH_KS8851_POWER_ON		48
 #define ETH_KS8851_QUART		138
 #define OMAP4SDP_MDM_PWR_EN_GPIO	157
-
-
-#define LED_SEC_DISP_GPIO 27
-#define DSI2_GPIO_59	59
-
-#define LED_PWM2ON		0x03
-#define LED_PWM2OFF		0x04
-#define LED_TOGGLE3		0x92
 
 static struct gpio_led sdp4430_gpio_leds[] = {
 	{
@@ -235,10 +217,6 @@ static struct omap_musb_board_data musb_board_data = {
 
 static int __init omap4_i2c_init(void)
 {
-	/*
-	 * Phoenix Audio IC needs I2C1 to
-	 * start with 400 KHz or less
-	 */
 	omap_register_i2c_bus(1, 400, NULL, 0);
 	omap_register_i2c_bus(2, 400, NULL, 0);
 	omap_register_i2c_bus(3, 400, NULL, 0);
@@ -256,11 +234,6 @@ static struct omap_board_mux board_mux[] __initdata = {
 #define board_mux	NULL
 #endif
 
-static void __init omap4_display_init(void)
-{
-
-}
-
 static void __init omap_4430sdp_init(void)
 {
 	int status;
@@ -276,7 +249,6 @@ static void __init omap_4430sdp_init(void)
 	blaze_touch_init();
 	blaze_sensor_init();
 	blaze_keypad_init();
-
 
 	platform_add_devices(sdp4430_devices, ARRAY_SIZE(sdp4430_devices));
 	omap_serial_init();
