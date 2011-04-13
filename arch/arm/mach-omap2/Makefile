@@ -227,7 +227,7 @@ obj-$(CONFIG_MACH_IGEP0030)		+= board-igep0030.o \
 					   hsmmc.o
 obj-$(CONFIG_MACH_OMAP3_TOUCHBOOK)	+= board-omap3touchbook.o \
 					   hsmmc.o
-obj-$(CONFIG_MACH_OMAP_4430SDP)		+= board-4430sdp.o \
+obj-$(CONFIG_MACH_OMAP_4430SDP)		+= board-blaze.o \
 					   board-blaze-sensors.o \
 					   board-blaze-touch.o \
 					   board-blaze-power.o \

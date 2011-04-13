@@ -1,5 +1,5 @@
 /*
- * Board support file for OMAP4430 SDP.
+ * Board support file for Blaze reference platform
  *
  * Copyright (C) 2009 Texas Instruments
  *
@@ -43,7 +43,7 @@
 #define ETH_KS8851_QUART		138
 #define OMAP4SDP_MDM_PWR_EN_GPIO	157
 
-static struct gpio_led sdp4430_gpio_leds[] = {
+static struct gpio_led blaze_gpio_leds[] = {
 	{
 		.name	= "omap4:green:debug0",
 		.gpio	= 61,
@@ -79,12 +79,12 @@ static struct gpio_led sdp4430_gpio_leds[] = {
 
 };
 
-static struct gpio_led_platform_data sdp4430_led_data = {
-	.leds	= sdp4430_gpio_leds,
-	.num_leds	= ARRAY_SIZE(sdp4430_gpio_leds),
+static struct gpio_led_platform_data blaze_led_data = {
+	.leds	= blaze_gpio_leds,
+	.num_leds	= ARRAY_SIZE(blaze_gpio_leds),
 };
 
-static struct led_pwm sdp4430_pwm_leds[] = {
+static struct led_pwm blaze_pwm_leds[] = {
 	{
 		.name		= "omap4:green:chrg",
 		.pwm_id		= 1,
@@ -93,27 +93,27 @@ static struct led_pwm sdp4430_pwm_leds[] = {
 	},
 };
 
-static struct led_pwm_platform_data sdp4430_pwm_data = {
-	.num_leds	= ARRAY_SIZE(sdp4430_pwm_leds),
-	.leds		= sdp4430_pwm_leds,
+static struct led_pwm_platform_data blaze_pwm_data = {
+	.num_leds	= ARRAY_SIZE(blaze_pwm_leds),
+	.leds		= blaze_pwm_leds,
 };
 
-static struct platform_device sdp4430_leds_pwm = {
+static struct platform_device blaze_leds_pwm = {
 	.name	= "leds_pwm",
 	.id	= -1,
 	.dev	= {
-		.platform_data = &sdp4430_pwm_data,
+		.platform_data = &blaze_pwm_data,
 	},
 };
 
-static struct platform_device sdp4430_leds_gpio = {
+static struct platform_device blaze_leds_gpio = {
 	.name	= "leds-gpio",
 	.id	= -1,
 	.dev	= {
-		.platform_data = &sdp4430_led_data,
+		.platform_data = &blaze_led_data,
 	},
 };
-static struct spi_board_info sdp4430_spi_board_info[] __initdata = {
+static struct spi_board_info blaze_spi_board_info[] __initdata = {
 	{
 		.modalias               = "ks8851",
 		.bus_num                = 1,
@@ -178,9 +178,9 @@ error1:
 	return status;
 }
 
-static struct platform_device *sdp4430_devices[] __initdata = {
-	&sdp4430_leds_gpio,
-	&sdp4430_leds_pwm,
+static struct platform_device *blaze_devices[] __initdata = {
+	&blaze_leds_gpio,
+	&blaze_leds_pwm,
 };
 
 static void __init omap_4430sdp_init_irq(void)
@@ -250,7 +250,7 @@ static void __init omap_4430sdp_init(void)
 	blaze_sensor_init();
 	blaze_keypad_init();
 
-	platform_add_devices(sdp4430_devices, ARRAY_SIZE(sdp4430_devices));
+	platform_add_devices(blaze_devices, ARRAY_SIZE(blaze_devices));
 	omap_serial_init();
 
 	/* Power on the ULPI PHY */
@@ -268,9 +268,9 @@ static void __init omap_4430sdp_init(void)
 	if (status) {
 		pr_err("Ethernet initialization failed: %d\n", status);
 	} else {
-		sdp4430_spi_board_info[0].irq = gpio_to_irq(ETH_KS8851_IRQ);
-		spi_register_board_info(sdp4430_spi_board_info,
-				ARRAY_SIZE(sdp4430_spi_board_info));
+		blaze_spi_board_info[0].irq = gpio_to_irq(ETH_KS8851_IRQ);
+		spi_register_board_info(blaze_spi_board_info,
+				ARRAY_SIZE(blaze_spi_board_info));
 	}
 }
 
