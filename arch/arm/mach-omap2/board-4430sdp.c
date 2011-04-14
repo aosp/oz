@@ -1018,7 +1018,6 @@ static struct regulator_init_data sdp4430_vmmc = {
 			.enabled	= false,
 			.disabled	= true,
 		},
-		.always_on	= true,
 	},
 	.num_consumer_supplies  = 1,
 	.consumer_supplies      = sdp4430_vmmc_supply,
