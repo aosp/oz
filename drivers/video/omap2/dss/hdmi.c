@@ -185,9 +185,9 @@ static const struct omap_video_timings all_timings_direct[] = {
 	{640, 480, 25200, 96, 16, 48, 2, 10, 33},
 	{1280, 720, 74250, 40, 440, 220, 5, 5, 20},
 	{1280, 720, 74250, 40, 110, 220, 5, 5, 20},
-	{720, 480, 27027, 62, 16, 60, 6, 9, 30},
+	{720, 480, 27000, 62, 16, 60, 6, 9, 30},
 	{2880, 576, 108000, 256, 48, 272, 5, 5, 39},
-	{1440, 240, 27027, 124, 38, 114, 3, 4, 15},
+	{1440, 240, 27000, 124, 38, 114, 3, 4, 15},
 	{1440, 288, 27000, 126, 24, 138, 3, 2, 19},
 	{1920, 540, 74250, 44, 528, 148, 5, 2, 15},
 	{1920, 540, 74250, 44, 88, 148, 5, 2, 15},
@@ -195,10 +195,10 @@ static const struct omap_video_timings all_timings_direct[] = {
 	{720, 576, 27000, 64, 12, 68, 5, 5, 39},
 	{1440, 576, 54000, 128, 24, 136, 5, 5, 39},
 	{1920, 1080, 148500, 44, 528, 148, 5, 4, 36},
-	{2880, 480, 108108, 248, 64, 240, 6, 9, 30},
+	{2880, 480, 108000, 248, 64, 240, 6, 9, 30},
 	{1920, 1080, 74250, 44, 638, 148, 5, 4, 36},
 	/* Vesa frome here */
-	{640, 480, 25175, 96, 8, 40, 2, 2, 25},
+	{640, 480, 25175, 96, 16, 48, 2, 10, 33},
 	{800, 600, 40000, 128, 40, 88, 4 , 1, 23},
 	{848, 480, 33750, 112, 16, 112, 8 , 6, 23},
 	{1280, 768, 79500, 128, 64, 192, 7 , 3, 20},
@@ -1167,7 +1167,7 @@ static int hdmi_power_on(struct omap_dss_device *dssdev)
 		hdmi.cfg.vsi_enabled = false;
 	}
 
-	hdmi.cfg.hdmi_dvi = hdmi.mode;
+	hdmi.cfg.hdmi_dvi = hdmi_has_ieee_id((u8 *)edid) && hdmi.mode;
 	hdmi.cfg.video_format = hdmi.code;
 	hdmi.cfg.supports_ai = hdmi_ai_supported(edid);
 
@@ -1245,7 +1245,7 @@ static int hdmi_min_enable(void)
 		hdmi.cfg.vsi_enabled = false;
 	}
 
-	hdmi.cfg.hdmi_dvi = hdmi.mode;
+	hdmi.cfg.hdmi_dvi = hdmi_has_ieee_id((u8 *)edid) && hdmi.mode;
 	hdmi.cfg.video_format = hdmi.code;
 	hdmi_lib_enable(&hdmi.cfg);
 	return 0;
@@ -1440,6 +1440,8 @@ static void hdmi_work_queue(struct work_struct *ws)
 		DSSINFO("Physical Connect\n");
 
 		/* turn on clocks on connect */
+		edid_set = false;
+		custom_set = true;
 		hdmi_reconfigure(dssdev);
 		mutex_unlock(&hdmi.lock_aux);
 		hdmi_notify_pwrchange(HDMI_EVENT_POWERON);
@@ -1450,6 +1452,7 @@ static void hdmi_work_queue(struct work_struct *ws)
 		if (dssdev->state != OMAP_DSS_DISPLAY_ACTIVE)
 			/* HDMI is disabled, no need to process */
 			goto done;
+		custom_set = false;
 	}
 
 done:
@@ -2257,6 +2260,7 @@ static int hdmi_read_edid(struct omap_video_timings *dp)
 		ret = HDMI_CORE_DDC_READEDID(HDMI_CORE_SYS, edid,
 							HDMI_EDID_MAX_LENGTH);
 	if (ret != 0) {
+		edid_set = false;
 		printk(KERN_WARNING "HDMI failed to read E-EDID\n");
 	} else {
 		if (!memcmp(edid, header, sizeof(header))) {

@@ -3091,7 +3091,7 @@ static int _dispc_setup_plane(enum omap_plane plane,
 	s32 pix_inc;
 	u16 frame_height = height;
 	unsigned int field_offset = 0;
-	unsigned int color_mask;
+	u32 color_mask;
 	u32 fifo_high, fifo_low;
 
 	if (paddr == 0)

@@ -726,23 +726,6 @@ static void __init prcm_setup_regs(void)
 	 */
 	prm_write_mod_reg(0x3, OMAP4430_PRM_DEVICE_MOD,
 				OMAP4_PRM_PWRREQCTRL_OFFSET);
-
-	/*
-	 * Set SRAM MPU/CORE/IVA LDO RETMODE
-	 */
-	prm_rmw_mod_reg_bits(OMAP4430_RETMODE_ENABLE_MASK,
-		0x1 << OMAP4430_RETMODE_ENABLE_SHIFT,
-		OMAP4430_PRM_DEVICE_MOD, OMAP4_PRM_LDO_SRAM_CORE_CTRL_OFFSET);
-	/* REVISIT: System hangs if SRAM_MPU LDO RET mode is enabled. */
-#if 0
-	prm_rmw_mod_reg_bits(OMAP4430_RETMODE_ENABLE_MASK,
-		0x1 << OMAP4430_RETMODE_ENABLE_SHIFT,
-		OMAP4430_PRM_DEVICE_MOD, OMAP4_PRM_LDO_SRAM_MPU_CTRL_OFFSET);
-#endif
-	prm_rmw_mod_reg_bits(OMAP4430_RETMODE_ENABLE_MASK,
-		0x1 << OMAP4430_RETMODE_ENABLE_SHIFT,
-		OMAP4430_PRM_DEVICE_MOD, OMAP4_PRM_LDO_SRAM_IVA_CTRL_OFFSET);
-
 }
 
 /**
@@ -760,14 +743,18 @@ static void __init prcm_clear_statdep_regs(void)
 
 	pr_info("%s: Clearing static depndencies\n", __func__);
 
+#if 0
 	/*
-	 * REVISIT: Seen issue with MPU/DSP -> L3_2 and L4CFG. Keeping
+	 * REVISIT: Seen SGX issues with MPU -> EMIF. Keeping
 	 * it enabled.
+	 * REVISIT: Seen issue with MPU/DSP -> L3_2 and L4CFG. 
+	 * Keeping them enabled
 	 */
-	/* MPU towards EMIF, L3_2 and L4CFG clockdomains */
+	/* MPU towards EMIF clockdomains */
 	reg = OMAP4430_MEMIF_STATDEP_MASK;
 	cm_rmw_mod_reg_bits(reg, 0, OMAP4430_CM1_MPU_MOD,
 		OMAP4_CM_MPU_STATICDEP_OFFSET);
+#endif
 
 	 /*
 	  * REVISIT: Issue seen with Ducati towards EMIF, L3_2, L3_1,
