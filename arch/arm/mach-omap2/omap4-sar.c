@@ -32,6 +32,7 @@
 void __iomem *sar_ram_base;
 static void __iomem *omap4_sar_modules[MAX_SAR_MODULES];
 static struct powerdomain *l3init_pwrdm;
+static struct clockdomain *l3init_clkdm;
 static struct clk *usb_host_ck, *usb_tll_ck;
 
 /*
@@ -88,24 +89,54 @@ static void save_sar_bank3(void)
 	omap2_clkdm_allow_idle(l4_secure_clkdm);
 }
 
+static int omap4_sar_not_accessible(void)
+{
+	u32 usbhost_state, usbtll_state;
+
+	/*
+	 * Make sure that USB host and TLL modules are not
+	 * enabled before attempting to save the context
+	 * registers, otherwise this will trigger an exception.
+	 */
+	usbhost_state = cm_read_mod_reg(OMAP4430_CM2_L3INIT_MOD,
+		OMAP4_CM_L3INIT_USB_HOST_CLKCTRL_OFFSET)
+		& (OMAP4430_STBYST_MASK | OMAP4430_IDLEST_MASK);
+	usbtll_state = cm_read_mod_reg(OMAP4430_CM2_L3INIT_MOD,
+		OMAP4_CM_L3INIT_USB_TLL_CLKCTRL_OFFSET)
+		& OMAP4430_IDLEST_MASK;
+
+	if ((usbhost_state == (OMAP4430_STBYST_MASK | OMAP4430_IDLEST_MASK)) &&
+		(usbtll_state == (OMAP4430_IDLEST_MASK)))
+		return 0;
+	else
+		return -EBUSY;
+}
+
  /*
   * omap4_sar_save -
   * Save the context to SAR_RAM1 and SAR_RAM2 as per
   * sar_ram1_layout and sar_ram2_layout for the device OFF mode
   */
-void omap4_sar_save(void)
+int omap4_sar_save(void)
 {
 	/*
 	 * Not supported on ES1.0 silicon
 	 */
 	if (omap_rev() == OMAP4430_REV_ES1_0) {
 		WARN_ONCE(1, "omap4: SAR backup not supported on ES1.0 ..\n");
-		return;
+		return 0;
+	}
+
+	if (omap4_sar_not_accessible()) {
+		pr_debug("%s: USB SAR CNTX registers are not accessible!\n",
+			__func__);
+		return -EBUSY;
 	}
 
 	/*
 	 * SAR bits and clocks needs to be enabled
 	 */
+	omap2_clkdm_wakeup(l3init_clkdm);
 	pwrdm_enable_hdwr_sar(l3init_pwrdm);
 	clk_enable(usb_host_ck);
 	clk_enable(usb_tll_ck);
@@ -116,15 +147,18 @@ void omap4_sar_save(void)
 	else
 		sar_save(NB_REGS_CONST_SETS_RAM1_HW, SAR_BANK1_OFFSET, sar_ram1_layout);
 
-	pwrdm_disable_hdwr_sar(l3init_pwrdm);
 	clk_disable(usb_host_ck);
 	clk_disable(usb_tll_ck);
+	pwrdm_disable_hdwr_sar(l3init_pwrdm);
+	omap2_clkdm_allow_idle(l3init_clkdm);
 
 	/* Save SAR BANK2 */
 	if (cpu_is_omap446x())
 		sar_save(OMAP446X_NB_REGS_CONST_SETS_RAM2_HW, SAR_BANK2_OFFSET, omap446x_sar_ram2_layout);
 	else
 		sar_save(NB_REGS_CONST_SETS_RAM2_HW, SAR_BANK2_OFFSET, sar_ram2_layout);
+
+	return 0;
 }
 
 /**
@@ -278,6 +312,10 @@ static int __init omap4_sar_ram_init(void)
 	l3init_pwrdm = pwrdm_lookup("l3init_pwrdm");
 	if (!l3init_pwrdm)
 		pr_err("Failed to get l3init_pwrdm\n");
+
+	l3init_clkdm = clkdm_lookup("l3_init_clkdm");
+	if (!l3init_clkdm)
+		pr_err("Failed to get l3_init_clkdm\n");
 
 	usb_host_ck = clk_get(NULL, "usb_host_hs_fck");
 	if (!usb_host_ck)

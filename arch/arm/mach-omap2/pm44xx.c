@@ -284,7 +284,8 @@ void omap4_enter_sleep(unsigned int cpu, unsigned int power_state)
 	if (omap4_device_off_read_next_state()) {
 		omap4_prcm_prepare_off();
 		/* Save the device context to SAR RAM */
-		omap4_sar_save();
+		if (omap4_sar_save())
+			goto restore_state;
 		omap4_sar_overwrite();
 	}
 
@@ -297,6 +298,7 @@ void omap4_enter_sleep(unsigned int cpu, unsigned int power_state)
 #endif
 	}
 
+restore_state:
 
 	/* FIXME  This call is not needed now for retention support and global
 	 * suspend resume support. All the required actions are taken based

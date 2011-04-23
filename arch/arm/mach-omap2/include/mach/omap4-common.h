@@ -125,7 +125,7 @@ extern int omap4_dpll_low_power_cascade_exit(void);
 extern void DO_WFI(void);
 
 #ifdef CONFIG_PM
-extern void omap4_sar_save(void);
+extern int omap4_sar_save(void);
 extern void omap4_sar_overwrite(void);
 extern void omap4_sar_usbhost_init(u32 fck_source);
 #else
