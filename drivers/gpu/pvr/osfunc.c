@@ -85,6 +85,7 @@
 #endif
 
 #define EVENT_OBJECT_TIMEOUT_MS		(100)
+#define PVR_FULL_CACHE_OP_THRESHOLD	(0x7D000)
 
 #if !defined(DEBUG_LINUX_MEMORY_ALLOCATIONS)
 PVRSRV_ERROR OSAllocMem_Impl(IMG_UINT32 ui32Flags, IMG_UINT32 ui32Size, IMG_PVOID *ppvCpuVAddr, IMG_HANDLE *phBlockAlloc)
@@ -2994,15 +2995,24 @@ IMG_BOOL OSFlushCPUCacheRangeKM(IMG_HANDLE hOSMemHandle,
 								IMG_UINT32 ui32Length)
 {
 	return CheckExecuteCacheOp(hOSMemHandle, pvRangeAddrStart, ui32Length,
-							   dmac_flush_range, outer_flush_range);
+			dmac_flush_range, outer_flush_range);
 }
 
 IMG_BOOL OSCleanCPUCacheRangeKM(IMG_HANDLE hOSMemHandle,
 								IMG_VOID *pvRangeAddrStart,
 								IMG_UINT32 ui32Length)
 {
-	return CheckExecuteCacheOp(hOSMemHandle, pvRangeAddrStart, ui32Length,
+	IMG_BOOL retval = IMG_TRUE;
+#if defined(CONFIG_OUTER_CACHE) && !defined(PVR_NO_FULL_CACHE_OPS)
+	if (ui32Length > PVR_FULL_CACHE_OP_THRESHOLD)
+		OSCleanCPUCacheKM();
+	else
+#endif
+	{
+		retval = CheckExecuteCacheOp(hOSMemHandle, pvRangeAddrStart, ui32Length,
 							   pvr_dmac_clean_range, outer_clean_range);
+	}
+	return retval;
 }
 
 IMG_BOOL OSInvalidateCPUCacheRangeKM(IMG_HANDLE hOSMemHandle,
