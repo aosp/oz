@@ -460,7 +460,7 @@ static struct qtouch_ts_platform_data atmel_mxt224_ts_platform_data = {
 		.supextto	= 0x0a,
 	},
 	.noise0_suppression_cfg = {
-		.ctrl		= 0x07,
+		.ctrl		= 0x05,
 		.reserved	= 0x0000,
 		.gcaf_upper_limit = 0x000a,
 		.gcaf_lower_limit = 0xfff6,
