@@ -1776,7 +1776,8 @@ static struct omap_uart_port_info omap_serial_platform_data[] = {
 static struct omap_board_mux board_mux[] __initdata = {
 #ifndef CONFIG_TIWLAN_SDIO
 	/* WLAN IRQ - GPIO 53 */
-	OMAP4_MUX(GPMC_NCS3, OMAP_MUX_MODE3 | OMAP_PIN_INPUT),
+	OMAP4_MUX(GPMC_NCS3, OMAP_MUX_MODE3 | OMAP_PIN_INPUT |
+		  OMAP_PIN_OFF_WAKEUPENABLE),
 	/* WLAN_EN - GPIO 54 */
 	OMAP4_MUX(GPMC_NWP, OMAP_MUX_MODE3 | OMAP_PIN_OUTPUT),
 	/* WLAN SDIO: MMC5 CMD */
