@@ -39,6 +39,7 @@
 #include <linux/irq.h>
 #include <linux/videodev2.h>
 #include <linux/slab.h>
+#include <linux/wait.h>
 
 #ifndef CONFIG_ARCH_OMAP4
 #include <media/videobuf-dma-sg.h>
@@ -1865,9 +1866,9 @@ static int omap_vout_buffer_prepare(struct videobuf_queue *q,
 		}
 	}
 #endif
-
 	omap_start_dma(tx->dma_ch);
-	interruptible_sleep_on_timeout(&tx->wait, VRFB_TX_TIMEOUT);
+	wait_event_interruptible_timeout(tx->wait, tx->tx_status != 0,
+		VRFB_TX_TIMEOUT);
 
 	if (tx->tx_status == 0) {
 		omap_stop_dma(tx->dma_ch);
