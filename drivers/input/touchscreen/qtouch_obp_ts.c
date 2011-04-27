@@ -707,6 +707,27 @@ static int do_touch_keyarray_msg(struct qtouch_ts_data *ts,
 	return 0;
 }
 
+static int do_noise_suppression_msg(struct qtouch_ts_data *ts,
+				 struct qtm_object *obj, void *_msg)
+{
+	struct qtm_touch_noise_suppression_msg *msg = _msg;
+
+	pr_info("%s:Noise supperssion Status 0x%X 0x%X\n",
+			__func__, msg->status, msg->gcafdepth);
+
+	if (msg->status & QTM_TOUCH_NOISE_SUPPRESSION_FREQ_CH)
+		pr_info("%s:Noise Suppression frequency change\n",
+			__func__);
+
+	if (msg->status & QTM_TOUCH_NOISE_SUPPRESSION_GCAFERR)
+		pr_info("%s:GCAF Error\n", __func__);
+
+	if (msg->status & QTM_TOUCH_NOISE_SUPPRESSION_FHERR)
+		pr_info("%s:Frequency hop error\n", __func__);
+
+	return 0;
+}
+
 static int qtouch_handle_msg(struct qtouch_ts_data *ts, struct qtm_object *obj,
 			     struct qtm_obj_message *msg)
 {
@@ -726,6 +747,9 @@ static int qtouch_handle_msg(struct qtouch_ts_data *ts, struct qtm_object *obj,
 		ret = do_touch_keyarray_msg(ts, obj, msg);
 		break;
 
+	case QTM_OBJ_PROCI_NOISESUPPRESSION_0:
+		ret = do_noise_suppression_msg(ts, obj, msg);
+		break;
 	default:
 		/* probably not fatal? */
 		ret = 0;

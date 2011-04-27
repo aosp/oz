@@ -132,7 +132,14 @@ struct qtm_touch_keyarray_msg {
 	uint32_t		keystate;
 } __attribute__ ((packed));
 
-
+/* status message sent by the noise suppression object - T22 */
+#define QTM_TOUCH_NOISE_SUPPRESSION_FREQ_CH	(1 << 0)
+#define QTM_TOUCH_NOISE_SUPPRESSION_GCAFERR	(1 << 2)
+#define QTM_TOUCH_NOISE_SUPPRESSION_FHERR	(1 << 3)
+struct qtm_touch_noise_suppression_msg {
+	uint8_t			status;
+	uint8_t			gcafdepth;
+} __attribute__ ((packed));
 
 /*******************************/
 /**** configuration objects ****/
