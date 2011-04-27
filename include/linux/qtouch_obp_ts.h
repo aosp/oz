@@ -247,6 +247,7 @@ struct qtm_proci_grip_suppression_cfg {
 	uint8_t			szthr2;
 	uint8_t			shpthr1;
 	uint8_t			shpthr2;
+	uint8_t			supextto;
 } __attribute__ ((packed));
 
 /* QTM_OBJ_NOISESUPPRESSION_0 */
