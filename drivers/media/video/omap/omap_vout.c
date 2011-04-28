@@ -100,7 +100,7 @@ enum dma_channel_state {
 #define MAX_PIXELS_PER_LINE     2048
 
 #define VRFB_TX_TIMEOUT         1000
-#define VRFB_NUM_BUFS		4
+#define VRFB_NUM_BUFS		OMAP_VOUT_MAX_BUFFERS
 
 /* Max buffer size tobe allocated during init */
 #define OMAP_VOUT_MAX_BUF_SIZE (VID_MAX_WIDTH*VID_MAX_HEIGHT*4)
@@ -110,8 +110,8 @@ enum dma_channel_state {
 
 static struct videobuf_queue_ops video_vbq_ops;
 /* Variables configurable through module params*/
-static u32 video1_numbuffers = 3;
-static u32 video2_numbuffers = 3;
+static u32 video1_numbuffers = OMAP_VOUT_MAX_BUFFERS;
+static u32 video2_numbuffers = OMAP_VOUT_MAX_BUFFERS;
 static u32 video1_bufsize = OMAP_VOUT_MAX_BUF_SIZE;
 static u32 video2_bufsize = OMAP_VOUT_MAX_BUF_SIZE;
 static u32 video3_numbuffers = 3;
@@ -496,38 +496,19 @@ static void calc_overlay_window_params(struct omap_vout_device *vout,
 	timing = &ovl->manager->device->panel.timings;
 	switch (vout->rotation) {
 	case dss_rotation_90_degree:
-	/* Invert the height and width for 90  and 270 degree rotation */
+	case dss_rotation_270_degree:
+		/* Invert the height and width for 90  and 270 degree rotation */
 		temp = info->out_width;
 		info->out_width = info->out_height;
 		info->out_height = temp;
-#ifndef CONFIG_ARCH_OMAP4
-		info->pos_y = (timing->y_res - win->w.width) - win->w.left;
-		info->pos_x = win->w.top;
-#endif
 		break;
 
 	case dss_rotation_180_degree:
-#ifndef CONFIG_ARCH_OMAP4
-		info->pos_x = (timing->x_res - win->w.width) - win->w.left;
-		info->pos_y = (timing->y_res - win->w.height) - win->w.top;
-#endif
-		break;
-
-	case dss_rotation_270_degree:
-		temp = info->out_width;
-		info->out_width = info->out_height;
-		info->out_height = temp;
-#ifndef CONFIG_ARCH_OMAP4
-		info->pos_y = win->w.left;
-		info->pos_x = (timing->x_res - win->w.height) - win->w.top;
-#endif
-		break;
-
 	default:
 		info->pos_x = win->w.left;
 		info->pos_y = win->w.top;
 		break;
-		}
+	}
 }
 
 /*
@@ -2183,13 +2164,8 @@ static int vidioc_s_fmt_vid_out(struct file *file, void *fh,
 	if (dev_buf_type & OMAP_FLAG_IDEV)
 		multiplier = 2;
 
-	if (!cpu_is_omap44xx() && rotate_90_or_270(vout)) {
-		vout->fbuf.fmt.height = timing->x_res;
-		vout->fbuf.fmt.width = timing->y_res * multiplier;
-	} else {
-		vout->fbuf.fmt.height = timing->y_res * multiplier;
-		vout->fbuf.fmt.width = timing->x_res;
-	}
+	vout->fbuf.fmt.height = timing->y_res * multiplier;
+	vout->fbuf.fmt.width = timing->x_res;
 
 	/* change to samller size is OK */
 

@@ -52,6 +52,11 @@
 #include "dss.h"
 #include <plat/edid.h>
 
+#ifdef CONFIG_OMAP_PM
+#include <plat/omap-pm.h>
+#endif
+
+
 static int hdmi_enable_video(struct omap_dss_device *dssdev);
 static void hdmi_disable_video(struct omap_dss_device *dssdev);
 static int hdmi_suspend_video(struct omap_dss_device *dssdev);
@@ -217,6 +222,7 @@ static const struct omap_video_timings all_timings_direct[] = {
 	{1680, 1050, 119000, 32, 48, 80, 6, 3, 21},
 	{1280, 800, 79500, 32, 48, 80, 6, 3, 14},
 	{1280, 720, 74250, 40, 110, 220, 5, 5, 20},
+	{1920, 1200, 154000, 32, 48, 80, 6, 3, 26},
 	/* supported 3d timings UNDEROVER full frame */
 	{1280, 1470, 148350, 40, 110, 220, 5, 5, 20},
 	{1280, 1470, 148500, 40, 110, 220, 5, 5, 20},
@@ -229,8 +235,8 @@ static int code_index[ARRAY_SIZE(all_timings_direct)] = {
 	29, 31, 35, 32,
 	/* <--15 CEA 22--> vesa*/
 	4, 9, 0xE, 0x17, 0x1C, 0x27, 0x20, 0x23, 0x10, 0x2A,
-	0X2F, 0x3A, 0X51, 0X52, 0x16, 0x29, 0x39, 0x1B, 0x55, 4,
-	4, 19
+	0X2F, 0x3A, 0X51, 0X52, 0x16, 0x29, 0x39, 0x1B, 0x55, 0X2C,
+	4, 4, 19,
 };
 
 /* Mapping the Timing values with the corresponding Vsync and Hsync polarity */
@@ -244,8 +250,8 @@ struct hdmi_hvsync_pol hvpol_mapping[ARRAY_SIZE(all_timings_direct)] = {
 	{1, 0}, {1, 1}, {1, 1}, {1, 1},
 	{0, 0}, {1, 0}, {1, 0}, {1, 0},
 	{1, 1}, {1, 1}, {0, 1}, {0, 1},
-	{0, 1}, {0, 1}, {1, 1}, {1, 1},
-	{1, 1}, {1, 1}
+	{0, 1}, {0, 1}, {1, 1}, {1, 0},
+	{1, 1}, {1, 1}, {1, 1}
 };
 
 /* Map CEA code to the corresponding timing values (10 entries/line) */
@@ -258,8 +264,8 @@ static int code_cea[39] = {
 
 /* Map CEA code to the corresponding 3D timing values */
 static int s3d_code_cea[39] = {
-	-1, -1, -1, -1, 35, -1, -1, -1, -1, -1,
-	-1, -1, -1, -1, -1, -1, -1, -1, -1, 36,
+	-1, -1, -1, -1, 36, -1, -1, -1, -1, -1,
+	-1, -1, -1, -1, -1, -1, -1, -1, -1, 37,
 	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
 	-1, -1, -1, -1, -1, -1, -1, -1, -1
 };
@@ -270,7 +276,7 @@ static int code_vesa[86] = {
 	-1, -1, -1, -1, 17, -1, 23, -1, -1, -1,
 	-1, -1, 29, 18, -1, -1, -1, 32, 19, -1,
 	-1, -1, 21, -1, -1, 22, -1, -1, -1, 20,
-	-1, 30, 24, -1, -1, -1, -1, 25, -1, -1,
+	-1, 30, 24, -1, 34, -1, -1, 25, -1, -1,
 	-1, -1, -1, -1, -1, -1, -1, 31, 26, -1,
 	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
 	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
@@ -440,19 +446,15 @@ static void hdmi_configure_lr_fr(void)
 {
 	int ret = 0;
 	if (hdmi.mode == 0 || (hdmi.mode == 1 && hdmi.code == 1)) {
-		ret = hdmi_configure_lrfr(HDMI_FULL_RANGE, 0);
+		ret = hdmi_configure_lrfr(HDMI_FULL_RANGE, 1);
 		if (!ret)
 			dispc_setup_color_fr_lr(1);
 		return;
-	}
-	if (hdmi.lr_fr) {
-		ret = hdmi_configure_lrfr(HDMI_FULL_RANGE, hdmi.force_set);
-		if (!ret && !hdmi.force_set)
-			dispc_setup_color_fr_lr(1);
 	} else {
-		ret = hdmi_configure_lrfr(HDMI_LIMITED_RANGE, hdmi.force_set);
-		if (!ret && !hdmi.force_set)
+		ret = hdmi_configure_lrfr(HDMI_LIMITED_RANGE, 1);
+		if (!ret)
 			dispc_setup_color_fr_lr(0);
+		return;
 	}
 }
 
@@ -1078,9 +1080,6 @@ static int hdmi_power_on(struct omap_dss_device *dssdev)
 
 	dssdev->panel.timings = all_timings_direct[code];
 
-	DSSINFO("%s:%d res=%dx%d ", hdmi.mode ? "CEA" : "VESA", hdmi.code,
-		dssdev->panel.timings.x_res, dssdev->panel.timings.y_res);
-
 	clkin = 3840; /* 38.4 mHz */
 	n = 15; /* this is a constant for our math */
 
@@ -1171,6 +1170,10 @@ static int hdmi_power_on(struct omap_dss_device *dssdev)
 	hdmi.cfg.video_format = hdmi.code;
 	hdmi.cfg.supports_ai = hdmi_ai_supported(edid);
 
+	DSSINFO("%s:%d res=%dx%d ", hdmi.cfg.hdmi_dvi ? "CEA" : "VESA",
+		hdmi.code, dssdev->panel.timings.x_res,
+		dssdev->panel.timings.y_res);
+
 	if ((hdmi.mode)) {
 		switch (hdmi.code) {
 		case 20:
@@ -1184,6 +1187,8 @@ static int hdmi_power_on(struct omap_dss_device *dssdev)
 			break;
 		}
 	}
+
+	hdmi_configure_lr_fr();
 
 	hdmi_lib_enable(&hdmi.cfg);
 
@@ -1356,8 +1361,14 @@ static void hdmi_work_queue(struct work_struct *ws)
 	if (r & (HDMI_CONNECT | HDMI_DISCONNECT))
 		action = (hdmi_is_connected()) ? HDMI_CONNECT : HDMI_DISCONNECT;
 
+	DSSDBG("\n\n");
+	DSSDBG("<%s> action = %d, interrupt_q = 0x%x, hdmi_power = %d,\n"
+	       "hdmi_connected = %d",
+	       __func__, action, r, hdmi_power, hdmi_connected);
+
 	if (action & HDMI_DISCONNECT) {
 		/* cancel auto-notify */
+		DSSINFO("Disable Display - HDMI_DISCONNECT\n");
 		mutex_unlock(&hdmi.lock_aux);
 		mutex_unlock(&hdmi.lock);
 		cancel_hot_plug_notify_work();
@@ -1397,7 +1408,6 @@ static void hdmi_work_queue(struct work_struct *ws)
 			/* HDMI is disabled, no need to process */
 			goto done;
 
-		DSSINFO("Display disabled\n");
 		HDMI_W1_StopVideoFrame(HDMI_WP);
 		if (dssdev->platform_disable)
 			dssdev->platform_disable(dssdev);
@@ -1409,6 +1419,29 @@ static void hdmi_work_queue(struct work_struct *ws)
 		HDMI_W1_SetWaitPllPwrState(HDMI_WP, HDMI_PLLPWRCMD_ALLOFF);
 		edid_set = custom_set = false;
 		set_video_power(dssdev, HDMI_POWER_MIN);
+
+		/* turn OFF clocks on disconnect*/
+		if (cpu_is_omap44xx()) {
+			if (hdmi_opt_clk_state) {
+#ifdef CONFIG_OMAP_PM
+				int ret = 0;
+#endif
+				DSSINFO("Disable HDMI_PHY_48MHz clock\n");
+				hdmi_opt_clock_disable();
+				hdmi_opt_clk_state = false;
+#ifdef CONFIG_OMAP_PM
+				DSSINFO("Release L3 constraint\n");
+				ret = omap_pm_set_min_bus_tput(
+					&dssdev->dev,
+					OCP_INITIATOR_AGENT,
+					-1);
+				if (ret)
+					DSSERR("Unable to release L3 "
+					       "constraint\n");
+#endif
+			}
+		}
+		DSSINFO("Disable Display Done - HDMI_DISCONNECT\n\n");
 	}
 
 	/* read connect timestamp */
@@ -1416,22 +1449,11 @@ static void hdmi_work_queue(struct work_struct *ws)
 		last_connect = ktime_get();
 
 	if (action & HDMI_CONNECT) {
-		if (!edid_set && !custom_set) {
-			/*
-			 * Schedule hot-plug-notify in 1 sec in case no HPD
-			 * event gets generated
-			 */
-			if (!delayed_work_pending(&hot_plug_notify_work))
-				queue_delayed_work(irq_wq,
-						&hot_plug_notify_work,
-						msecs_to_jiffies(1000));
-		} else {
-			if (custom_set)
-				user_hpd_state = false;
+		if (custom_set)
+			user_hpd_state = false;
 
-			if (!user_hpd_state && hdmi_power == HDMI_POWER_FULL)
-				set_hdmi_hot_plug_status(dssdev, true);
-		}
+		if (!user_hpd_state && (hdmi_power == HDMI_POWER_FULL))
+			set_hdmi_hot_plug_status(dssdev, true);
 	}
 
 	if ((action & HDMI_CONNECT) && (video_power == HDMI_POWER_MIN) &&
@@ -1439,7 +1461,27 @@ static void hdmi_work_queue(struct work_struct *ws)
 
 		DSSINFO("Physical Connect\n");
 
-		/* turn on clocks on connect */
+		/* turn ON clocks on connect*/
+		if (cpu_is_omap44xx()) {
+			if (!hdmi_opt_clk_state) {
+				int ret = 0;
+				DSSINFO("Enable HDMI_PHY_48MHz clock\n");
+				ret = hdmi_opt_clock_enable();
+				if (!ret)
+					hdmi_opt_clk_state = true;
+				else
+					goto done2;
+#ifdef CONFIG_OMAP_PM
+				DSSINFO("Set L3 constraint to 200MHz\n");
+				ret = omap_pm_set_min_bus_tput(
+					&dssdev->dev,
+					OCP_INITIATOR_AGENT,
+					200*1000*4);
+				if (ret)
+					DSSERR("Unable to set L3 at 200MHz\n");
+#endif
+			}
+		}
 		edid_set = false;
 		custom_set = true;
 		hdmi_reconfigure(dssdev);
@@ -1453,6 +1495,7 @@ static void hdmi_work_queue(struct work_struct *ws)
 			/* HDMI is disabled, no need to process */
 			goto done;
 		custom_set = false;
+		DSSINFO("Physical Connect Done:\n\n");
 	}
 
 done:
@@ -1467,38 +1510,72 @@ done:
 		mutex_lock(&hdmi.lock);
 		mutex_lock(&hdmi.lock_aux);
 
-		if (hdmi_power != HDMI_POWER_FULL || !hdmi_connected) {
-			DSSINFO("irqstatus=0x%08x ignoring FIRST_HPD when "
-				"hdmi_connected = %d, hdmi_power = %d\n",
-				r, hdmi_connected, hdmi_power);
-			goto done;
-		}
 		/*
 		 * HDMI should already be full on. We use this to read EDID
 		 * the first time we enable HDMI via HPD.
 		 */
-		DSSINFO("Connect 1 - Enabling display\n");
-		hdmi_reconfigure(dssdev);
+		DSSINFO("Enabling display - HDMI_FIRST_HPD\n");
 
+		if (!hdmi_connected) {
+			DSSINFO("irqstatus=0x%08x ignoring FIRST_HPD when "
+				"hdmi_connected = %d, hdmi_power = %d\n",
+				r, hdmi_connected, hdmi_power);
+			/* If HDMI is disconnected before FIRST HPD is processed
+			 * return without reconfiguring the HDMI and do not
+			 * send any hot plug event to the userspace in this case
+			 *  and reset irq's before returning.
+			 */
+			hdmi_set_irqs(0);
+			goto hpd_modify;
+		}
+
+		hdmi_reconfigure(dssdev);
 		set_hdmi_hot_plug_status(dssdev, true);
 		/* ignore return value for now */
+		DSSINFO("Enabling display Done- HDMI_FIRST_HPD\n\n");
 	}
 
+hpd_modify:
 	if (r & HDMI_HPD_MODIFY) {
+		struct omap_overlay *ovl;
+		int i;
+
+		/* check if any overlays are connected to TV and
+		 * return if connected after resetting the IRQ's
+		 */
+		for (i = 0; i < dssdev->manager->num_overlays; i++) {
+			ovl = dssdev->manager->overlays[i];
+			if (!(strcmp(ovl->manager->name, "tv")))
+				if (ovl->info.enabled) {
+					DSSINFO("Overlay %d is still "
+						"attached to tv\n", ovl->id);
+					DSSINFO("Cannot Rconfigure HDMI when "
+						"overlays are still attached "
+						"to tv\n"
+						"Dettach the overlays before "
+						"reconfiguring the HDMI\n\n");
+					/* clear the IRQ's*/
+					hdmi_set_irqs(0);
+					goto done2;
+				}
+		}
+
 		/*
 		 * HDMI HPD state low followed by a HPD state high
 		 * with more than 100ms duration is recieved so EDID should
 		 * reread and HDMI reconfigued.
 		 */
-		DSSINFO("HDMI HPD  display\n");
+		DSSINFO("Reconfigure HDMI PHY - HDMI_HPD_MODIFY\n\n");
 		/* force a new power-up to read EDID */
 		edid_set = false;
 		custom_set = false;
 		hdmi_reconfigure(dssdev);
 		set_hdmi_hot_plug_status(dssdev, true);
 		/* ignore return value for now */
+		DSSINFO("Reconfigure HDMI PHY Done- HDMI_HPD_MODIFY\n\n");
 	}
 
+done2:
 	mutex_unlock(&hdmi.lock_aux);
 	mutex_unlock(&hdmi.lock);
 	kfree(work);
@@ -1616,6 +1693,16 @@ static int hdmi_start_display(struct omap_dss_device *dssdev)
 			r = hdmi_opt_clock_enable();
 			if (!r)
 				hdmi_opt_clk_state = true;
+			else
+				goto err;
+#ifdef CONFIG_OMAP_PM
+			DSSINFO("Set L3 constraint to 200MHz\n");
+			r = omap_pm_set_min_bus_tput(&dssdev->dev,
+						       OCP_INITIATOR_AGENT,
+						       200*1000*4);
+			if (r)
+				DSSERR("Unable to set L3 at 200MHz\n");
+#endif
 		}
 	}
 err:
@@ -1670,6 +1757,7 @@ static int hdmi_set_power(struct omap_dss_device *dssdev,
 		} else if (power_need == HDMI_POWER_MIN) {
 			r = hdmi_min_enable();
 		} else {
+                        dssdev->manager->disable(dssdev->manager);
 			omap_dss_stop_device(dssdev);
 			hdmi_power_off(dssdev);
 		}
@@ -1686,20 +1774,21 @@ static int hdmi_set_power(struct omap_dss_device *dssdev,
 		power_need, (state_need == HDMI_ACTIVE ? 'A' :
 			     state_need == HDMI_SUSPENDED ? 'S' : 'D'), r);
 
-	if (cpu_is_omap44xx()) {
-		if (power_need == HDMI_POWER_FULL) {
-			if (!hdmi_opt_clk_state) {
-				r = hdmi_opt_clock_enable();
-				if (!r)
-					hdmi_opt_clk_state = true;
-			}
-		} else {
-			if (hdmi_opt_clk_state) {
-				hdmi_opt_clock_disable();
-				hdmi_opt_clk_state = false;
-			}
+	if (cpu_is_omap44xx())
+		if ((power_need < HDMI_POWER_FULL) && hdmi_opt_clk_state) {
+			DSSINFO("Disable HDMI_PHY_48MHz clock, "
+				"hdmi_power = %d\n\n", power_need);
+			hdmi_opt_clock_disable();
+			hdmi_opt_clk_state = false;
+#ifdef CONFIG_OMAP_PM
+			DSSINFO("Release L3 constraint\n");
+			r = omap_pm_set_min_bus_tput(&dssdev->dev,
+						     OCP_INITIATOR_AGENT,
+						     -1);
+			if (r)
+				DSSERR("Unable to release L3 constraint\n");
+#endif
 		}
-	}
 
 	return r;
 }
@@ -1901,9 +1990,27 @@ static void hdmi_set_timings(struct omap_dss_device *dssdev,
 static void hdmi_set_custom_edid_timing_code(struct omap_dss_device *dssdev,
 							int code, int mode)
 {
+	struct omap_overlay *ovl;
+	int i;
+
 	/* for now only set this while on or on HPD */
 	if (dssdev->state != OMAP_DSS_DISPLAY_ACTIVE)
 		return;
+
+	/* check if any overlays are connected to TV and return if connected*/
+	for (i = 0; i < dssdev->manager->num_overlays; i++) {
+		ovl = dssdev->manager->overlays[i];
+		if (!(strcmp(ovl->manager->name, "tv")))
+			if (ovl->info.enabled) {
+				DSSINFO("Overlay[%d] is still "
+					"attached to tv\n", ovl->id);
+				DSSINFO("Cannot change HDMI timing when "
+					"overlays are still attached to tv\n"
+					"Dettach the overlays before "
+					"timing change\n\n");
+				return;
+			}
+	}
 
 	/* ignore invalid codes */
 	if ((!mode && code < ARRAY_SIZE(code_vesa) && code_vesa[code] >= 0) ||
@@ -1943,7 +2050,7 @@ static struct hdmi_cm hdmi_get_code(struct omap_video_timings *timing)
 		if (temp_hsync == timing_hsync && temp_vsync == timing_vsync) {
 			code = i;
 			cm.code = code_index[i];
-			cm.mode = code < 14;
+			cm.mode = code < OMAP_HDMI_TIMINGS_VESA_START;
 			DSSDBG("Video code = %d mode = %s\n",
 			cm.code, cm.mode ? "CEA" : "VESA");
 			break;

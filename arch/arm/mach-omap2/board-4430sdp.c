@@ -873,6 +873,13 @@ static int wifi_set_power(struct device *dev, int slot, int power_on, int vdd)
 }
 #endif
 
+static struct twl4030_usb_data omap4_usbphy_data = {
+	.phy_init	= omap4430_phy_init,
+	.phy_exit	= omap4430_phy_exit,
+	.phy_power	= omap4430_phy_power,
+	.phy_set_clock	= omap4430_phy_set_clk,
+};
+
 static struct omap2_hsmmc_info mmc[] = {
 	{
 		.mmc		= 2,
@@ -1163,7 +1170,6 @@ static struct regulator_init_data sdp4430_vusb = {
 			.enabled	= false,
 			.disabled	= true,
 		},
-		.always_on	= true,
 	},
 };
 
@@ -1238,6 +1244,7 @@ static struct twl4030_platform_data sdp4430_twldata = {
 	.vaux1		= &sdp4430_vaux1,
 	.vaux2		= &sdp4430_vaux2,
 	.vaux3		= &sdp4430_vaux3,
+	.usb		= &omap4_usbphy_data,
 	.clk32kg        = &sdp4430_clk32kg,
 	.madc           = &sdp4430_gpadc_data,
 	.bci            = &sdp4430_bci_data,
@@ -1757,6 +1764,7 @@ static struct omap_board_mux board_mux[] __initdata = {
 	OMAP4_MUX(SDMMC5_DAT2, OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLUP),
 	OMAP4_MUX(SDMMC5_DAT3, OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLUP),
 #endif
+	OMAP4_MUX(USBB1_ULPITLL_CLK, OMAP_MUX_MODE3 | OMAP_PIN_INPUT),
 	{ .reg_offset = OMAP_MUX_TERMINATOR },
 };
 #else
