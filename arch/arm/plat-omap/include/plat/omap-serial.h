@@ -187,6 +187,7 @@ enum {
 	WAKELK_RX
 };
 
+void omap_uart_mdr1_errataset(int uart_no, u8 mdr1_val, u8 fcr_val);
 int omap_uart_active(int num, u32 timeout);
 void omap_uart_update_jiffies(int num);
 bool omap_is_console_port(struct uart_port *port);
