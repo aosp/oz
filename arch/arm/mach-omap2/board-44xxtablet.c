@@ -23,6 +23,7 @@
 #include <linux/i2c/bq2415x.h>
 #include <linux/i2c/bma180.h>
 #include <linux/i2c/mpu3050.h>
+#include <linux/i2c/tsl2771.h>
 #include <linux/regulator/machine.h>
 #include <linux/leds.h>
 #include <linux/leds_pwm.h>
@@ -77,6 +78,8 @@
 #define OMAP4_TOUCH_IRQ_1		35
 #define OMAP4_BMA180ACCEL_GPIO		178
 #define OMAP4_MPU3050GYRO_GPIO		2
+#define OMAP4_TSL2771_INT_GPIO		184
+#define OMAP4_TSL2771_PWR_GPIO		188
 #define OMAP4SDP_MDM_PWR_EN_GPIO	157
 
 #define LED_SEC_DISP_GPIO 27
@@ -334,6 +337,52 @@ static struct bma180accel_platform_data bma180accel_platform_data = {
 	.fuzz_y		= 25,
 	.fuzz_z		= 25,
 };
+
+/* TSL2771 ALS/Prox Begin */
+
+static void omap_tsl2771_power(int state)
+{
+	gpio_set_value(OMAP4_TSL2771_PWR_GPIO, state);
+}
+
+static void blaze_tablet_tsl2771_init(void)
+{
+	/* TO DO: Not sure what the use case of the proximity is on a tablet
+	 * but the interrupt may need to be wakeable if and only if proximity
+	 * is enabled but for now leave it alone */
+	gpio_request(OMAP4_TSL2771_PWR_GPIO, "tsl2771_power");
+	gpio_direction_output(OMAP4_TSL2771_PWR_GPIO, 0);
+
+	gpio_request(OMAP4_TSL2771_INT_GPIO, "tsl2771_interrupt");
+	gpio_direction_input(OMAP4_TSL2771_INT_GPIO);
+}
+
+/* TO DO: Need to create a interrupt threshold table here */
+
+struct tsl2771_platform_data tsl2771_data = {
+	.irq_flags	= (IRQF_TRIGGER_FALLING | IRQF_ONESHOT),
+	.flags		= (TSL2771_USE_ALS | TSL2771_USE_PROX),
+	.def_enable			= 0x0,
+	.als_adc_time 			= 0xdb,
+	.prox_adc_time			= 0xff,
+	.wait_time			= 0x00,
+	.als_low_thresh_low_byte	= 0x4,
+	.als_low_thresh_high_byte	= 0x0,
+	.als_high_thresh_low_byte	= 0x0,
+	.als_high_thresh_high_byte	= 0x10,
+	.prox_low_thresh_low_byte	= 0x0,
+	.prox_low_thresh_high_byte	= 0x0,
+	.prox_high_thresh_low_byte	= 0x0,
+	.prox_high_thresh_high_byte	= 0x0,
+	.interrupt_persistence		= 0xf5,
+	.config				= 0x00,
+	.prox_pulse_count		= 0x30,
+	.gain_control			= 0x20,
+	.glass_attn			= 0x01,
+	.device_factor			= 0x34,
+	.tsl2771_pwr_control		= omap_tsl2771_power,
+};
+/* TSL2771 ALS/Prox End */
 
 /* MPU3050 Gyro Begin */
 
@@ -1204,6 +1253,11 @@ static struct i2c_board_info __initdata tablet_i2c_4_boardinfo[] = {
 		.platform_data = &mpu3050_platform_data,
 		.irq = OMAP_GPIO_IRQ(OMAP4_MPU3050GYRO_GPIO),
 	},
+	{
+		I2C_BOARD_INFO(TSL2771_NAME, 0x39),
+		.platform_data = &tsl2771_data,
+		.irq = OMAP_GPIO_IRQ(OMAP4_TSL2771_INT_GPIO),
+	},
 };
 
 static struct usbhs_omap_platform_data usbhs_pdata __initconst = {
@@ -1659,6 +1713,7 @@ static void __init omap_44xxtablet_init(void)
 	omap_serial_init(omap_serial_platform_data);
 	omap4_twl6030_hsmmc_init(mmc);
 	omap_mpu3050_init();
+	blaze_tablet_tsl2771_init();
 
 #ifdef CONFIG_TIWLAN_SDIO
 	config_wlan_mux();
