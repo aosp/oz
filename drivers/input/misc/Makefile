@@ -48,3 +48,4 @@ obj-$(CONFIG_INPUT_HMC5843)		+= hmc5843.o
 obj-$(CONFIG_INPUT_BMP085)		+= bmp085.o
 obj-$(CONFIG_INPUT_BMA180)		+= bma180.o
 obj-$(CONFIG_INPUT_MPU3050)		+= mpu3050.o
+obj-$(CONFIG_INPUT_TSL2771)		+= tsl2771.o
