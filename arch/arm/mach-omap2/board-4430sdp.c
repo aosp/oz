@@ -1619,7 +1619,8 @@ static void omap_4430hsi_pad_conf(void)
 		OMAP_PIN_OFF_NONE);
 	/* gpio_92 */
 	omap_mux_init_signal("usbb1_ulpitll_dat4.gpio_92", \
-		OMAP_PULL_ENA);
+		OMAP_PIN_OUTPUT | \
+		OMAP_PIN_OFF_NONE);
 	/* gpio_95 */
 	omap_mux_init_signal("usbb1_ulpitll_dat7.gpio_95", \
 		OMAP_PIN_INPUT_PULLDOWN | \
