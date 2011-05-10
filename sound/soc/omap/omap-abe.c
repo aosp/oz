@@ -997,7 +997,7 @@ static void unmute_be_playback(struct snd_pcm_substream *substream)
 static inline void abe_dai_enable_data_transfer(int port)
 {
 	pr_debug("%s : port %d\n", __func__, port);
-	if (port != PDM_DL_PORT)
+	if ((port != PDM_DL_PORT) && (port != PDM_UL_PORT))
 		abe_enable_data_transfer(port);
 }
 
@@ -1173,7 +1173,7 @@ static void enable_fe_ports(struct snd_pcm_substream *substream, int stream)
 static inline void abe_dai_disable_data_transfer(int port)
 {
 	pr_debug("%s : port %d\n", __func__, port);
-	if (port != PDM_DL_PORT)
+	if ((port != PDM_DL_PORT) && (port != PDM_UL_PORT))
 		abe_disable_data_transfer(port);
 }
 
