@@ -41,4 +41,5 @@ obj-$(CONFIG_APANIC)		+= apanic.o
 obj-$(CONFIG_SENSORS_AK8975)	+= akm8975.o
 obj-$(CONFIG_TWL6040_VIB)	+= twl6040-vib.o
 obj-$(CONFIG_CDC_TCXO)		+= cdc_tcxo.o
+obj-$(CONFIG_OMAP4_DUTY_CYCLE)	+= omap4_duty_cycle.o
 obj-y				+= ti-st/
