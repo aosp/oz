@@ -63,6 +63,9 @@
 #define MPU3050_USER_CTRL		0x3D
 #define MPU3050_PWR_MGMT		0x3E
 
+#define SLEEP				0x00
+#define WAKEUP				0x01
+
 struct mpu3050_gyro_data {
 	struct mpu3050gyro_platform_data *pdata;
 	struct i2c_client *client;
@@ -73,6 +76,7 @@ struct mpu3050_gyro_data {
 
 	int enable;
 	int def_poll_rate;
+	int wakeup_flag;
 };
 
 static uint32_t gyro_debug;
@@ -163,6 +167,30 @@ static int mpu3050_read_transfer(struct mpu3050_gyro_data *data,
 	} while (counter >= 0);
 
 	return -1;
+}
+
+static void mpu3050_device_sleep_wakeup(struct mpu3050_gyro_data *data,
+							 int do_wakeup)
+{
+	int ret;
+	uint8_t reg_val;
+
+	mpu3050_read_transfer(data, MPU3050_PWR_MGMT, &reg_val, 1);
+
+	if (do_wakeup) {
+		reg_val &= ~MPU3050_PWR_MGMT_SLEEP;
+		ret = mpu3050_write(data, MPU3050_PWR_MGMT, reg_val);
+		if (ret < 0)
+			dev_err(&data->client->dev,
+				"can't wakeup device\n");
+		msleep(50);
+	} else {
+		reg_val |= MPU3050_PWR_MGMT_SLEEP;
+		ret = mpu3050_write(data, MPU3050_PWR_MGMT, reg_val);
+		if (ret < 0)
+			dev_err(&data->client->dev,
+				"sleep mode can't be set\n");
+	}
 }
 
 static int mpu3050_data_ready(struct mpu3050_gyro_data *data)
@@ -364,9 +392,18 @@ static ssize_t mpu3050_store_attr_enable(struct device *dev,
 	if (error)
 		return error;
 
+	mutex_lock(&data->mutex);
+	if (data->enable == !!val) {
+		mutex_unlock(&data->mutex);
+		return count;
+	}
+
 	data->enable = !!val;
+	mutex_unlock(&data->mutex);
 
 	if (data->enable) {
+		data->wakeup_flag = 0;
+		mpu3050_device_sleep_wakeup(data, WAKEUP);
 		if (data->client->irq)
 			enable_irq(data->client->irq);
 		else
@@ -376,6 +413,7 @@ static ssize_t mpu3050_store_attr_enable(struct device *dev,
 			disable_irq_nosync(data->client->irq);
 		else
 			cancel_delayed_work_sync(&data->d_work);
+		mpu3050_device_sleep_wakeup(data, SLEEP);
 	}
 	return count;
 }
@@ -634,23 +672,60 @@ static int __devexit mpu3050_driver_remove(struct i2c_client *client)
 }
 
 #ifdef CONFIG_PM
-/* TO DO: Need to figure out how to sleep the device and
-instrument power on/off calls that can be called from suspend/resume
-and from the enable sysfs entry */
 static int mpu3050_driver_suspend(struct i2c_client *client,
 		pm_message_t mesg)
 {
-	/* TODO */
+	struct mpu3050_gyro_data *data = i2c_get_clientdata(client);
+
+	mutex_lock(&data->mutex);
+	if (!data->enable) {
+		mutex_unlock(&data->mutex);
+		return 0;
+	}
+
+	data->enable = 0;
+	mutex_unlock(&data->mutex);
+	data->wakeup_flag = 1;
+
+	if (data->client->irq)
+		disable_irq_nosync(data->client->irq);
+	else
+		cancel_delayed_work_sync(&data->d_work);
+
+	mpu3050_device_sleep_wakeup(data, SLEEP);
+
 	return 0;
 }
 
 static int mpu3050_driver_resume(struct i2c_client *client)
 {
-	/* TODO */
+	struct mpu3050_gyro_data *data = i2c_get_clientdata(client);
+
+	mutex_lock(&data->mutex);
+	if (data->enable) {
+		mutex_unlock(&data->mutex);
+		return 0;
+	}
+
+	if (!data->wakeup_flag) {
+		mutex_unlock(&data->mutex);
+		return 0;
+	}
+
+	data->enable = 1;
+	mutex_unlock(&data->mutex);
+	data->wakeup_flag = 0;
+
+	mpu3050_device_sleep_wakeup(data, WAKEUP);
+
+	if (data->client->irq)
+		enable_irq(data->client->irq);
+	else
+		queue_delayed_work(data->wq, &data->d_work, 0);
+
 	return 0;
 }
 #endif
-
 
 static const struct i2c_device_id mpu3050_idtable[] = {
 	{ DEVICE_NAME, 0 },
