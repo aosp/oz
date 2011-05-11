@@ -1232,7 +1232,7 @@ static int tps6130x_enable(int on)
 	return ret;
 }
 
-struct tps6130x_platform_data tps6130x_pdata = {
+static struct tps6130x_platform_data tps6130x_pdata = {
 	.chip_enable	= tps6130x_enable,
 };
 
