@@ -1,22 +1,59 @@
 /*
- * ALSA SoC OMAP ABE driver
  *
- * Author:	Laurent Le Faucheur <l-le-faucheur@ti.com>
- *		Liam Girdwood <lrg@slimlogic.co.uk>
+ * This file is provided under a dual BSD/GPLv2 license.  When using or
+ * redistributing this file, you may do so under either license.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * version 2 as published by the Free Software Foundation.
+ * GPL LICENSE SUMMARY
+ *
+ * Copyright(c) 2010-2011 Texas Instruments Incorporated,
+ * All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
  *
  * This program is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
- * 02110-1301 USA
+ * Foundation, Inc., 51 Franklin St - Fifth Floor, Boston, MA 02110-1301 USA.
+ * The full GNU General Public License is included in this distribution
+ * in the file called LICENSE.GPL.
+ *
+ * BSD LICENSE
+ *
+ * Copyright(c) 2010-2011 Texas Instruments Incorporated,
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ *
+ * * Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * * Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in
+ *    the documentation and/or other materials provided with the
+ *   distribution.
+ * * Neither the name of Texas Instruments Incorporated nor the names of
+ *   its contributors may be used to endorse or promote products derived
+ *   from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
  */
 
 #include <linux/module.h>
@@ -450,14 +487,20 @@ int abe_set_opp_processing(u32 opp)
 						sizeof(ABE_SIODescriptor));
 	abe_block_copy(COPY_FROM_ABE_TO_HOST, ABE_DMEM, sio_desc_address,
 			(u32 *) &sio_desc, sizeof(sio_desc));
-	if (dOppMode32 == DOPPMODE32_OPP100) {
-		/* ASRC input buffer, size 40 */
-		sio_desc.smem_addr1 = smem_bt_vx_ul_opp100;
-		/* Init MM_EXT_IN ASRC and enable its adaptation */
-		abe_init_asrc_bt_ul(250);
+	if (abe_port[BT_VX_UL_PORT].format.f == 8000) {
+		if (dOppMode32 == DOPPMODE32_OPP100)
+			/* ASRC input buffer, size 40 */
+			sio_desc.smem_addr1 = smem_bt_vx_ul_opp100;
+		else
+			/* at OPP 50 without ASRC */
+			sio_desc.smem_addr1 = BT_UL_8k_labelID;
 	} else {
-		/* at OPP 50 or without ASRC */
-		sio_desc.smem_addr1 = smem_bt_vx_ul_opp50;
+		if (dOppMode32 == DOPPMODE32_OPP100)
+			/* ASRC input buffer, size 40 */
+			sio_desc.smem_addr1 = smem_bt_vx_ul_opp100;
+		else
+			/* at OPP 50 without ASRC */
+			sio_desc.smem_addr1 = BT_UL_16k_labelID;
 	}
 
 	abe_block_copy(COPY_FROM_HOST_TO_ABE, ABE_DMEM, sio_desc_address,
@@ -467,18 +510,46 @@ int abe_set_opp_processing(u32 opp)
 						sizeof(ABE_SIODescriptor));
 	abe_block_copy(COPY_FROM_ABE_TO_HOST, ABE_DMEM, sio_desc_address,
 		       (u32 *) &sio_desc, sizeof(sio_desc));
-	if (dOppMode32 == DOPPMODE32_OPP100) {
-		/* ASRC input buffer, size 40 */
-		sio_desc.smem_addr1 = smem_bt_vx_dl_opp100;
-		/* Init MM_EXT_IN ASRC and enable its adaptation */
-		abe_init_asrc_bt_dl(250);
+#define ABE_TASK_ID(ID) (D_tasksList_ADDR + sizeof(ABE_STask)*(ID))
+#define TASK_BT_DL_48_8_SLT 14
+#define TASK_BT_DL_48_8_IDX 4
+	if (abe_port[BT_VX_DL_PORT].format.f == 8000) {
+		if (dOppMode32 == DOPPMODE32_OPP100) {
+			abe->MultiFrame[TASK_BT_DL_48_8_SLT]
+				[TASK_BT_DL_48_8_IDX] =
+				ABE_TASK_ID(C_ABE_FW_TASK_BT_DL_48_8_OPP100);
+			sio_desc.smem_addr1 = BT_DL_8k_opp100_labelID;
+		} else {
+			abe->MultiFrame[TASK_BT_DL_48_8_SLT]
+				[TASK_BT_DL_48_8_IDX] =
+				ABE_TASK_ID(C_ABE_FW_TASK_BT_DL_48_8);
+			sio_desc.smem_addr1 = BT_DL_8k_labelID;
+		}
 	} else {
-		/* at OPP 50 or without ASRC */
-		sio_desc.smem_addr1 = smem_bt_vx_dl_opp50;
+		if (dOppMode32 == DOPPMODE32_OPP100) {
+			abe->MultiFrame[TASK_BT_DL_48_8_SLT]
+				[TASK_BT_DL_48_8_IDX] =
+				ABE_TASK_ID(C_ABE_FW_TASK_BT_DL_48_16_OPP100);
+			sio_desc.smem_addr1 = BT_DL_16k_opp100_labelID;
+		} else {
+			abe->MultiFrame[TASK_BT_DL_48_8_SLT]
+				[TASK_BT_DL_48_8_IDX] =
+				ABE_TASK_ID(C_ABE_FW_TASK_BT_DL_48_16);
+			sio_desc.smem_addr1 = BT_DL_16k_labelID;
+		}
 	}
-
+	abe_block_copy(COPY_FROM_HOST_TO_ABE, ABE_DMEM, D_multiFrame_ADDR,
+				(u32 *) abe->MultiFrame,
+				sizeof(abe->MultiFrame));
 	abe_block_copy(COPY_FROM_HOST_TO_ABE, ABE_DMEM, sio_desc_address,
 		       (u32 *) &sio_desc, sizeof(sio_desc));
+
+	if (dOppMode32 == DOPPMODE32_OPP100) {
+		/* Init BT_VX_UL ASRC and enable its adaptation */
+		abe_init_asrc_bt_ul(250);
+		/* Init BT_VX_DL ASRC and enable its adaptation */
+		abe_init_asrc_bt_dl(-250);
+	}
 
 	return 0;
 
@@ -829,12 +900,26 @@ int abe_enable_data_transfer(u32 id)
 		abe_init_io_tasks(DMIC_PORT, &format, protocol);
 	}
 	if (id == VX_UL_PORT) {
-		/* Init VX_UL ASRC and enable its adaptation */
-		abe_init_asrc_vx_ul(250);
+		if (abe_port[VX_DL_PORT].status !=
+			OMAP_ABE_PORT_ACTIVITY_RUNNING) {
+			/*
+			 * Init VX_UL ASRC & VX_DL ASRC
+			 * and enable its adaptation
+			 */
+			abe_init_asrc_vx_ul(-250);
+			abe_init_asrc_vx_dl(250);
+		}
 	}
 	if (id == VX_DL_PORT) {
-		/* Init VX_DL ASRC and enable its adaptation */
-		abe_init_asrc_vx_dl(250);
+		if (abe_port[VX_UL_PORT].status !=
+			OMAP_ABE_PORT_ACTIVITY_RUNNING) {
+			/*
+			 * Init VX_UL ASRC & VX_DL ASRC and
+			 * enable its adaptation
+			 */
+			abe_init_asrc_vx_ul(-250);
+			abe_init_asrc_vx_dl(250);
+		}
 	}
 	/* local host variable status= "port is running" */
 	abe_port[id].status = OMAP_ABE_PORT_ACTIVITY_RUNNING;
@@ -868,12 +953,14 @@ int abe_connect_cbpr_dmareq_port(u32 id, abe_data_format_t *f, u32 d,
 	abe_port[id].protocol.p.prot_dmareq.iter = abe_dma_port_iteration(f);
 	abe_port[id].protocol.p.prot_dmareq.dma_addr = ABE_DMASTATUS_RAW;
 	abe_port[id].protocol.p.prot_dmareq.dma_data = (1 << d);
-	abe_port[id].status = OMAP_ABE_PORT_INITIALIZED;
 	/* load the dma_t with physical information from AE memory mapping */
 	abe_init_dma_t(id, &((abe_port[id]).protocol));
+
 	/* load the micro-task parameters */
 	abe_init_io_tasks(id, &((abe_port[id]).format),
 			  &((abe_port[id]).protocol));
+	abe_port[id].status = OMAP_ABE_PORT_INITIALIZED;
+
 	/* load the ATC descriptors - disabled */
 	abe_init_atc(id);
 	/* return the dma pointer address */
@@ -1014,10 +1101,11 @@ int abe_connect_serial_port(u32 id, abe_data_format_t *f,
 	abe_read_hardware_configuration(UC_NULL, &OPP, &CONFIG);
 	(abe_port[id]).protocol.p.prot_serial.iter =
 		abe_dma_port_iter_factor(f);
-	abe_port[id].status = OMAP_ABE_PORT_INITIALIZED;
+
 	/* load the micro-task parameters */
 	abe_init_io_tasks(id, &((abe_port[id]).format),
 			  &((abe_port[id]).protocol));
+	abe_port[id].status = OMAP_ABE_PORT_INITIALIZED;
 	/* load the ATC descriptors - disabled */
 	abe_init_atc(id);
 
@@ -1723,6 +1811,50 @@ int abe_read_mixer(u32 id, u32 *f_g, u32 p)
 	return 0;
 }
 EXPORT_SYMBOL(abe_read_mixer);
+
+/**
+ * abe_mono_mixer
+ * @id: name of the mixer (MIXDL1 or MIXDL2)
+ * on_off: enable\disable flag
+ *
+ * This API Programs DL1Mixer or DL2Mixer to output mono data
+ * on both left and right data paths.
+ */
+int abe_mono_mixer(u32 id, u32 on_off)
+{
+#define ABE_TASK_ID(ID) (D_tasksList_ADDR + sizeof(ABE_STask)*(ID))
+#define TASK_DL2Mixer_SLT 1
+#define TASK_DL2Mixer_IDX 6
+#define TASK_DL1Mixer_SLT 2
+#define TASK_DL1Mixer_IDX 0
+
+	switch (id) {
+	case MIXDL1:
+		if (on_off)
+			abe->MultiFrame[TASK_DL1Mixer_SLT][TASK_DL1Mixer_IDX] =
+				ABE_TASK_ID(C_ABE_FW_TASK_DL1Mixer_dual_mono);
+		else
+			abe->MultiFrame[TASK_DL1Mixer_SLT][TASK_DL1Mixer_IDX] =
+				ABE_TASK_ID(C_ABE_FW_TASK_DL1Mixer);
+		break;
+	case MIXDL2:
+		if (on_off)
+			abe->MultiFrame[TASK_DL2Mixer_SLT][TASK_DL2Mixer_IDX] =
+				ABE_TASK_ID(C_ABE_FW_TASK_DL2Mixer_dual_mono);
+		else
+			abe->MultiFrame[TASK_DL2Mixer_SLT][TASK_DL2Mixer_IDX] =
+				ABE_TASK_ID(C_ABE_FW_TASK_DL2Mixer);
+		break;
+	default:
+		break;
+	}
+
+	abe_block_copy(COPY_FROM_HOST_TO_ABE, ABE_DMEM, D_multiFrame_ADDR,
+				(u32 *) abe->MultiFrame,
+				sizeof(abe->MultiFrame));
+	return 0;
+}
+EXPORT_SYMBOL(abe_mono_mixer);
 
 /**
  * abe_set_router_configuration

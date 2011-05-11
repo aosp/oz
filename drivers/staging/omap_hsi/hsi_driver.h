@@ -226,17 +226,19 @@ int hsi_driver_enable_read_interrupt(struct hsi_channel *hsi_channel,
 					u32 *data);
 int hsi_driver_enable_write_interrupt(struct hsi_channel *hsi_channel,
 					u32 *data);
+bool hsi_is_dma_read_int_pending(struct hsi_dev *hsi_ctrl);
 int hsi_driver_read_dma(struct hsi_channel *hsi_channel, u32 * data,
 			unsigned int count);
 int hsi_driver_write_dma(struct hsi_channel *hsi_channel, u32 * data,
 			 unsigned int count);
 
-void hsi_driver_cancel_write_interrupt(struct hsi_channel *ch);
+int hsi_driver_cancel_read_interrupt(struct hsi_channel *ch);
+int hsi_driver_cancel_write_interrupt(struct hsi_channel *ch);
 void hsi_driver_disable_read_interrupt(struct hsi_channel *ch);
-void hsi_driver_cancel_read_interrupt(struct hsi_channel *ch);
-void hsi_driver_cancel_write_dma(struct hsi_channel *ch);
-void hsi_driver_cancel_read_dma(struct hsi_channel *ch);
-void hsi_do_cawake_process(struct hsi_port *pport);
+void hsi_driver_disable_write_interrupt(struct hsi_channel *ch);
+int hsi_driver_cancel_write_dma(struct hsi_channel *ch);
+int hsi_driver_cancel_read_dma(struct hsi_channel *ch);
+int hsi_do_cawake_process(struct hsi_port *pport);
 
 int hsi_driver_device_is_hsi(struct platform_device *dev);
 
@@ -346,15 +348,20 @@ static inline void hsi_outw_and(u16 data, void __iomem *base, u32 offset)
 	hsi_outw((tmp & data), base, offset);
 }
 
-static inline u32 hsi_get_cawake(struct hsi_port *port)
+static inline int hsi_get_cawake(struct hsi_port *port)
 {
-	if (port->cawake_gpio >= 0)
-		return gpio_get_value(port->cawake_gpio);
-	else
+	struct platform_device *pdev =
+				to_platform_device(port->hsi_controller->dev);
+
+	if (hsi_driver_device_is_hsi(pdev))
 		return (HSI_HSR_MODE_WAKE_STATUS ==
 			(hsi_inl(port->hsi_controller->base,
 				HSI_HSR_MODE_REG(port->port_number)) &
 				HSI_HSR_MODE_WAKE_STATUS));
+	else if (port->cawake_gpio >= 0)
+		return gpio_get_value(port->cawake_gpio);
+	else
+		return -ENXIO;
 }
 
 static inline void hsi_clocks_disable(struct device *dev, const char *s)

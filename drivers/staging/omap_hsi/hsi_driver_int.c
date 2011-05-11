@@ -175,24 +175,35 @@ int hsi_driver_enable_read_interrupt(struct hsi_channel *ch, u32 * data)
 	return 0;
 }
 
-void hsi_driver_cancel_write_interrupt(struct hsi_channel *ch)
+/**
+ * hsi_driver_cancel_write_interrupt - Cancel pending write interrupt.
+ * @dev - hsi device channel where to cancel the pending interrupt.
+ *
+ * Return: -ECANCELED : write cancel success, data not transfered to TX FIFO
+ *	   0 : transfer is already over, data already transfered to TX FIFO
+ *
+ * Note: whatever returned value, write callback will not be called after
+ *       write cancel.
+ */
+int hsi_driver_cancel_write_interrupt(struct hsi_channel *ch)
 {
 	struct hsi_port *p = ch->hsi_port;
 	unsigned int port = p->port_number;
 	unsigned int channel = ch->channel_number;
 	void __iomem *base = p->hsi_controller->base;
-	u32 enable;
+	u32 status_reg;
 	long buff_offset;
 
-	enable = hsi_inl(base,
+	status_reg = hsi_inl(base,
 			 HSI_SYS_MPU_ENABLE_CH_REG(port, p->n_irq, channel));
 
-	if (!(enable & HSI_HST_DATAACCEPT(channel))) {
+	if (!(status_reg & HSI_HST_DATAACCEPT(channel))) {
 		dev_dbg(&ch->dev->device, "Write cancel on not "
 			"enabled channel %d ENABLE REG 0x%08X", channel,
-			enable);
-		return;
+			status_reg);
 	}
+	status_reg &= hsi_inl(base, HSI_SYS_MPU_STATUS_CH_REG(port, p->n_irq,
+								channel));
 
 	hsi_outl_and(~HSI_HST_DATAACCEPT(channel), base,
 		     HSI_SYS_MPU_ENABLE_CH_REG(port, p->n_irq, channel));
@@ -201,18 +212,45 @@ void hsi_driver_cancel_write_interrupt(struct hsi_channel *ch)
 	if (buff_offset >= 0)
 		hsi_outl_and(~HSI_BUFSTATE_CHANNEL(channel), base, buff_offset);
 	hsi_reset_ch_write(ch);
+
+	return status_reg & HSI_HST_DATAACCEPT(channel) ? 0 : -ECANCELED;
 }
 
-void hsi_driver_cancel_read_interrupt(struct hsi_channel *ch)
+/**
+ * hsi_driver_cancel_read_interrupt - Cancel pending read interrupt.
+ * @dev - hsi device channel where to cancel the pending interrupt.
+ *
+ * Return: -ECANCELED : read cancel success data not available at expected
+ *			address.
+ *	   0 : transfer is already over, data already available at expected
+ *	       address.
+ *
+ * Note: whatever returned value, read callback will not be called after cancel.
+ */
+int hsi_driver_cancel_read_interrupt(struct hsi_channel *ch)
 {
 	struct hsi_port *p = ch->hsi_port;
 	unsigned int port = p->port_number;
 	unsigned int channel = ch->channel_number;
 	void __iomem *base = p->hsi_controller->base;
+	u32 status_reg;
+
+	status_reg = hsi_inl(base,
+			HSI_SYS_MPU_ENABLE_CH_REG(port, p->n_irq, channel));
+
+	if (!(status_reg & HSI_HSR_DATAAVAILABLE(channel))) {
+		dev_dbg(&ch->dev->device, "Read cancel on not "
+			"enabled channel %d ENABLE REG 0x%08X", channel,
+			status_reg);
+	}
+	status_reg &= hsi_inl(base, HSI_SYS_MPU_STATUS_CH_REG(port, p->n_irq,
+								channel));
 
 	hsi_outl_and(~HSI_HSR_DATAAVAILABLE(channel), base,
 		     HSI_SYS_MPU_ENABLE_CH_REG(port, p->n_irq, channel));
 	hsi_reset_ch_read(ch);
+
+	return status_reg & HSI_HSR_DATAAVAILABLE(channel) ? 0 : -ECANCELED;
 }
 
 void hsi_driver_disable_write_interrupt(struct hsi_channel *ch)
@@ -269,7 +307,7 @@ static void hsi_do_channel_tx(struct hsi_channel *ch)
 	}
 
 	spin_unlock(&hsi_ctrl->lock);
-	dev_dbg(hsi_ctrl->dev, "Calling write callback.\n");
+	dev_dbg(hsi_ctrl->dev, "Calling ch %d write callback.\n", n_ch);
 	(*ch->write_done) (ch->dev, 1);
 	spin_lock(&hsi_ctrl->lock);
 }
@@ -345,14 +383,26 @@ done:
 
 	if (data_read) {
 		spin_unlock(&hsi_ctrl->lock);
-		dev_dbg(hsi_ctrl->dev, "Calling read callback.\n");
+		dev_dbg(hsi_ctrl->dev, "Calling ch %d read callback.\n", n_ch);
 		(*ch->read_done) (ch->dev, 1);
 		spin_lock(&hsi_ctrl->lock);
 	}
 }
 
-/* CAWAKE line management */
-void hsi_do_cawake_process(struct hsi_port *pport)
+/**
+ * hsi_do_cawake_process - CAWAKE line management
+ * @pport - HSI port to process
+ *
+ * This function handles the CAWAKE L/H transitions and call the event callback
+ * accordingly.
+ *
+ * Returns 0 if CAWAKE event process, -EAGAIN if CAWAKE event processing is
+ * delayed due to a pending DMA interrupt.
+ * If -EAGAIN is returned, pport->hsi_tasklet has to be re-scheduled once
+ * DMA tasklet has be executed. This should be done automatically by driver.
+ *
+*/
+int hsi_do_cawake_process(struct hsi_port *pport)
 {
 	struct hsi_dev *hsi_ctrl = pport->hsi_controller;
 	bool cawake_status = hsi_get_cawake(pport);
@@ -383,6 +433,14 @@ void hsi_do_cawake_process(struct hsi_port *pport)
 	} else {
 		dev_dbg(hsi_ctrl->dev, "CAWAKE falling edge detected\n");
 
+		/* Check for pending DMA interrupt */
+		if (hsi_is_dma_read_int_pending(hsi_ctrl)) {
+			dev_dbg(hsi_ctrl->dev, "Pending DMA Read interrupt "
+					       "before CAWAKE->L, exiting "
+					       "Interrupt tasklet.\n");
+			return -EAGAIN;
+		}
+
 		if (unlikely(!pport->cawake_status)) {
 			dev_warn(hsi_ctrl->dev,
 				"CAWAKE race is detected: %s.\n",
@@ -398,6 +456,7 @@ void hsi_do_cawake_process(struct hsi_port *pport)
 		hsi_port_event_handler(pport, HSI_EVENT_CAWAKE_DOWN, NULL);
 		spin_lock(&hsi_ctrl->lock);
 	}
+	return 0;
 }
 
 /**
@@ -480,14 +539,6 @@ static u32 hsi_driver_int_proc(struct hsi_port *pport,
 		channels_served |= HSI_ERROROCCURED;
 	}
 
-	/* CAWAKE falling or rising edge detected */
-	if ((status_reg & HSI_CAWAKEDETECTED) || pport->cawake_off_event) {
-		hsi_do_cawake_process(pport);
-
-		channels_served |= HSI_CAWAKEDETECTED;
-		pport->cawake_off_event = false;
-	}
-
 	for (channel = start; channel < stop; channel++) {
 		if (status_reg & HSI_HST_DATAACCEPT(channel)) {
 			hsi_do_channel_tx(&pport->hsi_channel[channel]);
@@ -506,6 +557,16 @@ static u32 hsi_driver_int_proc(struct hsi_port *pport,
 		}
 	}
 
+	/* CAWAKE falling or rising edge detected */
+	if ((status_reg & HSI_CAWAKEDETECTED) || pport->cawake_off_event) {
+		if (hsi_do_cawake_process(pport) == -EAGAIN)
+			goto proc_done;
+
+		channels_served |= HSI_CAWAKEDETECTED;
+		pport->cawake_off_event = false;
+	}
+
+proc_done:
 	/* Reset status bits */
 	hsi_outl(channels_served, base, status_offset);
 

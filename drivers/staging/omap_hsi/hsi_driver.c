@@ -36,7 +36,7 @@
 #include "hsi_driver.h"
 
 #define HSI_MODULENAME "omap_hsi"
-#define	HSI_DRIVER_VERSION	"0.4.0"
+#define	HSI_DRIVER_VERSION	"0.4.1"
 #define HSI_RESETDONE_MAX_RETRIES	5 /* Max 5*L4 Read cycles waiting for */
 					  /* reset to complete */
 #define HSI_RESETDONE_NORMAL_RETRIES	1 /* Reset should complete in 1 R/W */
@@ -114,7 +114,6 @@ void hsi_restore_ctx(struct hsi_dev *hsi_ctrl)
 		hsi_outl(p->hst.arb_mode, base, HSI_HST_ARBMODE_REG(port));
 
 		/* HSR */
-		hsi_outl(p->hsr.mode, base, HSI_HSR_MODE_REG(port));
 		if (!hsi_driver_device_is_hsi(pdev))
 			hsi_outl(p->hsr.frame_size, base,
 				HSI_HSR_FRAMESIZE_REG(port));
@@ -127,6 +126,14 @@ void hsi_restore_ctx(struct hsi_dev *hsi_ctrl)
 		/* SW strategy for HSI fifo management can be changed here */
 		hsi_fifo_mapping(hsi_ctrl, HSI_FIFO_MAPPING_DEFAULT);
 	}
+
+	/* As a last step move HSR from MODE_VAL.SLEEP to the relevant mode. */
+	/* This will enable the ACREADY flow control mechanism. */
+	for (port = 1; port <= pdata->num_ports; port++) {
+		p = &pdata->ctx->pctx[port - 1];
+		hsi_outl(p->hsr.mode, base, HSI_HSR_MODE_REG(port));
+	}
+
 }
 
 
@@ -916,6 +923,8 @@ int hsi_runtime_suspend(struct device *dev)
 {
 	struct platform_device *pd = to_platform_device(dev);
 	struct hsi_dev *hsi_ctrl = platform_get_drvdata(pd);
+	struct hsi_platform_data *pdata = hsi_ctrl->dev->platform_data;
+	int port;
 
 	dev_dbg(dev, "%s\n", __func__);
 
@@ -926,6 +935,12 @@ int hsi_runtime_suspend(struct device *dev)
 	hsi_save_ctx(hsi_ctrl);
 
 	hsi_ctrl->clock_enabled = false;
+
+	/* Put HSR into SLEEP mode to force ACREADY to low while HSI is idle */
+	for (port = 1; port <= pdata->num_ports; port++) {
+		hsi_outl_and(HSI_HSR_MODE_MODE_VAL_SLEEP, hsi_ctrl->base,
+			     HSI_HSR_MODE_REG(port));
+	}
 
 	/* HSI is now ready to be put in low power state */
 
