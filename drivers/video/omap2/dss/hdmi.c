@@ -41,6 +41,7 @@
 #include <linux/delay.h>
 #include <linux/string.h>
 #include <linux/platform_device.h>
+#include <linux/switch.h>
 #include <plat/display.h>
 #include <plat/cpu.h>
 #include <plat/hdmi_lib.h>
@@ -131,6 +132,9 @@ static bool in_dispc_digit_reset;
 
 #define HDMI_PLLCTRL		0x58006200
 #define HDMI_PHY		0x58006300
+
+/* switch class based hot-plug reporting */
+static struct switch_dev sdev;
 
 static u8 edid[HDMI_EDID_MAX_LENGTH] = {0};
 static u8 edid_set;
@@ -608,6 +612,7 @@ static int set_hdmi_hot_plug_status(struct omap_dss_device *dssdev, bool onoff)
 		DSSINFO("hot plug event %d", onoff);
 		ret = kobject_uevent(&dssdev->dev.kobj,
 					onoff ? KOBJ_ADD : KOBJ_REMOVE);
+		switch_set_state(&sdev, onoff);
 		if (ret)
 			DSSWARN("error sending hot plug event %d (%d)",
 								onoff, ret);
@@ -1093,12 +1098,17 @@ int hdmi_init(struct platform_device *pdev)
 	hdmi_irq = platform_get_irq(pdev, 0);
 	r = request_irq(hdmi_irq, hdmi_irq_handler, 0, "OMAP HDMI", (void *)0);
 
+	sdev.name = "hdmi";
+	if (switch_dev_register(&sdev))
+		printk(KERN_WARNING "HDMI switch failed to register");
+
 	return omap_dss_register_driver(&hdmi_driver);
 }
 
 void hdmi_exit(void)
 {
 	hdmi_lib_exit();
+	switch_dev_unregister(&sdev);
 	destroy_workqueue(irq_wq);
 	free_irq(OMAP44XX_IRQ_DSS_HDMI, NULL);
 	iounmap(hdmi.base_pll);
