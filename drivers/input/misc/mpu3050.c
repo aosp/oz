@@ -125,52 +125,88 @@ static int mpu3050_write(struct mpu3050_gyro_data *data,
 	return ret;
 }
 
-static int mpu3050_read(struct mpu3050_gyro_data *data, u8 reg)
+static int mpu3050_read_transfer(struct mpu3050_gyro_data *data,
+		unsigned short data_addr, char *data_buf, int count)
 {
-	int ret = i2c_smbus_read_byte_data(data->client, reg);
-	if (ret < 0)
-		dev_err(&data->client->dev,
-			"i2c_smbus_read_byte_data failed\n");
-	return ret;
+	int ret;
+	int counter = 5;
+	char *data_buffer = data_buf;
+
+	struct i2c_msg msgs[] = {
+	{
+		.addr = data->client->addr,
+		.flags = data->client->flags & I2C_M_TEN,
+		.len = 1,
+		.buf = data_buffer,
+		},
+		{
+		.addr = data->client->addr,
+		.flags = (data->client->flags & I2C_M_TEN) | I2C_M_RD,
+		.len = count,
+		.buf = data_buffer,
+		},
+	};
+
+	data_buffer[0] = data_addr;
+	msgs->buf = data_buffer;
+
+	do {
+		ret = i2c_transfer(data->client->adapter, msgs, 2);
+		if (ret != 2) {
+			dev_err(&data->client->dev,
+				"i2c_transfer failed\n");
+			counter--;
+			msleep(1);
+		} else {
+			return 0;
+		}
+	} while (counter >= 0);
+
+	return -1;
 }
 
-/* TO DO clean this function up.  Maybe change the I2C call
-to do I2c transfers with auto increment so you can read 6
-bytes in one transfer it will reduce time on the I2c bus
-and make this function a lot cleaner */
 static int mpu3050_data_ready(struct mpu3050_gyro_data *data)
 {
+	int ret;
 	uint8_t data_val_h, data_val_l;
 	short int x = 0;
 	short int y = 0;
 	short int z = 0;
 	short int temp = 0;
+	uint8_t data_buffer[8];
 
-	data_val_h = mpu3050_read(data, MPU3050_TEMP_OUT_H);
-	data_val_l = mpu3050_read(data, MPU3050_TEMP_OUT_L);
+	ret = mpu3050_read_transfer(data, MPU3050_TEMP_OUT_H, data_buffer, 8);
+	if (ret != 0) {
+		dev_err(&data->client->dev,
+			"mpu3050_read_data_ready failed\n");
+		return -1;
+	}
+	data_val_h = data_buffer[0];
+	data_val_l = data_buffer[1];
+
 	temp = ((data_val_h << 8) | data_val_l);
 	if (gyro_debug)
 		pr_info("%s: temp low 0x%X temp high 0x%X\n",
 		__func__, data_val_l, data_val_h);
 
 
-	data_val_h = mpu3050_read(data, MPU3050_GYRO_XOUT_H);
-	data_val_l = mpu3050_read(data, MPU3050_GYRO_XOUT_L);
+	data_val_h = data_buffer[2];
+	data_val_l = data_buffer[3];
 	if (gyro_debug)
 		pr_info("%s: X low 0x%X X high 0x%X\n",
 		__func__, data_val_l, data_val_h);
 	x = ((data_val_h << 8) | data_val_l);
 
-	data_val_h = mpu3050_read(data, MPU3050_GYRO_YOUT_H);
-	data_val_l = mpu3050_read(data, MPU3050_GYRO_YOUT_L);
+	data_val_h = data_buffer[4];
+	data_val_l = data_buffer[5];
 	if (gyro_debug)
 		pr_info("%s: Y low 0x%X Y high 0x%X\n",
 		__func__, data_val_l, data_val_h);
 
 	y = ((data_val_h << 8) | data_val_l);
 
-	data_val_h = mpu3050_read(data, MPU3050_GYRO_ZOUT_H);
-	data_val_l = mpu3050_read(data, MPU3050_GYRO_ZOUT_L);
+	data_val_h = data_buffer[6];
+	data_val_l = data_buffer[7];
 	if (gyro_debug)
 		pr_info("%s: Z low 0x%X Z high 0x%X\n",
 		__func__, data_val_l, data_val_h);
@@ -192,12 +228,21 @@ static int mpu3050_data_ready(struct mpu3050_gyro_data *data)
 static int mpu3050_device_autocalibrate(struct mpu3050_gyro_data *data)
 {
 #if 0
+	int ret;
 	uint8_t data_val_h, data_val_l;
 	short int data_val;
+	uint8_t data_buffer[6];
+
+	ret = mpu3050_read_transfer(data, MPU3050_GYRO_XOUT_H, data_buffer, 6);
+	if (ret != 0) {
+		dev_err(&data->client->dev,
+			"mpu3050_device_autocalibrate failed\n");
+		return -1;
+	}
 
 	/* read the values on a stable position (no movement) */
-	data_val_h = mpu3050_read(data, MPU3050_GYRO_XOUT_H);
-	data_val_l = mpu3050_read(data, MPU3050_GYRO_XOUT_L);
+	data_val_h = data_buffer[0];
+	data_val_l = data_buffer[1];
 	/* get the 2's complement of data_val and
 	leave the corresponding values on data_val_h and data_val_l */
 	data_val = (short int) ((data_val_h << 8) | data_val_l);
@@ -209,8 +254,8 @@ static int mpu3050_device_autocalibrate(struct mpu3050_gyro_data *data)
 	mpu3050_write(data, MPU3050_X_OFFS_USRL, data_val_l);
 
 	/* read the values on a stable position (no movement) */
-	data_val_h = mpu3050_read(data, MPU3050_GYRO_YOUT_H);
-	data_val_l = mpu3050_read(data, MPU3050_GYRO_YOUT_L);
+	data_val_h = data_buffer[2];
+	data_val_l = data_buffer[3];
 	/* get the 2's complement of data_val and leave the
 	corresponding values on data_val_h and data_val_l */
 	data_val = (short int) ((data_val_h << 8) | data_val_l);
@@ -222,8 +267,8 @@ static int mpu3050_device_autocalibrate(struct mpu3050_gyro_data *data)
 	mpu3050_write(data, MPU3050_Y_OFFS_USRL, data_val_l);
 
 	/* read the values on a stable position (no movement) */
-	data_val_h = mpu3050_read(data, MPU3050_GYRO_ZOUT_H);
-	data_val_l = mpu3050_read(data, MPU3050_GYRO_ZOUT_L);
+	data_val_h = data_buffer[4];
+	data_val_l = data_buffer[5];
 	/* get the 2's complement of data_val and leave the
 	corresponding values on data_val_h and data_val_l */
 	data_val = (short int) ((data_val_h << 8) | data_val_l);
@@ -242,7 +287,7 @@ static irqreturn_t mpu3050_thread_irq(int irq, void *dev_data)
 	uint8_t reg_val;
 	struct mpu3050_gyro_data *data = (struct mpu3050_gyro_data *) dev_data;
 
-	reg_val = mpu3050_read(data, MPU3050_INT_STATUS);
+	mpu3050_read_transfer(data, MPU3050_INT_STATUS, &reg_val, 1);
 
 	if (reg_val & MPU3050_INT_STATUS_MPU_RDY) {
 #ifdef MPU3050_DEBUG
@@ -264,7 +309,7 @@ static int mpu3050_device_work(void *work)
 		container_of((struct delayed_work *)work,
 			      struct mpu3050_gyro_data, d_work);
 
-	reg_val = mpu3050_read(data, MPU3050_INT_STATUS);
+	mpu3050_read_transfer(data, MPU3050_INT_STATUS, &reg_val, 1);
 	if (reg_val & MPU3050_INT_STATUS_RAW_DATA_RDY) {
 		mpu3050_data_ready(data);
 		queue_delayed_work(data->wq, &data->d_work,
@@ -284,10 +329,9 @@ static int mpu3050_device_hw_init(struct mpu3050_gyro_data *data)
 	mpu3050_write(data, MPU3050_PWR_MGMT,
 		(MPU3050_PWR_MGMT_RESET | MPU3050_PWR_MGMT_CLK_STOP_RESET));
 	mpu3050_write(data, MPU3050_PWR_MGMT, 0x00);
-
 	mpu3050_write(data, MPU3050_WHO_AM_I, data->client->addr);
 	mpu3050_write(data, MPU3050_IME_SLV_ADDR, data->pdata->slave_i2c_addr);
-	mpu3050_write(data, MPU3050_SMPLRT_DIV,	data->pdata->sample_rate_div);
+	mpu3050_write(data, MPU3050_SMPLRT_DIV, data->pdata->sample_rate_div);
 	mpu3050_write(data, MPU3050_DLPF_FS_SYNC, data->pdata->dlpf_fs_sync);
 	mpu3050_write(data, MPU3050_INT_CFG, data->pdata->interrupt_cfg);
 	mpu3050_write(data, MPU3050_ACCEL_BUS_LVL, 0x00);
@@ -297,7 +341,7 @@ static int mpu3050_device_hw_init(struct mpu3050_gyro_data *data)
 	/* auto calibrate (dont move the IC while this function is called) */
 	mpu3050_device_autocalibrate(data);
 
-	reg_val = mpu3050_read(data, MPU3050_INT_STATUS);
+	mpu3050_read_transfer(data, MPU3050_INT_STATUS, &reg_val, 1);
 
 	return ret;
 }
@@ -390,7 +434,7 @@ static ssize_t mpu3050_registers_show(struct device *dev,
 
 	reg_count = sizeof(mpu3050_regs) / sizeof(mpu3050_regs[0]);
 	for (i = 0, n = 0; i < reg_count; i++) {
-		value = mpu3050_read(data, mpu3050_regs[i].reg);
+		mpu3050_read_transfer(data, mpu3050_regs[i].reg, &value, 1);
 		n += scnprintf(buf + n, PAGE_SIZE - n,
 			       "%-20s = 0x%02X\n",
 			       mpu3050_regs[i].name,
