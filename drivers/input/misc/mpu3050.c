@@ -428,8 +428,6 @@ static ssize_t mpu3050_show_attr_delay(struct device *dev,
 	return sprintf(buf, "%d\n", data->def_poll_rate);
 }
 
-/* TO DO: Need to fix this to have the IC perform and report
-its measurements as close to the requested time as possible */
 static ssize_t mpu3050_store_attr_delay(struct device *dev,
 				     struct device_attribute *attr,
 				     const char *buf, size_t count)
@@ -443,17 +441,23 @@ static ssize_t mpu3050_store_attr_delay(struct device *dev,
 	if (error)
 		return error;
 
-
 	if (interval <= 0 || interval > 200)
 		return -EINVAL;
 
-	data->def_poll_rate = interval;
-#if 0
-	cancel_delayed_work_sync(&data->worklogic);
-	schedule_delayed_work(&data->worklogic, 0);
-#endif
-	return count;
+	if (data->client->irq)
+		disable_irq_nosync(data->client->irq);
+	else
+		cancel_delayed_work_sync(&data->d_work);
 
+	data->def_poll_rate = interval;
+	mpu3050_write(data, MPU3050_SMPLRT_DIV, interval - 1);
+
+	if (data->client->irq)
+		enable_irq(data->client->irq);
+	else
+		queue_delayed_work(data->wq, &data->d_work, 0);
+
+	return count;
 }
 
 #ifdef MPU3050_DEBUG
