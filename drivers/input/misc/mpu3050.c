@@ -223,11 +223,8 @@ static int mpu3050_data_ready(struct mpu3050_gyro_data *data)
 	return 0;
 }
 
-/* TODO: fix this function since it is failing some times,
-	probably because reads on H and L parts are not atomic. */
 static int mpu3050_device_autocalibrate(struct mpu3050_gyro_data *data)
 {
-#if 0
 	int ret;
 	uint8_t data_val_h, data_val_l;
 	short int data_val;
@@ -278,7 +275,6 @@ static int mpu3050_device_autocalibrate(struct mpu3050_gyro_data *data)
 	/* write the value to the corresponding offset register */
 	mpu3050_write(data, MPU3050_Z_OFFS_USRH, data_val_h);
 	mpu3050_write(data, MPU3050_Z_OFFS_USRL, data_val_l);
-#endif
 	return 0;
 }
 
@@ -320,7 +316,6 @@ static int mpu3050_device_work(void *work)
 	return 0;
 }
 
-/* TO DO: Need to fix auto calibrate for the Gyro */
 static int mpu3050_device_hw_init(struct mpu3050_gyro_data *data)
 {
 	int ret = 0;
@@ -336,7 +331,7 @@ static int mpu3050_device_hw_init(struct mpu3050_gyro_data *data)
 	mpu3050_write(data, MPU3050_INT_CFG, data->pdata->interrupt_cfg);
 	mpu3050_write(data, MPU3050_ACCEL_BUS_LVL, 0x00);
 
-	msleep(1);
+	msleep(50);
 
 	/* auto calibrate (dont move the IC while this function is called) */
 	mpu3050_device_autocalibrate(data);
