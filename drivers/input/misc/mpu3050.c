@@ -25,7 +25,6 @@
 #include <linux/interrupt.h>
 #include <linux/delay.h>
 #include <linux/input.h>
-#include <linux/workqueue.h>
 #include <linux/i2c.h>
 #include <linux/i2c/mpu3050.h>
 #include <linux/gpio.h>
@@ -34,7 +33,6 @@
 
 #define DEVICE_NAME "mpu3050_gyro"
 #define DRIVER_NAME "mpu3050_gyro"
-#define INPUT_WORKQUEUE_SIZE 1
 
 #define MPU3050_WHO_AM_I		0x00
 #define MPU3050_PRODUCT_ID		0x01
@@ -68,11 +66,8 @@ struct mpu3050_gyro_data {
 	struct mpu3050gyro_platform_data *pdata;
 	struct i2c_client *client;
 	struct input_dev *input_dev;
-	struct workqueue_struct *wq;
-	struct work_struct isr_work;
 	struct mutex mutex;
 
-	int buffer_queues;
 	int enable;
 	int def_poll_rate;
 };
@@ -251,33 +246,10 @@ static irqreturn_t mpu3050_thread_irq(int irq, void *dev_data)
 		printk(KERN_ALERT "%s: interrupt: MPU ready.", __func__);
 #endif
 	} else if (reg_val & MPU3050_INT_STATUS_RAW_DATA_RDY) {
-		if (data->wq != NULL) {
-			int r;
-			if (data->buffer_queues < INPUT_WORKQUEUE_SIZE) {
-				data->buffer_queues++;
-				r = queue_work(data->wq, &data->isr_work);
-				if (!r) {
-					dev_err(&data->client->dev,
-						"Unable to create workqueue\n");
-					return IRQ_NONE;
-				}
-			}
-		}
+		mpu3050_data_ready(data);
 	} else {
 		return IRQ_NONE;
 	}
-
-	return IRQ_HANDLED;
-}
-
-static int mpu3050_device_isr_work(void *work)
-{
-	struct mpu3050_gyro_data *data = container_of((struct work_struct *)work,
-				struct mpu3050_gyro_data, isr_work);
-
-	mpu3050_data_ready(data);
-
-	data->buffer_queues--;
 
 	return IRQ_HANDLED;
 }
@@ -334,17 +306,13 @@ static ssize_t mpu3050_store_attr_enable(struct device *dev,
 	if (error)
 		return error;
 
-	if (val == 0)
-		data->enable = val;
-	else
-		data->enable = 0x01;
+	data->enable = !!val;
 
-	if (data->enable) {
-		queue_work(data->wq, &data->isr_work);
+	if (data->enable)
 		enable_irq(data->client->irq);
-	} else {
+	else
 		disable_irq_nosync(data->client->irq);
-	}
+
 	return count;
 }
 
@@ -500,14 +468,6 @@ static int __devinit mpu3050_driver_probe(struct i2c_client *client,
 	if (!data)
 		return -ENOMEM;
 
-	INIT_WORK(&data->isr_work, (void *)mpu3050_device_isr_work);
-
-	data->wq = create_singlethread_workqueue("mpu3050");
-	if (!data->wq) {
-		ret = -ENOMEM;
-		goto error;
-	}
-
 	data->pdata = pdata;
 	data->client = client;
 	data->enable = 0;
@@ -518,7 +478,7 @@ static int __devinit mpu3050_driver_probe(struct i2c_client *client,
 		ret = -ENOMEM;
 		dev_err(&data->client->dev,
 			"Failed to allocate input device\n");
-		goto error;
+		goto input_device_error;
 	}
 
 	data->input_dev->name = "mpu3050";
@@ -536,7 +496,8 @@ static int __devinit mpu3050_driver_probe(struct i2c_client *client,
 	if (ret) {
 		dev_err(&data->client->dev,
 			"Unable to register input device\n");
-		goto error;
+		input_free_device(data->input_dev);
+		goto register_device_error;
 	}
 
 	mutex_init(&data->mutex);
@@ -548,25 +509,26 @@ static int __devinit mpu3050_driver_probe(struct i2c_client *client,
 		if (ret < 0) {
 			dev_err(&data->client->dev,
 				"request_threaded_irq failed\n");
-			goto error;
+			goto irq_request_error;
 		}
 		disable_irq_nosync(data->client->irq);
 	}
 
-	data->buffer_queues = 0;
-
 	mpu3050_device_hw_init(data);
-	if (ret)
-		goto error;
 
 	ret = sysfs_create_group(&client->dev.kobj, &mpu3050_attr_group);
 	if (ret)
-		goto error;
+		goto group_create_error;
 
 	return 0;
 
-error:
+group_create_error:
+	free_irq(data->client->irq, data);
+irq_request_error:
 	mutex_destroy(&data->mutex);
+	input_unregister_device(data->input_dev);
+register_device_error:
+input_device_error:
 	kfree(data);
 	return ret;
 }
@@ -575,7 +537,13 @@ static int __devexit mpu3050_driver_remove(struct i2c_client *client)
 {
 	struct mpu3050_gyro_data *data = i2c_get_clientdata(client);
 
+	if (data->enable)
+		disable_irq_nosync(data->client->irq);
+
 	sysfs_remove_group(&client->dev.kobj, &mpu3050_attr_group);
+	free_irq(data->client->irq, data);
+	input_unregister_device(data->input_dev);
+	mutex_destroy(&data->mutex);
 	i2c_set_clientdata(client, NULL);
 	kfree(data);
 
