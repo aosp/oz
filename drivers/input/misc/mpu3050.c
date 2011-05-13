@@ -25,6 +25,7 @@
 #include <linux/interrupt.h>
 #include <linux/delay.h>
 #include <linux/input.h>
+#include <linux/workqueue.h>
 #include <linux/i2c.h>
 #include <linux/i2c/mpu3050.h>
 #include <linux/gpio.h>
@@ -66,6 +67,8 @@ struct mpu3050_gyro_data {
 	struct mpu3050gyro_platform_data *pdata;
 	struct i2c_client *client;
 	struct input_dev *input_dev;
+	struct workqueue_struct *wq;
+	struct delayed_work d_work;
 	struct mutex mutex;
 
 	int enable;
@@ -254,6 +257,24 @@ static irqreturn_t mpu3050_thread_irq(int irq, void *dev_data)
 	return IRQ_HANDLED;
 }
 
+static int mpu3050_device_work(void *work)
+{
+	uint8_t reg_val;
+	struct mpu3050_gyro_data *data =
+		container_of((struct delayed_work *)work,
+			      struct mpu3050_gyro_data, d_work);
+
+	reg_val = mpu3050_read(data, MPU3050_INT_STATUS);
+	if (reg_val & MPU3050_INT_STATUS_RAW_DATA_RDY) {
+		mpu3050_data_ready(data);
+		queue_delayed_work(data->wq, &data->d_work,
+			msecs_to_jiffies(data->def_poll_rate));
+	} else
+		queue_delayed_work(data->wq, &data->d_work, 1);
+
+	return 0;
+}
+
 /* TO DO: Need to fix auto calibrate for the Gyro */
 static int mpu3050_device_hw_init(struct mpu3050_gyro_data *data)
 {
@@ -291,8 +312,6 @@ static ssize_t mpu3050_show_attr_enable(struct device *dev,
 	return sprintf(buf, "%d\n", data->enable);
 }
 
-/* TO DO: This function will change based on the if you are doing
-an interrupt or doing a work queue */
 static ssize_t mpu3050_store_attr_enable(struct device *dev,
 				     struct device_attribute *attr,
 				     const char *buf, size_t count)
@@ -308,11 +327,17 @@ static ssize_t mpu3050_store_attr_enable(struct device *dev,
 
 	data->enable = !!val;
 
-	if (data->enable)
-		enable_irq(data->client->irq);
-	else
-		disable_irq_nosync(data->client->irq);
-
+	if (data->enable) {
+		if (data->client->irq)
+			enable_irq(data->client->irq);
+		else
+			queue_delayed_work(data->wq, &data->d_work, 0);
+	} else {
+		if (data->client->irq)
+			disable_irq_nosync(data->client->irq);
+		else
+			cancel_delayed_work_sync(&data->d_work);
+	}
 	return count;
 }
 
@@ -443,8 +468,6 @@ static const struct attribute_group mpu3050_attr_group = {
 	.attrs = mpu3050_attrs,
 };
 
-/* TO DO: Implement a polling mechanism when the IRQ method is not desired.
-Also find out if the gyro will reliably support a polling mechanism */
 static int __devinit mpu3050_driver_probe(struct i2c_client *client,
 		const struct i2c_device_id *id)
 {
@@ -512,6 +535,15 @@ static int __devinit mpu3050_driver_probe(struct i2c_client *client,
 			goto irq_request_error;
 		}
 		disable_irq_nosync(data->client->irq);
+	} else {
+		INIT_DELAYED_WORK(&data->d_work,
+			(void *)mpu3050_device_work);
+
+		data->wq = create_singlethread_workqueue("mpu3050");
+		if (!data->wq) {
+			ret = -ENOMEM;
+			goto workqueue_error;
+		}
 	}
 
 	mpu3050_device_hw_init(data);
@@ -523,7 +555,11 @@ static int __devinit mpu3050_driver_probe(struct i2c_client *client,
 	return 0;
 
 group_create_error:
-	free_irq(data->client->irq, data);
+	if (data->client->irq)
+		free_irq(data->client->irq, data);
+	else
+		destroy_workqueue(data->wq);
+workqueue_error:
 irq_request_error:
 	mutex_destroy(&data->mutex);
 	input_unregister_device(data->input_dev);
@@ -537,11 +573,19 @@ static int __devexit mpu3050_driver_remove(struct i2c_client *client)
 {
 	struct mpu3050_gyro_data *data = i2c_get_clientdata(client);
 
-	if (data->enable)
-		disable_irq_nosync(data->client->irq);
+	if (data->enable) {
+		if (data->client->irq)
+			disable_irq_nosync(data->client->irq);
+		else
+			cancel_delayed_work_sync(&data->d_work);
+	}
+
+	if (data->client->irq)
+		free_irq(data->client->irq, data);
+	else
+		destroy_workqueue(data->wq);
 
 	sysfs_remove_group(&client->dev.kobj, &mpu3050_attr_group);
-	free_irq(data->client->irq, data);
 	input_unregister_device(data->input_dev);
 	mutex_destroy(&data->mutex);
 	i2c_set_clientdata(client, NULL);
