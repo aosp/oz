@@ -383,7 +383,7 @@ static irqreturn_t prcm_interrupt_handler (int irq, void *dev_id)
 
 		/* Modem HSI wakeup */
 		if (omap_hsi_is_io_wakeup_from_hsi())
-			omap_hsi_wakeup();
+			omap_hsi_wakeup(0);
 
 		/* usbhs remote wakeup */
 		usbhs_wakeup();
@@ -480,7 +480,6 @@ static int omap4_pm_suspend(void)
 	if (cpu1_state != PWRDM_POWER_OFF)
 		goto restore;
 	omap_uart_prepare_suspend();
-	omap_hsi_prepare_suspend();
 
 	/* Enable Device OFF */
 	if (enable_off_mode && volt_off_mode)

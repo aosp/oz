@@ -36,6 +36,8 @@
 #include <linux/seq_file.h>
 #include <linux/pm_runtime.h>
 
+#include <plat/omap-pm.h>
+
 #include <mach/omap_hsi.h>
 #include <linux/hsi_driver_if.h>
 
@@ -214,8 +216,11 @@ struct hsi_platform_data {
 	int (*device_enable) (struct platform_device *pdev);
 	int (*device_shutdown) (struct platform_device *pdev);
 	int (*device_idle) (struct platform_device *pdev);
-	int (*wakeup_enable) (struct hsi_dev *hsi_ctrl, int hsi_port);
-	int (*wakeup_disable) (struct hsi_dev *hsi_ctrl, int hsi_port);
+	int (*wakeup_enable) (int hsi_port);
+	int (*wakeup_disable) (int hsi_port);
+	int (*wakeup_is_from_hsi) (void);
+	int (*board_suspend)(int hsi_port, bool dev_may_wakeup);
+	int (*board_resume)(int hsi_port);
 	u8 num_ports;
 	struct ctrl_ctx *ctx;
 	u8 hsi_gdd_chan_count;

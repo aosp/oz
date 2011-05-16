@@ -836,7 +836,7 @@ static int __init hsi_platform_device_probe(struct platform_device *pd)
 	}
 
 	/* Allow HSI to wake up the platform */
-	device_init_wakeup(hsi_ctrl->dev, 1);
+	device_init_wakeup(hsi_ctrl->dev, true);
 
 	/* Set the HSI FCLK to default. */
 	err = omap_device_set_rate(hsi_ctrl->dev, hsi_ctrl->dev,
@@ -888,18 +888,47 @@ static int __exit hsi_platform_device_remove(struct platform_device *pd)
 #ifdef CONFIG_SUSPEND
 static int hsi_suspend_noirq(struct device *dev)
 {
+	struct hsi_platform_data *pdata = dev->platform_data;
+	struct platform_device *pd = to_platform_device(dev);
+	struct hsi_dev *hsi_ctrl = platform_get_drvdata(pd);
+
 	dev_dbg(dev, "%s\n", __func__);
 
-	/* HSI_TODO : missing the SUSPEND feature */
+	/* If HSI is enabled, CAWAKE IO wakeup has been disabled and */
+	/* we don't want to re-enable it here. HSI interrupt shall be */
+	/* generated normally because HSI HW is ON. */
+	if (hsi_ctrl->clock_enabled) {
+		dev_info(dev, "Platform Suspend while HSI active\n");
+		return 0;
+	}
+
+	/* Perform HSI board specific action before platform suspend */
+	if (pdata->board_suspend)
+		pdata->board_suspend(0, device_may_wakeup(dev));
 
 	return 0;
 }
 
 static int hsi_resume_noirq(struct device *dev)
 {
+	struct hsi_platform_data *pdata = dev->platform_data;
+
 	dev_dbg(dev, "%s\n", __func__);
 
-	/* HSI_TODO : missing the SUSPEND feature */
+	/* This function shall not schedule the tasklet, because it is */
+	/* redundant with what is already done in the PRCM interrupt handler. */
+	/* HSI IO checking in PRCM int handler is done when waking up from : */
+	/* - Device OFF mode (wake up from suspend) */
+	/* - L3INIT in RET (Idle mode) */
+	/* hsi_resume_noirq is called only when system wakes up from suspend. */
+	/* So HSI IO checking in PRCM int handler and hsi_resume_noirq are */
+	/* redundant. We need to choose which one will schedule the tasklet */
+	/* Since HSI IO checking in PRCM int handler covers more cases, it is */
+	/* the winner. */
+
+	/* Perform (optional) HSI board specific action after platform wakeup */
+	if (pdata->board_resume)
+		pdata->board_resume(0);
 
 	return 0;
 }
@@ -929,7 +958,7 @@ int hsi_runtime_resume(struct device *dev)
 	hsi_restore_ctx(hsi_ctrl);
 
 	/* When HSI is ON, no need for IO wakeup mechanism */
-	pdata->wakeup_disable(hsi_ctrl, 0);
+	pdata->wakeup_disable(0);
 
 	/* HSI device is now fully operational and _must_ be able to */
 	/* complete I/O operations */
@@ -970,9 +999,9 @@ int hsi_runtime_suspend(struct device *dev)
 
 	/* HSI is going to INA/RET/OFF, it needs IO wakeup mechanism enabled */
 	if (device_may_wakeup(dev))
-		pdata->wakeup_enable(hsi_ctrl, 0);
+		pdata->wakeup_enable(0);
 	else
-		pdata->wakeup_disable(hsi_ctrl, 0);
+		pdata->wakeup_disable(0);
 
 	/* HSI is now ready to be put in low power state */
 
