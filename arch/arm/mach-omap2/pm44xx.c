@@ -496,6 +496,8 @@ restore:
 	/* Print the previous power domain states */
 	pr_info("Read Powerdomain states as ...\n");
 	pr_info("0 : OFF, 1 : RETENTION, 2 : ON-INACTIVE, 3 : ON-ACTIVE\n");
+	pr_info("DEVICE-OFF hit:%s (%d)\n", omap4_device_off_read_prev_state() ?
+				       "yes" : "no", omap4_device_off_counter);
 	list_for_each_entry(pwrst, &pwrst_list, node) {
 		state = pwrdm_read_prev_pwrst(pwrst->pwrdm);
 		if (state == -EINVAL) {
