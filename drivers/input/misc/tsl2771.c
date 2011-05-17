@@ -648,7 +648,7 @@ static ssize_t tsl2771_lux_show(struct device *dev,
 	struct tsl2771_data *data = platform_get_drvdata(pdev);
 
 	tsl2771_read_als(data);
-	return 1;
+	return sprintf(buf, "%d\n", data->lux);
 }
 static DEVICE_ATTR(registers, S_IWUSR | S_IRUGO,
 		tsl2771_registers_show, tsl2771_registers_store);
