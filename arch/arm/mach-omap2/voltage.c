@@ -439,6 +439,7 @@ static struct omap_volt_data omap446x_vdd_core_volt_data[] = {
 	{.volt_nominal = 860000, .sr_errminlimit = 0xF4, .vp_errgain = 0x0C},
 	{.volt_nominal = 860000, .sr_errminlimit = 0xF4, .vp_errgain = 0x0C},
 	{.volt_nominal = 1100000, .sr_errminlimit = 0xF9, .vp_errgain = 0x16},
+	{.volt_nominal = 1200000, .sr_errminlimit = 0xF9, .vp_errgain = 0x16},
 };
 
 
