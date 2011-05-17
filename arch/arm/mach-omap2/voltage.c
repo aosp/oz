@@ -2511,6 +2511,7 @@ int omap_voltage_scale(struct voltagedomain *voltdm)
 	int is_volt_scaled = 0, i;
 	bool is_sr_disabled = false;
 	struct omap_vdd_info *vdd;
+	struct omap_volt_data *vnom;
 	struct plist_node *node;
 	unsigned long volt;
 
@@ -2520,11 +2521,11 @@ int omap_voltage_scale(struct voltagedomain *voltdm)
 	}
 
 	vdd = container_of(voltdm, struct omap_vdd_info, voltdm);
+	vnom = omap_voltage_get_nom_volt(voltdm);
 
 	mutex_lock(&vdd->scaling_mutex);
 
-	curr_volt = omap_get_operation_voltage(
-			omap_voltage_get_nom_volt(voltdm));
+	curr_volt = vnom->volt_nominal;
 
 	/* Find the highest voltage for this vdd */
 	node = plist_last(&vdd->user_list);
