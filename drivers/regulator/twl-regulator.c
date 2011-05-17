@@ -156,7 +156,7 @@ static int twl6030reg_is_enabled(struct regulator_dev *rdev)
 	val = twlreg_read(info, TWL_MODULE_PM_RECEIVER, VREG_STATE);
 	val = TWL6030_CFG_STATE_APP(val);
 
-	return grp && (val == TWL6030_CFG_STATE_ON);
+	return grp && (val == TWL6030_CFG_STATE_ON || val == TWL6030_CFG_STATE_SLEEP);
 }
 
 static int twlreg_enable(struct regulator_dev *rdev)
