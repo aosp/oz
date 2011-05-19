@@ -401,7 +401,7 @@ static struct mpu3050gyro_platform_data mpu3050_platform_data = {
 	.irq_flags = (IRQF_TRIGGER_HIGH | IRQF_ONESHOT),
 	.slave_i2c_addr = 0x40,
 	.sample_rate_div = 0x00,
-	.dlpf_fs_sync = 0x10,
+	.dlpf_fs_sync = 0x11,
 	.interrupt_cfg = (MPU3050_INT_CFG_OPEN | MPU3050_INT_CFG_LATCH_INT_EN |
 		MPU3050_INT_CFG_MPU_RDY_EN | MPU3050_INT_CFG_RAW_RDY_EN),
 };
