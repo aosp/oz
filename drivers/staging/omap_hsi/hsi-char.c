@@ -367,10 +367,15 @@ static int hsi_char_ioctl(struct inode *inode, struct file *file,
 		if (copy_from_user(&state, (void __user *)arg, sizeof(state)))
 			ret = -EFAULT;
 		else
-			if_hsi_set_wakeline(ch, state);
+			if_hsi_set_acwakeline(ch, state);
 		break;
 	case CS_GET_ACWAKELINE:
-		if_hsi_get_wakeline(ch, &state);
+		if_hsi_get_acwakeline(ch, &state);
+		if (copy_to_user((void __user *)arg, &state, sizeof(state)))
+			ret = -EFAULT;
+		break;
+	case CS_GET_CAWAKELINE:
+		if_hsi_get_cawakeline(ch, &state);
 		if (copy_to_user((void __user *)arg, &state, sizeof(state)))
 			ret = -EFAULT;
 		break;

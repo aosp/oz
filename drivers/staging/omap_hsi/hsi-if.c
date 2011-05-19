@@ -240,19 +240,26 @@ void if_hsi_flush_tx(int ch)
 	hsi_ioctl(channel->dev, HSI_IOCTL_FLUSH_TX, NULL);
 }
 
-void if_hsi_get_wakeline(int ch, unsigned int *state)
+void if_hsi_get_acwakeline(int ch, unsigned int *state)
 {
 	struct if_hsi_channel *channel;
 	channel = &hsi_iface.channels[ch];
 	hsi_ioctl(channel->dev, HSI_IOCTL_GET_ACWAKE, state);
 }
 
-void if_hsi_set_wakeline(int ch, unsigned int state)
+void if_hsi_set_acwakeline(int ch, unsigned int state)
 {
 	struct if_hsi_channel *channel;
 	channel = &hsi_iface.channels[ch];
 	hsi_ioctl(channel->dev,
 		  state ? HSI_IOCTL_ACWAKE_UP : HSI_IOCTL_ACWAKE_DOWN, NULL);
+}
+
+void if_hsi_get_cawakeline(int ch, unsigned int *state)
+{
+	struct if_hsi_channel *channel;
+	channel = &hsi_iface.channels[ch];
+	hsi_ioctl(channel->dev, HSI_IOCTL_GET_CAWAKE, state);
 }
 
 int if_hsi_set_rx(int ch, struct hsi_rx_config *cfg)
@@ -656,7 +663,7 @@ int __devexit if_hsi_exit(void)
 	for (i = 0; i < HSI_MAX_CHAR_DEVS; i++) {
 		channel = &hsi_iface.channels[i];
 		if (channel->opened) {
-			if_hsi_set_wakeline(i, HSI_IOCTL_ACWAKE_DOWN);
+			if_hsi_set_acwakeline(i, HSI_IOCTL_ACWAKE_DOWN);
 			if_hsi_closechannel(channel);
 		}
 	}
