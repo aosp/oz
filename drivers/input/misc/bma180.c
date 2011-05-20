@@ -175,18 +175,44 @@ static int bma180_write(struct bma180_accel_data *data, u8 reg, u8 val)
 	return ret;
 }
 
-static int bma180_read(struct bma180_accel_data *data, u8 reg)
+static int bma180_read_transfer(struct bma180_accel_data *data,
+		unsigned short data_addr, char *data_buf, int count)
 {
-	int ret = 0;
+	int ret;
+	int counter = 5;
+	char *data_buffer = data_buf;
 
-	mutex_lock(&data->mutex);
-	ret = i2c_smbus_read_byte_data(data->client, reg);
-	if (ret < 0)
-		dev_err(&data->client->dev,
-			"i2c_smbus_read_byte_data failed\n");
-	mutex_unlock(&data->mutex);
+	struct i2c_msg msgs[] = {
+		{
+		.addr = data->client->addr,
+		.flags = data->client->flags & I2C_M_TEN,
+		.len = 1,
+		.buf = data_buffer,
+		},
+		{
+		.addr = data->client->addr,
+		.flags = (data->client->flags & I2C_M_TEN) | I2C_M_RD,
+		.len = count,
+		.buf = data_buffer,
+		},
+	};
 
-	return ret;
+	data_buffer[0] = data_addr;
+	msgs->buf = data_buffer;
+
+	do {
+		ret = i2c_transfer(data->client->adapter, msgs, 2);
+		if (ret != 2) {
+			dev_err(&data->client->dev,
+				"i2c_transfer failed\n");
+			counter--;
+			msleep(1);
+		} else {
+			return 0;
+		}
+	} while (counter >= 0);
+
+	return -1;
 }
 
 static int bma180_accel_device_hw_set_bandwidth(struct bma180_accel_data *data,
@@ -195,9 +221,9 @@ static int bma180_accel_device_hw_set_bandwidth(struct bma180_accel_data *data,
 	uint8_t reg_val;
 	uint8_t int_val;
 
-	int_val = bma180_read(data, BMA180_CTRL_REG3);
+	bma180_read_transfer(data, BMA180_CTRL_REG3, &int_val, 1);
 	bma180_write(data, BMA180_CTRL_REG3, 0x00);
-	reg_val = bma180_read(data, BMA180_BW_TCS);
+	bma180_read_transfer(data, BMA180_BW_TCS, &reg_val, 1);
 	reg_val = (reg_val & 0x0F) | ((bandwidth << 4) & 0xF0);
 	bma180_write(data, BMA180_BW_TCS, reg_val);
 	msleep(10);
@@ -210,7 +236,7 @@ static void bma180_accel_device_sleep(struct bma180_accel_data *data)
 {
 	uint8_t reg_val;
 
-	reg_val = bma180_read(data, BMA180_CTRL_REG0);
+	bma180_read_transfer(data, BMA180_CTRL_REG0, &reg_val, 1);
 	reg_val |= BMA180_SLEEP;
 	bma180_write(data, BMA180_CTRL_REG0, reg_val);
 }
@@ -219,7 +245,7 @@ static void bma180_accel_device_wakeup(struct bma180_accel_data *data)
 {
 	uint8_t reg_val;
 
-	reg_val = bma180_read(data, BMA180_CTRL_REG0);
+	bma180_read_transfer(data, BMA180_CTRL_REG0, &reg_val, 1);
 	reg_val &= ~BMA180_SLEEP;
 	bma180_write(data, BMA180_CTRL_REG0, reg_val);
 	msleep(10);
@@ -237,13 +263,21 @@ static irqreturn_t bma180_accel_thread_irq(int irq, void *dev_data)
 
 static int bma180_accel_data_ready(struct bma180_accel_data *data)
 {
+	int ret;
 	uint8_t data_val_h, data_val_l;
 	short int x = 0;
 	short int y = 0;
 	short int z = 0;
+	uint8_t data_buffer[6];
 
-	data_val_l = bma180_read(data, BMA180_ACC_X_LSB);
-	data_val_h = bma180_read(data, BMA180_ACC_X_MSB);
+	ret = bma180_read_transfer(data, BMA180_ACC_X_LSB, data_buffer, 6);
+	if (ret != 0) {
+		dev_err(&data->client->dev,
+			"bma180_read_data_ready failed\n");
+		return -1;
+	}
+	data_val_l = data_buffer[0];
+	data_val_h = data_buffer[1];
 	if (accl_debug)
 		pr_info("%s: X low 0x%X X high 0x%X\n",
 		__func__, data_val_l, data_val_h);
@@ -251,8 +285,8 @@ static int bma180_accel_data_ready(struct bma180_accel_data *data)
 	x = (x >> 2);
 	x = x * g_range_table[data->pdata->g_range]/data->pdata->bit_mode;
 
-	data_val_l = bma180_read(data, BMA180_ACC_Y_LSB);
-	data_val_h = bma180_read(data, BMA180_ACC_Y_MSB);
+	data_val_l = data_buffer[2];
+	data_val_h = data_buffer[3];
 	if (accl_debug)
 		pr_info("%s: Y low 0x%X Y high 0x%X\n",
 		__func__, data_val_l, data_val_h);
@@ -261,8 +295,8 @@ static int bma180_accel_data_ready(struct bma180_accel_data *data)
 	y = (y >> 2);
 	y = y * g_range_table[data->pdata->g_range]/data->pdata->bit_mode;
 
-	data_val_l = bma180_read(data, BMA180_ACC_Z_LSB);
-	data_val_h = bma180_read(data, BMA180_ACC_Z_MSB);
+	data_val_l = data_buffer[4];
+	data_val_h = data_buffer[5];
 	if (accl_debug)
 		pr_info("%s: Z low 0x%X Z high 0x%X\n",
 		__func__, data_val_l, data_val_h);
@@ -406,7 +440,7 @@ static ssize_t bma180_registers_show(struct device *dev,
 
 	reg_count = sizeof(bma180_regs) / sizeof(bma180_regs[0]);
 	for (i = 0, n = 0; i < reg_count; i++) {
-		value = bma180_read(data, bma180_regs[i].reg);
+		bma180_read_transfer(data, bma180_regs[i].reg, &value, 1);
 		n += scnprintf(buf + n, PAGE_SIZE - n,
 			       "%-20s = 0x%02X\n",
 			       bma180_regs[i].name,
@@ -495,7 +529,7 @@ static int bma180_accel_device_hw_reset_int(struct bma180_accel_data *data)
 {
 	uint8_t reg_val;
 
-	reg_val = bma180_read(data, BMA180_CTRL_REG0);
+	bma180_read_transfer(data, BMA180_CTRL_REG0, &reg_val, 1);
 	reg_val |= 0x40;
 	bma180_write(data, BMA180_CTRL_REG0, reg_val);
 
@@ -507,7 +541,7 @@ static int bma180_accel_device_hw_set_grange(struct bma180_accel_data *data,
 {
 	uint8_t reg_val;
 
-	reg_val = bma180_read(data, BMA180_OFFSET_LSB1);
+	bma180_read_transfer(data, BMA180_OFFSET_LSB1, &reg_val, 1);
 	reg_val = (reg_val & 0xF1) | ((grange << 1) & 0x0E);
 	bma180_write(data, BMA180_OFFSET_LSB1, reg_val);
 
@@ -519,7 +553,7 @@ static int bma180_accel_device_hw_set_smp_skip(struct bma180_accel_data *data,
 {
 	uint8_t reg_val;
 
-	reg_val = bma180_read(data, BMA180_OFFSET_LSB1);
+	bma180_read_transfer(data, BMA180_OFFSET_LSB1, &reg_val, 1);
 	reg_val = (reg_val & 0xFE) | ((smp_skip << 0) & 0x01);
 	bma180_write(data, BMA180_OFFSET_LSB1, reg_val);
 
@@ -531,7 +565,7 @@ static int bma180_accel_device_hw_set_mode(struct bma180_accel_data *data,
 {
 	uint8_t reg_val;
 
-	reg_val = bma180_read(data, BMA180_TCO_Z);
+	bma180_read_transfer(data, BMA180_TCO_Z, &reg_val, 1);
 	reg_val = (reg_val & 0xFC) | ((mode << 0) & 0x03);
 	bma180_write(data, BMA180_TCO_Z, reg_val);
 
@@ -543,7 +577,7 @@ static int bma180_accel_device_hw_set_12bits(struct bma180_accel_data *data,
 {
 	uint8_t reg_val;
 
-	reg_val = bma180_read(data, BMA180_OFFSET_T);
+	bma180_read_transfer(data, BMA180_OFFSET_T, &reg_val, 1);
 	reg_val = (reg_val & 0xFE) | ((mode << 0) & 0x01);
 	bma180_write(data, BMA180_OFFSET_T, reg_val);
 
