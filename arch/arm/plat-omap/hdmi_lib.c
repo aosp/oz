@@ -2114,6 +2114,8 @@ void hdmi_notify_pwrchange(int state)
 {
 	struct hdmi_notifier *cur, *next;
 
+	printk(KERN_INFO "<%s> Notify Audio Powerchange - %d\n",
+	       __func__, state);
 	list_for_each_entry_safe(cur, next, &hdmi.notifier_head, list) {
 		if (cur->pwrchange_notifier)
 			cur->pwrchange_notifier(state, cur->private_data);
