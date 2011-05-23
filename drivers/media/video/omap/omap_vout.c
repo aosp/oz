@@ -1372,13 +1372,6 @@ static int omapvid_process_frame(struct omap_vout_device *vout)
 {
 	u32 addr, uv_addr;
 	int ret = 0;
-	struct omapvideo_info *ovid;
-	struct omap_overlay *ovl;
-	struct omap_dss_device *cur_display;
-
-	ovid = &vout->vid_info;
-	ovl = ovid->overlays[0];
-	cur_display = ovl->manager->device;
 
 	vout->next_frm = list_entry(vout->dma_queue.next,
 			struct videobuf_buffer, queue);
