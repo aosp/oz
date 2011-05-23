@@ -1587,8 +1587,12 @@ done:
 			 * send any hot plug event to the userspace in this case
 			 *  and reset irq's before returning.
 			 */
-			hdmi_set_irqs(0);
-			goto hpd_modify;
+			if (hdmi_opt_clk_state) {
+				hdmi_set_irqs(0);
+				goto hpd_modify;
+			} else
+				goto done2;
+
 		}
 
 		hdmi_reconfigure(dssdev);
@@ -1633,6 +1637,7 @@ hpd_modify:
 		DSSINFO("Reconfigure HDMI PHY Done- HDMI_HPD_MODIFY\n\n");
 	}
 
+done2:
 	mutex_unlock(&hdmi.lock_aux);
 	mutex_unlock(&hdmi.lock);
 	kfree(work);
