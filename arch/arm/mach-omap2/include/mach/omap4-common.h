@@ -48,6 +48,7 @@
 #define PPA_SERVICE_NS_SMP		0x25
 
 #define PL310_POR			5
+#define OMAP446x_PL310_POR		0x70000009
 /*
  * Secure HAL API flags
  */
@@ -69,6 +70,7 @@
 /* L2 controller AUXCTRL value */
 #define OMAP4_L2X0_AUXCTL_VALUE_ES1			0x0e050000
 #define OMAP4_L2X0_AUXCTL_VALUE				0x1e470000
+#define OMAP446x_L2X0_AUXCTL_VALUE			0x7e470000
 
 #define A9_ES1_REV					0x410FC091
 

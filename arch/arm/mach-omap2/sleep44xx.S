@@ -31,6 +31,14 @@
 #define SRAM_VADDR                             (OMAP2_L4_IO_OFFSET + \
 						 OMAP44XX_SAR_RAM_BASE)
 
+/*
+ * Macro to check cpu omap
+ */
+.macro IS_CPU_OMAP4460
+	mrc	p15, 0, r0, c0, c0, 0
+	and	r0, #0xf
+	cmp	r0, #0xa
+.endm
 
 /*
  * Macro to call PPA svc when MMU is OFF
@@ -62,6 +70,9 @@ zero_params:
 
 POR_params:
 .word 1, 5
+
+POR_4460_params:
+.word 1, 0x70000009
 
 /*
  * CPUx Wakeup Non-Secure Physical Address for
@@ -160,10 +171,16 @@ check_por:
 	cmp	r1, #0x1                   @ Check for HS device
 	bne	skip_por
 	ldr	r0, =PPA_SERVICE_PL310_POR @ Setup PPA HAL call
-	adr	r3, POR_params
+	IS_CPU_OMAP4460
+	ite	eq
+	adreq	r3, POR_4460_params
+	adrne	r3, POR_params
 	LM_CALL_PPA_SERVICE_PA
 skip_por:
-	ldr	r0, =OMAP4_L2X0_AUXCTL_VALUE
+	IS_CPU_OMAP4460
+	ite	eq
+	ldreq	r0, =OMAP446x_L2X0_AUXCTL_VALUE
+	ldrne	r0, =OMAP4_L2X0_AUXCTL_VALUE
 	ldr     r12, =0x109		@ Setup L2 AUXCTL value
 	dsb
 	smc     #0

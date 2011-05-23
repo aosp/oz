@@ -221,12 +221,30 @@ static int __init omap_l2_cache_init(void)
 
 	if (omap_rev() != OMAP4430_REV_ES1_0) {
 		/* Set POR through PPA service only in EMU/HS devices */
-		if (omap_type() != OMAP2_DEVICE_TYPE_GP)
-			omap4_secure_dispatcher(
-				PPA_SERVICE_PL310_POR, 0x7, 1,
-				PL310_POR, 0, 0, 0);
-
-		omap_smc1(0x109, OMAP4_L2X0_AUXCTL_VALUE);
+		if (omap_type() != OMAP2_DEVICE_TYPE_GP) {
+			if (cpu_is_omap4460())
+				omap4_secure_dispatcher(
+					PPA_SERVICE_PL310_POR, 0x7, 1,
+					OMAP446x_PL310_POR, 0, 0, 0);
+			else
+				omap4_secure_dispatcher(
+					PPA_SERVICE_PL310_POR, 0x7, 1,
+					PL310_POR, 0, 0, 0);
+		}
+		if (cpu_is_omap446x()) {
+			writel_relaxed(0xa5a5, l2cache_base + 0x900);
+			writel_relaxed(0xa5a5, l2cache_base + 0x908);
+			writel_relaxed(0xa5a5, l2cache_base + 0x904);
+			writel_relaxed(0xa5a5, l2cache_base + 0x90C);
+			/*
+			 * BRESP enabled, $I and $D prefetch ON,
+			 * Share-override = 1, NS lockdown enabled
+			 */
+			omap_smc1(0x109, OMAP446x_L2X0_AUXCTL_VALUE);
+			/* Default setting and L2 cache is WB mode */
+			omap_smc1(0x100, 0x0);
+		} else
+			omap_smc1(0x109, OMAP4_L2X0_AUXCTL_VALUE);
 	}
 
 	/* Enable PL310 L2 Cache controller */
