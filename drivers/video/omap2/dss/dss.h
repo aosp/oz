@@ -111,7 +111,8 @@ enum omap_burst_size {
 enum omap_parallel_interface_mode {
 	OMAP_DSS_PARALLELMODE_BYPASS,		/* MIPI DPI */
 	OMAP_DSS_PARALLELMODE_RFBI,		/* MIPI DBI */
-	OMAP_DSS_PARALLELMODE_DSI,
+	OMAP_DSS_DSI_VIDEO_MODE,
+	OMAP_DSS_DSI_COMMAND_MODE,
 };
 
 enum dss_clock {
@@ -389,6 +390,7 @@ int dsi_calc_clock_rates(enum omap_channel channel,
 		struct dsi_clock_info *cinfo);
 void dsi_wait_pll_dispc_active(enum omap_dsi_index ix);
 void dsi_wait_pll_dsi_active(enum omap_dsi_index ix);
+void dsi_config_video_mode(struct omap_dss_device *dssdev);
 #else
 static inline int dsi_init(struct platform_device *pdev)
 {
@@ -497,7 +499,6 @@ int dispc_setup_plane(enum omap_plane plane,
 bool dispc_go_busy(enum omap_channel channel);
 void dispc_go(enum omap_channel channel);
 void dispc_enable_digit_out(bool enable);
-void dispc_enable_channel(enum omap_channel channel, bool enable);
 bool dispc_is_channel_enabled(enum omap_channel channel);
 void dispc_enable_plane(enum omap_plane plane, bool enable);
 void dispc_enable_replication(enum omap_plane plane, bool enable);
@@ -522,6 +523,7 @@ void dispc_enable_trans_key(enum omap_channel ch, bool enable);
 void dispc_enable_alpha_blending(enum omap_channel ch, bool enable);
 bool dispc_trans_key_enabled(enum omap_channel ch);
 bool dispc_alpha_blending_enabled(enum omap_channel ch);
+void dispc_enable_pre_mult_alpha(enum omap_plane plane, bool enable);
 
 bool dispc_lcd_timings_ok(struct omap_video_timings *timings);
 void dispc_set_lcd_timings(enum omap_channel channel,

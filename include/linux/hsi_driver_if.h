@@ -110,22 +110,6 @@ struct ctrl_ctx {
 
 /**
  * struct hsi_device - HSI device object (Virtual)
- * @hsi_gdd_chan_count: DMA channels available
-*/
-struct hsi_platform_data {
-	void (*set_min_bus_tput) (struct device *dev, u8 agent_id,
-				  unsigned long r);
-	int (*device_enable) (struct platform_device *pdev);
-	int (*device_shutdown) (struct platform_device *pdev);
-	int (*device_idle) (struct platform_device *pdev);
-	u8 num_ports;
-	struct ctrl_ctx *ctx;
-	u8 hsi_gdd_chan_count;
-	unsigned long default_hsi_fclk;
-};
-
-/**
- * struct hsi_device - HSI device object (Virtual)
  * @n_ctrl: associated HSI controller platform id number
  * @n_p: port number
  * @n_ch: channel number
@@ -170,9 +154,9 @@ int hsi_register_driver(struct hsi_device_driver *driver);
 void hsi_unregister_driver(struct hsi_device_driver *driver);
 int hsi_open(struct hsi_device *dev);
 int hsi_write(struct hsi_device *dev, u32 *addr, unsigned int size);
-void hsi_write_cancel(struct hsi_device *dev);
+int hsi_write_cancel(struct hsi_device *dev);
 int hsi_read(struct hsi_device *dev, u32 *addr, unsigned int size);
-void hsi_read_cancel(struct hsi_device *dev);
+int hsi_read_cancel(struct hsi_device *dev);
 int hsi_poll(struct hsi_device *dev);
 int hsi_unpoll(struct hsi_device *dev);
 int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg);

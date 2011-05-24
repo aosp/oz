@@ -299,7 +299,7 @@ static struct omapfb_colormode omapfb_colormodes[] = {
 		.blue	= { .length = 8, .offset = 8, .msb_right = 0 },
 		.transp	= { .length = 8, .offset = 0, .msb_right = 0 },
 	}, {
-		.dssmode = OMAP_DSS_COLOR_RGBX32,
+		.dssmode = OMAP_DSS_COLOR_RGBX24,
 		.bits_per_pixel = 32,
 		.red	= { .length = 8, .offset = 24, .msb_right = 0 },
 		.green	= { .length = 8, .offset = 16, .msb_right = 0 },
@@ -748,12 +748,8 @@ int check_fb_var(struct fb_info *fbi, struct fb_var_screeninfo *var)
 			var->xres, var->yres,
 			var->xres_virtual, var->yres_virtual);
 
-	if (display && display->driver->get_dimension)
-		display->driver->get_dimension(display, &var->width, &var->height);
-	else {
-		var->height = -1;
-		var->width = -1;
-	}
+	var->width = display ? display->panel.width_in_mm : 0;
+	var->height = display ? display->panel.height_in_mm : 0;
 	var->grayscale = 0;
 
 	if (display && display->driver->get_timings) {
@@ -1727,7 +1723,7 @@ static enum omap_color_mode fb_format_to_dss_mode(enum omapfb_color_format fmt)
 		mode = OMAP_DSS_COLOR_RGBA32;
 		break;
 	case OMAPFB_COLOR_RGBX32:
-		mode = OMAP_DSS_COLOR_RGBX32;
+		mode = OMAP_DSS_COLOR_RGBX24;
 		break;
 	default:
 		mode = -EINVAL;

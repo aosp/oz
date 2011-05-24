@@ -97,7 +97,7 @@ obj-$(CONFIG_ARCH_OMAP3)		+= $(clock-common) clock3xxx.o \
 					   clock3517.o clock36xx.o \
 					   dpll3xxx.o clock3xxx_data.o
 obj-$(CONFIG_ARCH_OMAP4)		+= $(clock-common) clock44xx_data.o \
-					   dpll3xxx.o
+					   dpll3xxx.o clock4xxx.o
 
 # OMAP2 clock rate set data (old "OPP" data)
 obj-$(CONFIG_ARCH_OMAP2420)		+= opp2420_data.o
@@ -190,6 +190,9 @@ obj-$(CONFIG_MACH_CM_T35)		+= board-cm-t35.o \
 obj-$(CONFIG_MACH_IGEP0020)		+= board-igep0020.o \
 					   hsmmc.o
 obj-$(CONFIG_MACH_OMAP3_TOUCHBOOK)	+= board-omap3touchbook.o \
+					   hsmmc.o
+obj-$(CONFIG_MACH_OMAP_BLAZE)		+= board-44xxtablet.o \
+					   omap_phy_internal.o \
 					   hsmmc.o
 obj-$(CONFIG_MACH_OMAP_4430SDP)		+= board-4430sdp.o \
 					   omap_phy_internal.o \

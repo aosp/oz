@@ -38,6 +38,11 @@ enum {
 #define OMAP_TAG_FLASH_PART	0x4f81
 #define OMAP_TAG_VERSION_STR	0x4f82
 
+#if defined(CONFIG_MACH_OMAP_4430SDP)
+#define OMAP4_BLAZE_BOARD		0   /* 0x0010 */
+#define OMAP4_BLAZETABLET_BOARD 	1   /* 2143d */
+#endif
+
 struct omap_clock_config {
 	/* 0 for 12 MHz, 1 for 13 MHz and 2 for 19.2 MHz */
 	u8 system_clock_type;

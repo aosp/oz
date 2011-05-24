@@ -69,6 +69,7 @@
 #include "smartreflex-class3.h"
 #include "board-4430sdp-wifi.h"
 #include "omap_tps6236x.h"
+#include "board-44xxtablet.h"
 
 #include <linux/skbuff.h>
 #include <linux/ti_wilink_st.h>
@@ -289,7 +290,8 @@ static void omap_sfh7741prox_init(void)
 	error = gpio_direction_output(OMAP4_SFH7741_ENABLE_GPIO , 0);
 	if (error < 0) {
 		pr_err("%s: GPIO configuration failed: GPIO %d,\
-			error %d\n",__func__, OMAP4_SFH7741_ENABLE_GPIO, error);
+			error %d\n", __func__, OMAP4_SFH7741_ENABLE_GPIO,
+			error);
 		goto fail3;
 	}
 	return;
@@ -302,7 +304,7 @@ fail1:
 
 static struct sfh7741_platform_data omap_sfh7741_data = {
 	.flags = SFH7741_WAKEABLE_INT,
-	.irq = OMAP_GPIO_IRQ(OMAP4_SFH7741_SENSOR_OUTPUT_GPIO),
+	.irq_flags = IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
 	.prox_enable = 0,
 	.activate_func = omap_prox_activate,
 	.read_prox = omap_prox_read,
@@ -457,12 +459,12 @@ static struct platform_device sdp4430_leds_pwm = {
 /* Begin Synaptic Touchscreen TM-01217 */
 
 static char *tm12xx_idev_names[] = {
-	"Synaptic TM12XX TouchPoint 1",
-	"Synaptic TM12XX TouchPoint 2",
-	"Synaptic TM12XX TouchPoint 3",
-	"Synaptic TM12XX TouchPoint 4",
-	"Synaptic TM12XX TouchPoint 5",
-	"Synaptic TM12XX TouchPoint 6",
+	"syn_tm12xx_ts_1",
+	"syn_tm12xx_ts_2",
+	"syn_tm12xx_ts_3",
+	"syn_tm12xx_ts_4",
+	"syn_tm12xx_ts_5",
+	"syn_tm12xx_ts_6",
 	NULL,
 };
 
@@ -479,6 +481,7 @@ static struct tm12xx_ts_platform_data tm12xx_platform_data[] = {
 		.num_buttons = ARRAY_SIZE(tm12xx_button_map),
 		.repeat = 0,
 		.swap_xy = 1,
+		.controller_num = 0,
 	/* Android does not have touchscreen as wakeup source */
 #if !defined(CONFIG_ANDROID)
 		.suspend_state = SYNTM12XX_ON_ON_SUSPEND,
@@ -493,6 +496,7 @@ static struct tm12xx_ts_platform_data tm12xx_platform_data[] = {
 		.num_buttons = ARRAY_SIZE(tm12xx_button_map),
 		.repeat = 0,
 		.swap_xy = 1,
+		.controller_num = 1,
 	/* Android does not have touchscreen as wakeup source */
 #if !defined(CONFIG_ANDROID)
 		.suspend_state = SYNTM12XX_ON_ON_SUSPEND,
@@ -615,6 +619,11 @@ static struct omap_dss_device sdp4430_lcd_device = {
 			.regm_dsi	= 4,
 			.lp_clk_div	= 8,
 		},
+		.xfer_mode = OMAP_DSI_XFER_CMD_MODE,
+	},
+	.panel			= {
+		.width_in_mm = 84,
+		.height_in_mm = 47,
 	},
 	.channel		= OMAP_DSS_CHANNEL_LCD,
 };
@@ -640,6 +649,11 @@ static struct omap_dss_device sdp4430_lcd2_device = {
 			.regm_dsi	= 4,
 			.lp_clk_div	= 8,
 		},
+		.xfer_mode = OMAP_DSI_XFER_CMD_MODE,
+	},
+	.panel			= {
+		.width_in_mm = 84,
+		.height_in_mm = 47,
 	},
 	.channel		= OMAP_DSS_CHANNEL_LCD2,
 };
@@ -762,13 +776,13 @@ int plat_kim_suspend(struct platform_device *pdev, pm_message_t state)
 	 }
 	return 0;
 }
-int plat_kim_resume(struct platform_device *pdev)
+static int plat_kim_resume(struct platform_device *pdev)
 {
 	retry_suspend = 0;
 	return 0;
 }
 /* wl128x BT, FM, GPS connectivity chip */
-struct ti_st_plat_data wilink_pdata = {
+static struct ti_st_plat_data wilink_pdata = {
 	.nshutdown_gpio = 55,
 	.dev_name = BLUETOOTH_UART_DEV_NAME,
 	.flow_cntrl = 1,
@@ -917,6 +931,7 @@ static struct omap2_hsmmc_info mmc[] = {
 static struct wl12xx_platform_data omap4_panda_wlan_data __initdata = {
 	.irq = OMAP_GPIO_IRQ(GPIO_WIFI_IRQ),
 	.board_ref_clock = WL12XX_REFCLOCK_26,
+	.board_tcxo_clock = 1,
 };
 #endif
 
@@ -1219,7 +1234,7 @@ static int tps6130x_enable(int on)
 	return ret;
 }
 
-struct tps6130x_platform_data tps6130x_pdata = {
+static struct tps6130x_platform_data tps6130x_pdata = {
 	.chip_enable	= tps6130x_enable,
 };
 
@@ -1394,6 +1409,7 @@ static struct i2c_board_info __initdata sdp4430_i2c_4_boardinfo[] = {
 	},
 };
 
+
 static struct usbhs_omap_platform_data usbhs_pdata __initconst = {
 	.port_mode[0] = OMAP_EHCI_PORT_MODE_PHY,
 	.port_mode[1] = OMAP_OHCI_PORT_MODE_PHY_6PIN_DATSE0,
@@ -1527,7 +1543,7 @@ static void omap_4430hsi_pad_conf(void)
 
 	/* hsi1_cawake */
 	omap_mux_init_signal("usbb1_ulpitll_clk.hsi1_cawake", \
-		OMAP_PIN_INPUT | \
+		OMAP_PIN_INPUT_PULLDOWN | \
 		OMAP_PIN_OFF_NONE | \
 		OMAP_PIN_OFF_WAKEUPENABLE);
 	/* hsi1_caflag */
@@ -1541,7 +1557,7 @@ static void omap_4430hsi_pad_conf(void)
 	/* hsi1_acready */
 	omap_mux_init_signal("usbb1_ulpitll_nxt.hsi1_acready", \
 		OMAP_PIN_OUTPUT | \
-		OMAP_PIN_OFF_NONE);
+		OMAP_PIN_OFF_OUTPUT_LOW);
 	/* hsi1_acwake */
 	omap_mux_init_signal("usbb1_ulpitll_dat0.hsi1_acwake", \
 		OMAP_PIN_OUTPUT | \
@@ -1726,9 +1742,7 @@ static struct omap_volt_vc_data vc446x_config = {
 	.vdd2_off = 600000,	/* 0.6 v */
 };
 
-
-
-void plat_hold_wakelock(void *up, int flag)
+static void plat_hold_wakelock(void *up, int flag)
 {
 	struct uart_omap_port *up2 = (struct uart_omap_port *)up;
 	/*Specific wakelock for bluetooth usecases*/
@@ -1844,6 +1858,27 @@ static struct omap_board_mux board_mux[] __initdata = {
 	OMAP4_MUX(SDMMC5_DAT3, OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLUP),
 #endif
 	OMAP4_MUX(USBB1_ULPITLL_CLK, OMAP_MUX_MODE3 | OMAP_PIN_INPUT),
+	/* IO optimization pdpu and offmode settings to reduce leakage */
+	OMAP4_MUX(GPMC_A17, OMAP_MUX_MODE3 | OMAP_INPUT_EN),
+	OMAP4_MUX(GPMC_NBE1, OMAP_MUX_MODE3 | OMAP_PIN_OUTPUT),
+	OMAP4_MUX(GPMC_NCS4, OMAP_MUX_MODE3 | OMAP_INPUT_EN),
+	OMAP4_MUX(GPMC_NCS5, OMAP_MUX_MODE3 | OMAP_PULL_ENA | OMAP_PULL_UP
+					 | OMAP_OFF_EN | OMAP_OFF_PULL_EN),
+	OMAP4_MUX(GPMC_NCS7, OMAP_MUX_MODE3 | OMAP_INPUT_EN),
+	OMAP4_MUX(GPMC_NBE1, OMAP_MUX_MODE3 | OMAP_PULL_ENA | OMAP_PULL_UP
+					 | OMAP_OFF_EN | OMAP_OFF_PULL_EN),
+	OMAP4_MUX(GPMC_WAIT0, OMAP_MUX_MODE3 | OMAP_INPUT_EN),
+	OMAP4_MUX(GPMC_NOE, OMAP_MUX_MODE1 | OMAP_INPUT_EN),
+	OMAP4_MUX(MCSPI1_CS1, OMAP_MUX_MODE3 | OMAP_PULL_ENA | OMAP_PULL_UP
+					| OMAP_OFF_EN | OMAP_OFF_PULL_EN),
+	OMAP4_MUX(MCSPI1_CS2, OMAP_MUX_MODE3 | OMAP_PULL_ENA | OMAP_PULL_UP
+					| OMAP_OFF_EN | OMAP_OFF_PULL_EN),
+	OMAP4_MUX(SDMMC5_CLK, OMAP_MUX_MODE0 | OMAP_INPUT_EN | OMAP_OFF_EN
+					| OMAP_OFF_PULL_EN),
+	OMAP4_MUX(USBB2_ULPITLL_CLK, OMAP_MUX_MODE0 | OMAP_PULL_ENA |
+				OMAP_INPUT_EN | OMAP_OFF_EN | OMAP_OFF_PULL_EN),
+	OMAP4_MUX(GPMC_NCS1, OMAP_MUX_MODE3 | OMAP_INPUT_EN | OMAP_WAKEUP_EN),
+	OMAP4_MUX(GPMC_A24, OMAP_MUX_MODE3 | OMAP_INPUT_EN | OMAP_WAKEUP_EN),
 	{ .reg_offset = OMAP_MUX_TERMINATOR },
 };
 #else
@@ -1929,6 +1964,7 @@ static void __init omap_4430sdp_init(void)
 	enable_rtc_gpio();
 	omap4_audio_conf();
 	omap4_i2c_init();
+
 	omap4_display_init();
 	omap_disp_led_init();
 	platform_add_devices(sdp4430_devices, ARRAY_SIZE(sdp4430_devices));
@@ -1967,6 +2003,7 @@ static void __init omap_4430sdp_init(void)
 	usb_uhhtll_init(&usbhs_pdata);
 	usb_musb_init(&musb_board_data);
 
+
 	status = omap4_keypad_initialization(&sdp4430_keypad_data);
 	if (status)
 		pr_err("Keypad initialization failed: %d\n", status);
@@ -1981,7 +2018,9 @@ static void __init omap_4430sdp_init(void)
 	}
 	omap_sfh7741prox_init();
 	omap_cma3000accl_init();
+
 	omap_display_init(&sdp4430_dss_data);
+
 	enable_board_wakeup_source();
 
 	if (cpu_is_omap443x()) {
@@ -2010,7 +2049,7 @@ static void __init omap_4430sdp_map_io(void)
 	omap44xx_map_common_io();
 }
 
-MACHINE_START(OMAP_4430SDP, "OMAP4430 4430SDP board")
+MACHINE_START(OMAP_4430SDP, "OMAP4430")
 	/* Maintainer: Santosh Shilimkar - Texas Instruments Inc */
 	.phys_io	= 0x48000000,
 	.io_pg_offst	= ((0xfa000000) >> 18) & 0xfffc,

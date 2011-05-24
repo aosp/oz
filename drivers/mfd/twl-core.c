@@ -135,9 +135,16 @@
 
 #if defined(CONFIG_INPUT_TWL4030_PWRBUTTON) \
 	|| defined(CONFIG_INPUT_TWL4030_PWRBUTTON_MODULE)
-#define twl_has_pwrbutton()	true
+#define twl4030_has_pwrbutton()	true
 #else
-#define twl_has_pwrbutton()	false
+#define twl4030_has_pwrbutton()	false
+#endif
+
+#if defined(CONFIG_INPUT_TWL6030_PWRBUTTON) \
+	|| defined(CONFIG_INPUT_TWL6030_PWRBUTTON_MODULE)
+#define twl6030_has_pwrbutton()        true
+#else
+#define twl6030_has_pwrbutton()        false
 #endif
 
 #define SUB_CHIP_ID0 0
@@ -770,9 +777,16 @@ add_children(struct twl4030_platform_data *pdata, unsigned long features)
 			return PTR_ERR(child);
 	}
 
-	if (twl_has_pwrbutton()) {
+	if (twl4030_has_pwrbutton()) {
 		child = add_child(1, "twl4030_pwrbutton",
 				NULL, 0, true, pdata->irq_base + 8 + 0, 0);
+		if (IS_ERR(child))
+			return PTR_ERR(child);
+	}
+
+	if (twl6030_has_pwrbutton()) {
+		child = add_child(1, "twl6030_pwrbutton",
+				NULL, 0, true, pdata->irq_base, 0);
 		if (IS_ERR(child))
 			return PTR_ERR(child);
 	}
@@ -1032,7 +1046,7 @@ static int __devexit twl_remove(struct i2c_client *client)
 static void _init_twl6030_settings(void)
 {
 	/* unmask PREQ transition */
-	twl_i2c_write_u8(TWL6030_MODULE_ID0, 0xE0, 0x02);
+	twl_i2c_write_u8(TWL6030_MODULE_ID0, 0xC0, 0x02);
 
 	/* USB_VBUS_CTRL_CLR */
 	twl_i2c_write_u8(TWL6030_MODULE_ID1, 0xFF, 0x05);

@@ -281,9 +281,9 @@ IS_OMAP_TYPE(4460, 0x4460)
 #define cpu_is_omap3505()		0
 #define cpu_is_omap3517()		0
 #define cpu_is_omap3430()		0
-#define cpu_is_omap4430()		0
 #define cpu_is_omap3630()		0
 #define cpu_is_omap4460()		0
+#define cpu_is_omap4430()		0
 
 /*
  * Whether we have MULTI_OMAP1 or not, we still need to distinguish
