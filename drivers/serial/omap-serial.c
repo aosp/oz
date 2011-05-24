@@ -368,10 +368,11 @@ static unsigned int check_modem_status(struct uart_omap_port *up)
 	return status;
 }
 
-static inline bool omap_is_console_port(struct uart_port *port)
+inline bool omap_is_console_port(struct uart_port *port)
 {
 	return port->cons && port->cons->index == port->line;
 }
+EXPORT_SYMBOL(omap_is_console_port);
 
 /**
  * serial_omap_irq() - This handles the interrupt from one port
@@ -1559,6 +1560,15 @@ int omap_uart_active(int num, u32 timeout)
 	struct uart_omap_port *up = ui[num];
 	struct circ_buf *xmit;
 	unsigned int status;
+
+	/* Though when UART's initialised this can never happen,
+	 * but during initialisation, it can happen the "ui"
+	 * structure is not initialized and the timer kicks
+	 * in. This would result in a NULL value, resulting
+	 * in crash.
+	 */
+	if (up == NULL)
+		return 0;
 
 	/* Check for recent driver activity. If time delta from now
 	 * to last activty < "uart idle timeout" second keep clocks on.

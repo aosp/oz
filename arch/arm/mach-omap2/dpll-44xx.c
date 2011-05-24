@@ -21,6 +21,7 @@
 #include <plat/prcm.h>
 #include <plat/opp.h>
 #include <plat/omap-serial.h>
+#include <plat/smartreflex.h>
 
 #include <mach/emif.h>
 #include <mach/omap4-common.h>
@@ -64,7 +65,6 @@ static struct dpll_cascade_saved_state {
 	u32 clkreqctrl;
 	unsigned long dpll_core_ck_rate;
 	u32 dpll_core_m2_div;
-	unsigned long cm2_scale_fclk_div;
 	struct clk *per_hsd_byp_clk_mux_ck_parent;
 	unsigned int cpufreq_policy_min_rate;
 	unsigned int cpufreq_policy_max_rate;
@@ -508,9 +508,14 @@ long omap4_dpll_regm4xen_round_rate(struct clk *clk, unsigned long target_rate)
 
 void omap4_dpll_low_power_cascade_check_timer(struct work_struct *dwork)
 {
+	struct clk *dpll_mpu_m2_ck, *dpll_core_m2_ck;
 	int delay;
 
-	if (num_online_cpus() > 1) {
+	dpll_mpu_m2_ck = clk_get(NULL, "dpll_mpu_m2_ck");
+	dpll_core_m2_ck = clk_get(NULL, "dpll_core_m2_ck");
+
+	if (num_online_cpus() > 1 || clk_get_rate(dpll_core_m2_ck) > 400000000
+			|| clk_get_rate(dpll_mpu_m2_ck) > 300000000) {
 		delay = usecs_to_jiffies(LP_DELAY);
 
 		schedule_delayed_work_on(0, &lpmode_work, delay);
@@ -560,6 +565,7 @@ int omap4_dpll_low_power_cascade_enter()
 	struct device *mpu_dev;
 	struct cpufreq_policy *cp;
 	struct omap_opp *opp;
+	struct voltagedomain *vdd_mpu, *vdd_iva, *vdd_core;
 
 	dpll_abe_ck = clk_get(NULL, "dpll_abe_ck");
 	dpll_mpu_ck = clk_get(NULL, "dpll_mpu_ck");
@@ -602,6 +608,18 @@ int omap4_dpll_low_power_cascade_enter()
 		ret = -ENODEV;
 		goto out;
 	}
+
+	omap4_lpmode = true;
+
+	/* look up the three scalable voltage domains */
+	vdd_mpu = omap_voltage_domain_get("mpu");
+	vdd_iva = omap_voltage_domain_get("iva");
+	vdd_core = omap_voltage_domain_get("core");
+
+	/* disable SR adaptive voltage scaling while changing freq */
+	omap_smartreflex_disable(vdd_mpu);
+	omap_smartreflex_disable(vdd_iva);
+	omap_smartreflex_disable(vdd_core);
 
 	/* prevent DPLL_ABE & DPLL_CORE from idling */
 	omap3_dpll_deny_idle(dpll_abe_ck);
@@ -695,22 +713,8 @@ int omap4_dpll_low_power_cascade_enter()
 
 	/* bypass DPLL_MPU */
 	state.dpll_mpu_ck_rate = dpll_mpu_ck->rate;
-
-	mpu_dev = omap2_get_mpuss_device();
-	opp = opp_find_voltage(mpu_dev, 1005000, false);
-	opp_enable(opp);
-	state.mpu_opp = opp;
-
-	cp = cpufreq_cpu_get(0);
-	state.cpufreq_policy_cur_rate = cp->cur;
-	state.cpufreq_policy_min_rate = cp->min;
-	state.cpufreq_policy_max_rate = cp->max;
-
-	/* cpufreq takes in KHz */
-	cp->min = LP_196M_RATE / 1000;
-	cp->max = LP_196M_RATE / 1000;
-	cpufreq_cpu_put(cp);
-	ret = cpufreq_driver_target(cp, LP_196M_RATE / 1000, CPUFREQ_RELATION_H);
+	ret = clk_set_rate(dpll_mpu_ck,
+			dpll_mpu_ck->dpll_data->clk_bypass->rate);
 	if (ret) {
 		pr_err("%s: DPLL_MPU failed to enter Low Power bypass\n",
 				__func__);
@@ -718,11 +722,9 @@ int omap4_dpll_low_power_cascade_enter()
 	} else
 		pr_debug("%s: DPLL_MPU entered Low Power bypass\n", __func__);
 
-	omap4_lpmode = true;
-
 	/* bypass DPLL_IVA */
 	state.dpll_iva_ck_rate = dpll_iva_ck->rate;
-	ret = omap3_noncore_dpll_set_rate(dpll_iva_ck,
+	ret = clk_set_rate(dpll_iva_ck,
 			dpll_iva_ck->dpll_data->clk_bypass->rate);
 	if (ret) {
 		pr_err("%s: DPLL_IVA failed to enter Low Power bypass\n",
@@ -733,7 +735,7 @@ int omap4_dpll_low_power_cascade_enter()
 
 	/* bypass DPLL_PER */
 	state.dpll_per_ck_rate = dpll_per_ck->rate;
-	ret = omap3_noncore_dpll_set_rate(dpll_per_ck,
+	ret = clk_set_rate(dpll_per_ck,
 			dpll_per_ck->dpll_data->clk_bypass->rate);
 	if (ret) {
 		pr_debug("%s: DPLL_PER failed to enter Low Power bypass\n",
@@ -742,20 +744,16 @@ int omap4_dpll_low_power_cascade_enter()
 	} else
 		pr_debug("%s: DPLL_PER entered Low Power bypass\n",__func__);
 
-	/* run PER functional clocks at full speed */
-	state.cm2_scale_fclk_div =
-		omap4_prm_read_bits_shift(func_48m_fclk->clksel_reg,
-				func_48m_fclk->clksel_mask);
-	clk_set_rate(func_48m_fclk, (func_48m_fclk->parent->rate / 4));
-
-	/* recalibarte UART rate for half rates */
-	omap_uart_recalibrate_baud(1);
-
 	__raw_writel(1, OMAP4430_CM_L4_WKUP_CLKSEL);
 
 	/* never de-assert CLKREQ while in DPLL cascading scheme */
 	state.clkreqctrl = __raw_readl(OMAP4430_PRM_CLKREQCTRL);
 	__raw_writel(0x4, OMAP4430_PRM_CLKREQCTRL);
+
+	/* re-enable SR adaptive voltage scaling */
+	omap_smartreflex_enable(vdd_mpu);
+	omap_smartreflex_enable(vdd_iva);
+	omap_smartreflex_enable(vdd_core);
 
 	/* drive PM debug clocks from CORE_M6X2 and allow the clkdm to idle */
 	/*state.pmd_stm_clock_mux_ck_parent = pmd_stm_clock_mux_ck->parent;
@@ -831,6 +829,7 @@ int omap4_dpll_low_power_cascade_exit()
 	struct clk *pmd_stm_clock_mux_ck, *pmd_trace_clk_mux_ck;
 	struct clockdomain *emu_sys_44xx_clkdm, *abe_44xx_clkdm;
 	struct cpufreq_policy *cp;
+	struct voltagedomain *vdd_mpu, *vdd_iva, *vdd_core;
 
 	sys_clkin_ck = clk_get(NULL, "sys_clkin_ck");
 	dpll_abe_ck = clk_get(NULL, "dpll_abe_ck");
@@ -881,27 +880,28 @@ int omap4_dpll_low_power_cascade_exit()
 	if (!omap4_lpmode)
 		return 0;
 
-	omap4_lpmode = false;
+	/* look up the three scalable voltage domains */
+	vdd_mpu = omap_voltage_domain_get("mpu");
+	vdd_iva = omap_voltage_domain_get("iva");
+	vdd_core = omap_voltage_domain_get("core");
 
-	cp = cpufreq_cpu_get(0);
-	cp->min = state.cpufreq_policy_min_rate;
-	cp->max = state.cpufreq_policy_max_rate;
-	cpufreq_cpu_put(cp);
-	cpufreq_driver_target(cp, state.cpufreq_policy_cur_rate,
-			CPUFREQ_RELATION_H);
-	opp_disable(state.mpu_opp);
+	/* disable SR adaptive voltage scaling while changing freq */
+	omap_smartreflex_disable(vdd_mpu);
+	omap_smartreflex_disable(vdd_iva);
+	omap_smartreflex_disable(vdd_core);
+
+	/* lock DPLL_MPU */
+	ret = clk_set_rate(dpll_mpu_ck, state.dpll_mpu_ck_rate);
+	if (ret)
+		pr_err("%s: DPLL_MPU failed to relock\n", __func__);
 
 	/* lock DPLL_IVA */
-	ret = omap3_noncore_dpll_set_rate(dpll_iva_ck, state.dpll_iva_ck_rate);
+	ret = clk_set_rate(dpll_iva_ck, state.dpll_iva_ck_rate);
 	if (ret)
 		pr_err("%s: DPLL_IVA failed to relock\n", __func__);
 
-	/* restore PER functional clocks frequency */
-	clk_set_rate(func_48m_fclk, (func_48m_fclk->parent->rate /
-				(1 << state.cm2_scale_fclk_div)));
-
 	/* lock DPLL_PER */
-	ret = omap3_noncore_dpll_set_rate(dpll_per_ck, state.dpll_per_ck_rate);
+	ret = clk_set_rate(dpll_per_ck, state.dpll_per_ck_rate);
 	if (ret)
 		pr_err("%s: DPLL_PER failed to relock\n", __func__);
 
@@ -924,9 +924,6 @@ int omap4_dpll_low_power_cascade_exit()
 	if (ret)
 		pr_err("%s: failed to restore DPLL_PER bypass clock\n",
 				__func__);
-
-	/* recalibarte UART rate for normal clock rates */
-	omap_uart_recalibrate_baud(0);
 
 	/* restore CORE clock rates */
 	ret = clk_set_rate(div_core_ck, (div_core_ck->parent->rate /
@@ -976,7 +973,14 @@ int omap4_dpll_low_power_cascade_exit()
 		pr_debug("%s: failed restoring parent to PMD clocks\n",
 				__func__);*/
 
+	/* re-enable SR adaptive voltage scaling */
+	omap_smartreflex_enable(vdd_mpu);
+	omap_smartreflex_enable(vdd_iva);
+	omap_smartreflex_enable(vdd_core);
+
 	recalculate_root_clocks();
+
+	omap4_lpmode = false;
 
 out:
 	return ret;

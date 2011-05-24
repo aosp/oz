@@ -310,7 +310,10 @@ static struct workqueue_struct *ipu_resources;
 static struct workqueue_struct *ipu_clean_up;
 struct work_struct clean;
 static DECLARE_COMPLETION(ipu_clean_up_comp);
-static bool recover;
+static u32 recover;
+#ifdef CONFIG_DUCATI_WATCH_DOG
+static bool wd_error;
+#endif
 
 /* Latency cstrs */
 #ifdef CONFIG_OMAP_PM
@@ -458,19 +461,24 @@ static void ipu_pm_recover_schedule(void)
 	struct ipu_pm_object *handle;
 
 	INIT_COMPLETION(ipu_clean_up_comp);
-	recover = true;
+	recover = 0;
 
 	/* get the handle to proper ipu pm object
 	 * and flush any pending fifo message
 	 */
 	handle = ipu_pm_get_handle(APP_M3);
-	if (handle)
+	if (handle) {
+		recover++;
 		kfifo_reset(&handle->fifo);
+	}
 	handle = ipu_pm_get_handle(SYS_M3);
-	if (handle)
+	if (handle) {
+		recover++;
 		kfifo_reset(&handle->fifo);
+	}
 
 	/* schedule clean up work */
+	pr_debug("%s:%d:Schedule Recover\n", __func__, __LINE__);
 	queue_work(ipu_clean_up, &clean);
 }
 
@@ -483,7 +491,7 @@ static void ipu_pm_clean_res(void)
 	/* Check RAT and call each release function
 	 * per resource in rcb
 	 */
-	unsigned used_res_mask = global_rcb->rat;
+	unsigned used_res_mask;
 	struct ipu_pm_object *handle;
 	struct ipu_pm_params *params;
 	struct rcb_block *rcb_p;
@@ -499,7 +507,8 @@ static void ipu_pm_clean_res(void)
 	 * rcb = 1 is reserved.
 	 * Start in 2
 	 */
-	used_res_mask &= RESERVED_RCBS;
+	mutex_lock(ipu_pm_state.gate_handle);
+	used_res_mask = global_rcb->rat & RESERVED_RCBS;
 	pr_debug("Resources Mask 0x%x\n", used_res_mask);
 
 	if (!used_res_mask)
@@ -552,13 +561,16 @@ static void ipu_pm_clean_res(void)
 	}
 
 	global_rcb->rat = used_res_mask;
-	if (!used_res_mask)
-		goto complete_exit;
 
-	pr_warning("%s:Not all resources were released", __func__);
-	return;
+	/* Maybe an already released resource or currupted RAT
+	 * anyway call complete to allow the reload of the images
+	 */
+	if (used_res_mask)
+		pr_warning("%s: Not all resources were released\n", __func__);
+
 complete_exit:
 	complete_all(&ipu_clean_up_comp);
+	mutex_unlock(ipu_pm_state.gate_handle);
 	return;
 }
 
@@ -568,6 +580,20 @@ complete_exit:
  */
 static void ipu_pm_clean_work(struct work_struct *work)
 {
+
+#ifdef CONFIG_DUCATI_WATCH_DOG
+	/* Notify devh about WD error */
+	if (wd_error) {
+		ipu_pm_notify_event(0, NULL);
+		wd_error = false;
+	}
+#endif
+
+#ifdef CONFIG_SYSLINK_IPU_SELF_HIBERNATION
+	/* Stop timer */
+	if (sys_rproc->dmtimer != NULL)
+		omap_dm_timer_stop(sys_rproc->dmtimer);
+#endif
 	ipu_pm_clean_res();
 }
 
@@ -770,7 +796,6 @@ void ipu_pm_notify_callback(u16 proc_id, u16 line_id, u32 event_id,
 			 * Remote proc to Host proc
 			 */
 			pr_debug("Remote Proc is ready to hibernate\n");
-
 			retval = ipu_pm_save_ctx(proc_id);
 			if (retval)
 				pr_err("Unable to stop proc %d\n", proc_id);
@@ -788,7 +813,6 @@ void ipu_pm_notify_callback(u16 proc_id, u16 line_id, u32 event_id,
 		handle->pm_event[event].pm_msg = payload;
 		up(&handle->pm_event[event].sem_handle);
 	}
-
 	return;
 error:
 	pr_err("Unknow event received from remote proc: %d\n", event);
@@ -2526,10 +2550,15 @@ int ipu_pm_save_ctx(int proc_id)
 	unsigned long timeout;
 	struct ipu_pm_object *handle;
 
+	mutex_lock(ipu_pm_state.gate_handle);
+	/* Currently in recover, dont need to save */
+	if (recover)
+		goto exit;
+
 	/* get the handle to proper ipu pm object */
 	handle = ipu_pm_get_handle(proc_id);
 	if (unlikely(handle == NULL))
-		return 0;
+		goto exit;
 
 	/* get M3's load flag */
 	sys_loaded = (ipu_pm_get_state(proc_id) & SYS_PROC_LOADED) >>
@@ -2541,7 +2570,6 @@ int ipu_pm_save_ctx(int proc_id)
 	 * if APPM3 is enable and we need to shut it down too
 	 * Sysm3 is the only want sending the hibernate message
 	*/
-	mutex_lock(ipu_pm_state.gate_handle);
 	if (proc_id == SYS_M3 || proc_id == APP_M3) {
 		if (!sys_loaded)
 			goto exit;
@@ -2621,8 +2649,8 @@ error:
 #ifdef CONFIG_SYSLINK_IPU_SELF_HIBERNATION
 	ipu_pm_timer_state(PM_HIB_TIMER_ON);
 #endif
-	mutex_unlock(ipu_pm_state.gate_handle);
 	pr_debug("Aborting hibernation process\n");
+	mutex_unlock(ipu_pm_state.gate_handle);
 	return -EINVAL;
 restore:
 	pr_debug("Starting restore_ctx since messages pending in mbox\n");
@@ -2833,6 +2861,7 @@ int ipu_pm_setup(struct ipu_pm_config *cfg)
 	ducati_mbox = NULL;
 	sys_rproc = NULL;
 	app_rproc = NULL;
+	recover = 0;
 
 	memcpy(&ipu_pm_state.cfg, cfg, sizeof(struct ipu_pm_config));
 	ipu_pm_state.is_setup = true;
@@ -2971,6 +3000,9 @@ int ipu_pm_attach(u16 remote_proc_id, void *shared_addr)
 		}
 	}
 
+	if (recover)
+		recover--;
+
 	return retval;
 exit:
 	pr_err("ipu_pm_attach failed! retval = 0x%x", retval);
@@ -3083,8 +3115,6 @@ int ipu_pm_detach(u16 remote_proc_id)
 		}
 		/* Reset the state_flag */
 		handle->rcb_table->state_flag = 0;
-		if (recover)
-			recover = false;
 		global_rcb = NULL;
 		first_time = 1;
 	}
@@ -3219,10 +3249,8 @@ static int ipu_pm_timer_state(int event)
 		} else if (params->hib_timer_state == PM_HIB_TIMER_WDRESET) {
 			/* notify devh to begin error recovery here */
 			pr_debug("Timer ISR: Trigger WD reset + recovery\n");
+			wd_error = true;
 			ipu_pm_recover_schedule();
-			ipu_pm_notify_event(0, NULL);
-			if (sys_rproc->dmtimer != NULL)
-				omap_dm_timer_stop(sys_rproc->dmtimer);
 			params->hib_timer_state = PM_HIB_TIMER_OFF;
 #endif
 		}

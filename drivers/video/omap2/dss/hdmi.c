@@ -127,6 +127,7 @@ static bool hdmi_opt_clk_state;
 static int in_reset;
 #define HDMI_IN_RESET		0x1000
 static bool hdmi_connected;
+static bool in_dispc_digit_reset;
 
 #define HDMI_PLLCTRL		0x58006200
 #define HDMI_PHY		0x58006300
@@ -135,6 +136,7 @@ static u8 edid[HDMI_EDID_MAX_LENGTH] = {0};
 static u8 edid_set;
 static u8 header[8] = {0x0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x0};
 static u8 custom_set;
+static bool in_hdmi_restart;
 
 enum hdmi_ioctl_cmds {
 	HDMI_ENABLE,
@@ -308,6 +310,7 @@ struct hdmi {
 	struct platform_device *pdev;
 	void (*hdmi_start_frame_cb)(void);
 	void (*hdmi_stop_frame_cb)(void);
+	void (*hdmi_irq_cb)(int status);
 } hdmi;
 
 struct hdmi_cm {
@@ -315,6 +318,27 @@ struct hdmi_cm {
 	int mode;
 };
 struct omap_video_timings edid_timings;
+
+void hdmi_sync_lost_isr(void *arg, unsigned int irqstatus)
+{
+	if (in_dispc_digit_reset)
+		return;
+	else
+		in_dispc_digit_reset = true;
+
+	if (irqstatus & DISPC_IRQ_SYNC_LOST_DIGIT &&
+	    hdmi_connected &&
+	    hdmi_power == HDMI_POWER_FULL) {
+		DSSINFO("\nStopping Digital channel...\n");
+		HDMI_W1_StopVideoFrame(HDMI_WP);
+		dispc_enable_digit_out(0);
+		mdelay(20);
+		DSSINFO("Stating Digital channel...\n");
+		HDMI_W1_StartVideoFrame(HDMI_WP);
+		dispc_enable_digit_out(1);
+	}
+	in_dispc_digit_reset = false;
+}
 
 /* Set / Release 48MHz phy clock, L3-200 MHz and c-state constraints */
 static int hdmi_set_48Mhz_l3_cstr(struct omap_dss_device *dssdev, bool enable)
@@ -332,25 +356,30 @@ static int hdmi_set_48Mhz_l3_cstr(struct omap_dss_device *dssdev, bool enable)
 			hdmi_opt_clk_state = enable ? true : false;
 		else
 			goto err;
-	}
 
 #ifdef CONFIG_OMAP_PM
-	DSSINFO("%s L3-200Mhz constraint\n\n",
-		enable ? "Set" : "Release");
-	r = omap_pm_set_min_bus_tput(
-		&dssdev->dev,
-		OCP_INITIATOR_AGENT,
-		enable ? 200 * 1000 * 4 : -1);
-	if (r)
-		DSSERR("unable to %s L3-200Mhz constraint\n",
-		       enable ? "release" : "set");
+		DSSINFO("%s L3-200Mhz constraint\n\n",
+			enable ? "Set" : "Release");
+		r = omap_pm_set_min_bus_tput(
+			&dssdev->dev,
+			OCP_INITIATOR_AGENT,
+			enable ? 200 * 1000 * 4 : -1);
+		if (r)
+			DSSERR("unable to %s L3-200Mhz constraint\n",
+			       enable ? "release" : "set");
 
-	r = omap_pm_set_max_sdma_lat(&pm_qos_handle,
-				       enable ? 10 : -1);
-	if (r)
-		DSSERR("Unable to %s core cstr\n",
-		       enable ? "set" : "remove");
+		r = omap_pm_set_max_sdma_lat(&pm_qos_handle,
+					       enable ? 10 : -1);
+		if (r)
+			DSSERR("Unable to %s core cstr\n",
+			       enable ? "set" : "remove");
 #endif
+		/* register / unregister SYNC_LOST_DIGIT ISR*/
+		enable ? omap_dispc_register_isr(hdmi_sync_lost_isr, dssdev,
+					DISPC_IRQ_SYNC_LOST_DIGIT) :
+			omap_dispc_unregister_isr(hdmi_sync_lost_isr, dssdev,
+				       DISPC_IRQ_SYNC_LOST_DIGIT);
+	}
 
 err:
 	return ret;
@@ -1032,6 +1061,8 @@ int hdmi_init(struct platform_device *pdev)
 
 	hdmi.hdmi_start_frame_cb = 0;
 	hdmi.hdmi_stop_frame_cb = 0;
+	hdmi.hdmi_irq_cb = 0;
+	in_hdmi_restart = false;
 
 	hdmi_enable_clocks(0);
 	/* Get the major number for this module */
@@ -1380,6 +1411,28 @@ static int hdmi_is_connected(void)
 	return hdmi_rxdet();
 }
 
+static void hdmi_notify_status(struct omap_dss_device *dssdev)
+{
+
+	mutex_unlock(&hdmi.lock_aux);
+	hdmi_notify_pwrchange(HDMI_EVENT_POWERON);
+	mutex_unlock(&hdmi.lock);
+	mdelay(100);
+	mutex_lock(&hdmi.lock);
+	mutex_lock(&hdmi.lock_aux);
+
+	set_hdmi_hot_plug_status(dssdev, true);
+
+	/* Allow suffecient delay to stabilize the Digital channel
+	 * from sync lost digit errors
+	 */
+	mutex_unlock(&hdmi.lock_aux);
+	mutex_unlock(&hdmi.lock);
+	mdelay(100);
+	mutex_lock(&hdmi.lock);
+	mutex_lock(&hdmi.lock_aux);
+}
+
 static void hdmi_work_queue(struct work_struct *ws)
 {
 	struct hdmi_work_struct *work =
@@ -1406,9 +1459,9 @@ static void hdmi_work_queue(struct work_struct *ws)
 		action = (hdmi_is_connected()) ? HDMI_CONNECT : HDMI_DISCONNECT;
 
 	DSSDBG("\n\n");
-	DSSDBG("<%s> action = %d, interrupt_q = 0x%x, hdmi_power = %d,\n"
-	       "hdmi_connected = %d",
-	       __func__, action, r, hdmi_power, hdmi_connected);
+	DSSINFO("<%s> action = %d, r = 0x%x, hdmi_power = %d,"
+		" hdmi_connected = %d",
+		__func__, action, r, hdmi_power, hdmi_connected);
 
 	if (action & HDMI_DISCONNECT) {
 		/* cancel auto-notify */
@@ -1475,12 +1528,12 @@ static void hdmi_work_queue(struct work_struct *ws)
 	if (action & HDMI_CONNECT)
 		last_connect = ktime_get();
 
-	if (action & HDMI_CONNECT) {
-		if (custom_set)
-			user_hpd_state = false;
+	if (action & HDMI_CONNECT &&
+	    hdmi_power == HDMI_POWER_FULL &&
+	    custom_set) {
+		user_hpd_state = false;
 
-		if (!user_hpd_state && (hdmi_power == HDMI_POWER_FULL))
-			set_hdmi_hot_plug_status(dssdev, true);
+		hdmi_notify_status(dssdev);
 	}
 
 	if ((action & HDMI_CONNECT) && (video_power == HDMI_POWER_MIN) &&
@@ -1496,12 +1549,6 @@ static void hdmi_work_queue(struct work_struct *ws)
 		edid_set = false;
 		custom_set = true;
 		hdmi_reconfigure(dssdev);
-		mutex_unlock(&hdmi.lock_aux);
-		hdmi_notify_pwrchange(HDMI_EVENT_POWERON);
-		mutex_unlock(&hdmi.lock);
-		mdelay(100);
-		mutex_lock(&hdmi.lock);
-		mutex_lock(&hdmi.lock_aux);
 		if (dssdev->state != OMAP_DSS_DISPLAY_ACTIVE)
 			/* HDMI is disabled, no need to process */
 			goto done;
@@ -1541,8 +1588,7 @@ done:
 		}
 
 		hdmi_reconfigure(dssdev);
-		set_hdmi_hot_plug_status(dssdev, true);
-		/* ignore return value for now */
+		hdmi_notify_status(dssdev);
 		DSSINFO("Enabling display Done- HDMI_FIRST_HPD\n\n");
 	}
 
@@ -1565,8 +1611,16 @@ hpd_modify:
 						"to tv\n"
 						"Dettach the overlays before "
 						"reconfiguring the HDMI\n\n");
+
 					/* clear the IRQ's*/
 					hdmi_set_irqs(0);
+
+					/* HDCP start callback must be called to
+					 * restart authentication
+					 */
+					if (hdmi.hdmi_start_frame_cb)
+						(*hdmi.hdmi_start_frame_cb)();
+
 					goto done2;
 				}
 		}
@@ -1581,8 +1635,7 @@ hpd_modify:
 		edid_set = false;
 		custom_set = false;
 		hdmi_reconfigure(dssdev);
-		set_hdmi_hot_plug_status(dssdev, true);
-		/* ignore return value for now */
+		hdmi_notify_status(dssdev);
 		DSSINFO("Reconfigure HDMI PHY Done- HDMI_HPD_MODIFY\n\n");
 	}
 
@@ -1617,6 +1670,7 @@ static irqreturn_t hdmi_irq_handler(int irq, void *arg)
 	spin_lock_irqsave(&irqstatus_lock, flags);
 
 	HDMI_W1_HPD_handler(&r);
+
 	DSSDBG("Received IRQ r=%08x\n", r);
 
 	if (((r & HDMI_CONNECT) || (r & HDMI_FIRST_HPD)) &&
@@ -1631,6 +1685,9 @@ static irqreturn_t hdmi_irq_handler(int irq, void *arg)
 
 	hdmi_handle_irq_work(r | in_reset);
 
+	if (hdmi.hdmi_irq_cb != 0)
+		(*hdmi.hdmi_irq_cb)(r);
+
 	return IRQ_HANDLED;
 }
 
@@ -1641,7 +1698,7 @@ static void hdmi_power_off_phy(struct omap_dss_device *dssdev)
 	HDMI_W1_StopVideoFrame(HDMI_WP);
 	hdmi_set_irqs(1);
 
-	dispc_enable_digit_out(0);
+	dssdev->manager->disable(dssdev->manager);
 
 	if (hdmi.hdmi_stop_frame_cb)
 		(*hdmi.hdmi_stop_frame_cb)();
@@ -1653,8 +1710,9 @@ static void hdmi_power_off_phy(struct omap_dss_device *dssdev)
 
 static void hdmi_power_off(struct omap_dss_device *dssdev)
 {
-	set_hdmi_hot_plug_status(dssdev, false);
-	/* ignore return value for now */
+	if (!in_hdmi_restart)
+		set_hdmi_hot_plug_status(dssdev, false);
+		/* ignore return value for now */
 
 	/*
 	 * WORKAROUND: wait before turning off HDMI.  This may give
@@ -1753,9 +1811,8 @@ static int hdmi_set_power(struct omap_dss_device *dssdev,
 		} else if (power_need == HDMI_POWER_MIN) {
 			r = hdmi_min_enable();
 		} else {
-                        dssdev->manager->disable(dssdev->manager);
-			omap_dss_stop_device(dssdev);
 			hdmi_power_off(dssdev);
+			omap_dss_stop_device(dssdev);
 		}
 		if (!r)
 			hdmi_power = power_need;
@@ -2516,10 +2573,12 @@ const struct omap_video_timings *hdmi_get_omap_timing(int ix)
 }
 
 int hdmi_register_hdcp_callbacks(void (*hdmi_start_frame_cb)(void),
-				 void (*hdmi_stop_frame_cb)(void))
+				 void (*hdmi_stop_frame_cb)(void),
+				 void (*hdmi_irq_cb)(int status))
 {
 	hdmi.hdmi_start_frame_cb = hdmi_start_frame_cb;
 	hdmi.hdmi_stop_frame_cb  = hdmi_stop_frame_cb;
+	hdmi.hdmi_irq_cb	 = hdmi_irq_cb;
 
 	return hdmi_w1_get_video_state();
 }
@@ -2529,7 +2588,9 @@ void hdmi_restart(void)
 {
 	struct omap_dss_device *dssdev = get_hdmi_device();
 
-	hdmi_disable_video(dssdev);
-	hdmi_enable_video(dssdev);
+	in_hdmi_restart = true;
+	set_video_power(dssdev, HDMI_POWER_OFF);
+	set_video_power(dssdev, HDMI_POWER_FULL);
+	in_hdmi_restart = false;
 }
 EXPORT_SYMBOL(hdmi_restart);

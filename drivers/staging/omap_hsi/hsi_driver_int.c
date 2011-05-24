@@ -427,6 +427,12 @@ int hsi_do_cawake_process(struct hsi_port *pport)
 		}
 		pport->cawake_status = 1;
 
+		/* Force HSI to ON_ACTIVE when CAWAKE is high */
+		hsi_set_pm_force_hsi_on(hsi_ctrl);
+		/* TODO: Use omap_pm_set_max_dev_wakeup_lat() to set latency */
+		/* constraint to prevent L3INIT to enter RET/OFF when CAWAKE */
+		/* is high */
+
 		spin_unlock(&hsi_ctrl->lock);
 		hsi_port_event_handler(pport, HSI_EVENT_CAWAKE_UP, NULL);
 		spin_lock(&hsi_ctrl->lock);
@@ -451,6 +457,12 @@ int hsi_do_cawake_process(struct hsi_port *pport)
 			spin_lock(&hsi_ctrl->lock);
 		}
 		pport->cawake_status = 0;
+
+		/* Allow HSI HW to enter IDLE when CAWAKE is low */
+		hsi_set_pm_default(hsi_ctrl);
+		/* TODO: Use omap_pm_set_max_dev_wakeup_lat() to release */
+		/* latency constraint to prevent L3INIT to enter RET/OFF when */
+		/* CAWAKE is low */
 
 		spin_unlock(&hsi_ctrl->lock);
 		hsi_port_event_handler(pport, HSI_EVENT_CAWAKE_DOWN, NULL);
@@ -539,7 +551,7 @@ static u32 hsi_driver_int_proc(struct hsi_port *pport,
 		channels_served |= HSI_ERROROCCURED;
 	}
 
-	for (channel = start; channel < stop; channel++) {
+	for (channel = start; channel <= stop; channel++) {
 		if (status_reg & HSI_HST_DATAACCEPT(channel)) {
 			hsi_do_channel_tx(&pport->hsi_channel[channel]);
 			channels_served |= HSI_HST_DATAACCEPT(channel);
@@ -583,14 +595,15 @@ static u32 hsi_process_int_event(struct hsi_port *pport)
 	status_reg = hsi_driver_int_proc(pport,
 			    HSI_SYS_MPU_STATUS_REG(port, irq),
 			    HSI_SYS_MPU_ENABLE_REG(port, irq),
-			    0, min(pport->max_ch, (u8) HSI_SSI_CHANNELS_MAX));
+			    0,
+			    min(pport->max_ch, (u8) HSI_SSI_CHANNELS_MAX) - 1);
 
 	/* Process events for channels 8..15 */
 	if (pport->max_ch > HSI_SSI_CHANNELS_MAX)
 		status_reg |= hsi_driver_int_proc(pport,
 				    HSI_SYS_MPU_U_STATUS_REG(port, irq),
 				    HSI_SYS_MPU_U_ENABLE_REG(port, irq),
-				    HSI_SSI_CHANNELS_MAX, pport->max_ch);
+				    HSI_SSI_CHANNELS_MAX, pport->max_ch - 1);
 
 	return status_reg;
 }
