@@ -31,6 +31,7 @@
 #include <linux/slab.h>
 #include <linux/pm_runtime.h>
 
+#include <mach/omap4-common.h>
 #include <plat/omap_device.h>
 
 #include "hsi_driver.h"
@@ -634,6 +635,10 @@ void hsi_clocks_disable_channel(struct device *dev, u8 channel_number,
 	if (hsi_is_hst_controller_busy(hsi_ctrl))
 		dev_warn(dev, "Disabling clocks with HST FSM not IDLE !\n");
 
+	/* Allow Fclk to change */
+	if (dpll_cascading_blocker_release(dev) < 0)
+		dev_warn(dev, "Error releasing DPLL cascading constraint\n");
+
 #ifndef USE_PM_RUNTIME_FOR_HSI
 	hsi_runtime_suspend(dev);
 	omap_device_idle(pd);
@@ -673,6 +678,11 @@ int hsi_clocks_enable_channel(struct device *dev, u8 channel_number,
 		dev_dbg(dev, "Clocks already enabled, skipping...\n");
 		return -EEXIST;
 	}
+
+	/* Prevent Fclk change */
+	if (dpll_cascading_blocker_hold(dev) < 0)
+		dev_warn(dev, "Error holding DPLL cascading constraint\n");
+
 #ifndef USE_PM_RUNTIME_FOR_HSI
 	omap_device_enable(pd);
 	hsi_runtime_resume(dev);
@@ -828,15 +838,15 @@ static int __init hsi_platform_device_probe(struct platform_device *pd)
 	/* Allow HSI to wake up the platform */
 	device_init_wakeup(hsi_ctrl->dev, 1);
 
-	/* From here no need for HSI HW access */
-	hsi_clocks_disable(hsi_ctrl->dev, __func__);
-
 	/* Set the HSI FCLK to default. */
 	err = omap_device_set_rate(hsi_ctrl->dev, hsi_ctrl->dev,
 					pdata->default_hsi_fclk);
 	if (err)
 		dev_err(&pd->dev, "Cannot set HSI FClk to default value: %ld\n",
 			pdata->default_hsi_fclk);
+
+	/* From here no need for HSI HW access */
+	hsi_clocks_disable(hsi_ctrl->dev, __func__);
 
 	return err;
 
