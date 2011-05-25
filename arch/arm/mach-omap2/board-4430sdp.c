@@ -1625,10 +1625,6 @@ static void omap_4430hsi_pad_conf(void)
 	omap_mux_init_signal("usbb1_ulpitll_dat7.gpio_95", \
 		OMAP_PIN_INPUT_PULLDOWN | \
 		OMAP_PIN_OFF_NONE);
-	/* gpio_157 */
-	omap_mux_init_signal("usbb2_ulpitll_clk.gpio_157", \
-		OMAP_PIN_OUTPUT | \
-		OMAP_PIN_OFF_NONE);
 	/* gpio_187 */
 	omap_mux_init_signal("sys_boot3.gpio_187", \
 		OMAP_PIN_OUTPUT | \
@@ -1920,8 +1916,11 @@ static struct omap_board_mux board_mux[] __initdata = {
 					| OMAP_OFF_EN | OMAP_OFF_PULL_EN),
 	OMAP4_MUX(SDMMC5_CLK, OMAP_MUX_MODE0 | OMAP_INPUT_EN | OMAP_OFF_EN
 					| OMAP_OFF_PULL_EN),
-	OMAP4_MUX(USBB2_ULPITLL_CLK, OMAP_MUX_MODE0 | OMAP_PULL_ENA |
-				OMAP_INPUT_EN | OMAP_OFF_EN | OMAP_OFF_PULL_EN),
+	/* Mux gpio-157 to USBB2_ULPITLL_CLK pad which is used to enable
+	 * power to modem circuit required when using HSI and EHCI drivers.
+	 */
+	OMAP4_MUX(USBB2_ULPITLL_CLK, OMAP_MUX_MODE3 | OMAP_PULL_ENA |
+				OMAP_INPUT_EN),
 	OMAP4_MUX(GPMC_NCS1, OMAP_MUX_MODE3 | OMAP_INPUT_EN | OMAP_WAKEUP_EN),
 	OMAP4_MUX(GPMC_A24, OMAP_MUX_MODE3 | OMAP_INPUT_EN | OMAP_WAKEUP_EN),
 	{ .reg_offset = OMAP_MUX_TERMINATOR },
@@ -2024,12 +2023,13 @@ static void __init omap_4430sdp_init(void)
 	omap4_4430sdp_wifi_init();
 #endif
 
+#ifdef CONFIG_USB_ARCH_HAS_EHCI
 	/* Power on the ULPI PHY */
 	if (gpio_is_valid(OMAP4SDP_MDM_PWR_EN_GPIO)) {
-		/* FIXME: Assumes pad is muxed for GPIO mode */
 		gpio_request(OMAP4SDP_MDM_PWR_EN_GPIO, "USBB1 PHY VMDM_3V3");
 		gpio_direction_output(OMAP4SDP_MDM_PWR_EN_GPIO, 1);
 	}
+#endif
 
 	/*
 	 * Test board-4430sdp.modem_ipc bootargs value to detect if HSI pad
