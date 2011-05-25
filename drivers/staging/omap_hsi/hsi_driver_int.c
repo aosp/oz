@@ -140,7 +140,7 @@ bool hsi_is_hst_controller_busy(struct hsi_dev *hsi_ctrl)
 }
 
 
-/* Enables the CAWAKE, BREAK, or ERROR interrupt for he given port */
+/* Enables the CAWAKE, BREAK, or ERROR interrupt for the given port */
 int hsi_driver_enable_interrupt(struct hsi_port *pport, u32 flag)
 {
 	hsi_outl_or(flag, pport->hsi_controller->base,
@@ -332,6 +332,26 @@ static void hsi_do_channel_rx(struct hsi_channel *ch)
 	dev_dbg(hsi_ctrl->dev,
 		"Data Available interrupt for channel %d.\n", n_ch);
 
+	/* Check if there is data in FIFO available for reading */
+	if (hsi_driver_device_is_hsi(to_platform_device(hsi_ctrl->dev))) {
+		fifo = hsi_fifo_get_id(hsi_ctrl, n_ch, n_p);
+		if (unlikely(fifo < 0)) {
+			dev_err(hsi_ctrl->dev, "No valid FIFO id found for "
+					       "channel %d.\n", n_ch);
+			return;
+		}
+		fifo_words_avail = hsi_get_rx_fifo_occupancy(hsi_ctrl, fifo);
+		if (!fifo_words_avail) {
+			dev_warn(hsi_ctrl->dev,
+				"WARNING: RX FIFO %d empty before CPU copy\n",
+				fifo);
+
+			/* Do not disable interrupt becaue another interrupt */
+			/* can still come, this time with a real frame. */
+			return;
+		}
+	}
+
 	/* Disable interrupts for polling if not needed */
 	if (!(ch->flags & HSI_CH_RX_POLL))
 		hsi_driver_disable_read_interrupt(ch);
@@ -355,22 +375,6 @@ static void hsi_do_channel_rx(struct hsi_channel *ch)
 	}
 
 	hsi_reset_ch_read(ch);
-
-	/* Check if FIFO is correctly emptied */
-	if (hsi_driver_device_is_hsi(to_platform_device(hsi_ctrl->dev))) {
-		fifo = hsi_fifo_get_id(hsi_ctrl, n_ch, n_p);
-		if (unlikely(fifo < 0)) {
-			dev_err(hsi_ctrl->dev, "No valid FIFO id found for "
-					       "channel %d.\n", n_ch);
-			goto done;
-		}
-		fifo_words_avail = hsi_get_rx_fifo_occupancy(hsi_ctrl, fifo);
-		if (fifo_words_avail)
-			dev_dbg(hsi_ctrl->dev,
-				"WARNING: RX FIFO %d not empty after CPU copy, "
-				"remaining %d/%d frames\n",
-				fifo, fifo_words_avail, HSI_HSR_FIFO_SIZE);
-	}
 
 done:
 	if (rx_poll) {
