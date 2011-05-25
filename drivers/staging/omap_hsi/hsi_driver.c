@@ -199,8 +199,8 @@ static int __init reg_hsi_dev_ch(struct hsi_dev *hsi_ctrl, unsigned int p,
 		dev_set_name(&dev->device, "omap_hsi%d-p%u.c%u", dev->n_ctrl, p,
 			     ch);
 
-	pr_debug
-	    ("HSI DRIVER : reg_hsi_dev_ch, port %d, ch %d, hsi_ctrl->dev:0x%x,"
+	dev_dbg(hsi_ctrl->dev,
+		"reg_hsi_dev_ch, port %d, ch %d, hsi_ctrl->dev:0x%x,"
 		"&dev->device:0x%x\n",
 	     p, ch, (unsigned int)hsi_ctrl->dev, (unsigned int)&dev->device);
 
@@ -780,7 +780,7 @@ static int __init hsi_platform_device_probe(struct platform_device *pd)
 		hsi_driver_device_is_hsi(pd) ? "HSI" : "SSI");
 
 	if (!pdata) {
-		pr_err(LOG_NAME "No platform_data found on hsi device\n");
+		dev_err(&pd->dev, "No platform_data found on hsi device\n");
 		return -ENXIO;
 	}
 
@@ -1089,10 +1089,15 @@ static int __init hsi_driver_init(void)
 {
 	int err = 0;
 
-	pr_info("HSI DRIVER Version " HSI_DRIVER_VERSION "\n");
+	pr_info(LOG_NAME "HSI DRIVER Version " HSI_DRIVER_VERSION "\n");
 
 	/* Register the (virtual) HSI bus */
-	hsi_bus_init();
+	err = hsi_bus_init();
+	if (err < 0) {
+		pr_err(LOG_NAME "HSI bus_register err %d\n", err);
+		return err;
+	}
+
 	err = hsi_debug_init();
 	if (err < 0) {
 		pr_err(LOG_NAME "HSI Debugfs failed %d\n", err);
@@ -1120,7 +1125,7 @@ static void __exit hsi_driver_exit(void)
 	hsi_debug_exit();
 	hsi_bus_exit();
 
-	pr_info("HSI DRIVER removed\n");
+	pr_info(LOG_NAME "HSI DRIVER removed\n");
 }
 
 module_init(hsi_driver_init);

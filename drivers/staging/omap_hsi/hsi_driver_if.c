@@ -322,7 +322,7 @@ int hsi_write(struct hsi_device *dev, u32 *addr, unsigned int size)
 	int err;
 
 	if (unlikely(!dev)) {
-		pr_err("Null dev pointer in hsi_write\n");
+		pr_err(LOG_NAME "Null dev pointer in hsi_write\n");
 		return -EINVAL;
 	}
 
@@ -404,7 +404,7 @@ int hsi_read(struct hsi_device *dev, u32 *addr, unsigned int size)
 	int err;
 
 	if (unlikely(!dev)) {
-		pr_err("Null dev pointer in hsi_read\n");
+		pr_err(LOG_NAME "Null dev pointer in hsi_read\n");
 		return -EINVAL;
 	}
 
