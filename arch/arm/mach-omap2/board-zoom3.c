@@ -21,6 +21,7 @@
 #include <mach/board-zoom.h>
 
 #include <plat/common.h>
+#include <plat/control.h>
 #include <plat/board.h>
 #include <plat/usb.h>
 #include <plat/opp_twl_tps.h>
@@ -229,27 +230,27 @@ static struct platform_device *zoom_devices[] __initdata = {
 struct opp_frequencies {
 	unsigned long mpu;
 	unsigned long iva;
+	unsigned long ena;
 };
 
 static struct opp_frequencies opp_freq_add_table[] __initdata = {
   {
 	.mpu = 800000000,
 	.iva = 660000000,
+	.ena = OMAP3630_CONTROL_FUSE_OPP120_VDD1,
   },
   {
 	.mpu = 1000000000,
 	.iva =  800000000,
+	.ena = OMAP3630_CONTROL_FUSE_OPP1G_VDD1,
   },
-#if 0
-  1.2GHz has been observed to cause issues on ES1.1 boards and requires
-  further investigation.
   {
 	.mpu = 1200000000,
 	.iva =   65000000,
+	.ena = OMAP3630_CONTROL_FUSE_OPP1_2G_VDD1,
   },
-#endif
 
-  { 0, 0 },
+  { 0, 0, 0 },
 };
 
 
@@ -314,6 +315,7 @@ static int __init zoom3_opp_init(void)
 	struct omap_opp *mopp, *dopp;
 	struct device *mdev, *ddev;
 	struct opp_frequencies *opp_freq;
+	unsigned long hw_support;
 
 
 	if (!cpu_is_omap3630())
@@ -338,9 +340,11 @@ static int __init zoom3_opp_init(void)
 	for (opp_freq = opp_freq_add_table; opp_freq->mpu; opp_freq++) {
 		/* check enable/disable status of MPU frequecy setting */
 		mopp = opp_find_freq_exact(mdev, opp_freq->mpu, false);
+		hw_support = omap_ctrl_readl(opp_freq->ena);
+
 		if (IS_ERR(mopp))
 			mopp = opp_find_freq_exact(mdev, opp_freq->mpu, true);
-		if (IS_ERR(mopp)) {
+		if (IS_ERR(mopp) || !hw_support) {
 			pr_err("%s: MPU does not support %lu MHz\n", __func__, opp_freq->mpu / 1000000);
 			continue;
 		}
