@@ -1410,6 +1410,7 @@ static int serial_omap_probe(struct platform_device *pdev)
 	up->port.uartclk = omap_up_info->uartclk;
 	up->uart_dma.uart_base = mem->start;
 	up->plat_hold_wakelock = omap_up_info->plat_hold_wakelock;
+	up->try_locked = 0;
 	/* Initialise this to zero, would be initialsed
 	 * to the corrcet value at set_stermios.
 	 */

@@ -178,6 +178,7 @@ struct uart_omap_port {
 	unsigned long		port_activity;
 	unsigned int		baud_rate;
 	void			(*plat_hold_wakelock)(void *up, int flag);
+	int			try_locked;
 };
 
 enum {

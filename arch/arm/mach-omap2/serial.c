@@ -104,6 +104,8 @@ struct omap_uart_state {
 	u16 mdr3;
 	u16 dma_thresh;
 	u16 lcr;
+	u16 dpll_ier_state;
+	u16 dpll_lcr_state;
 
 
 #endif
@@ -649,8 +651,10 @@ static int omap_uart_recalibrate_baud_cb(struct notifier_block *nb,
 			/* If Console, Stop from here, till the Frequencies
 			 * Change.
 			 */
-			if (omap_is_console_port(&up->port))
-				console_stop(up->port.cons);
+			if (omap_is_console_port(&up->port)) {
+				up->port.cons->flags &= ~CON_ENABLED;
+				up->try_locked = spin_trylock(&up->port.lock);
+			}
 
 			/* If the device uses the RTS based controlling,
 			 * Pull Up the signal to stop transaction. As the
@@ -668,6 +672,20 @@ static int omap_uart_recalibrate_baud_cb(struct notifier_block *nb,
 			 */
 			udelay(10);
 
+			/*
+			 * All the Software requirements taken cares, Now
+			 * Block the UART IP.
+			 * Disable the Interrupts ( Since the RTS disabled,
+			 * there shouldnt be no RX ).
+			 * Disable the UART Mode  ( TX case is forced stop )
+			 */
+			uart->dpll_lcr_state = serial_read_reg(uart, UART_LCR);
+			uart->dpll_ier_state = serial_read_reg(uart, UART_IER);
+			/* Hence Forth no interrupts till DPLL is changed */
+			serial_write_reg(uart, UART_IER, 0);
+
+			/* Disable the UART Module, Enabled after DPLL Exit */
+			serial_write_reg(uart, UART_OMAP_MDR1, 0x7);
 			/* Do the Required thing for the Devices in The
 			 * Pre State
 			 */
@@ -697,14 +715,23 @@ static int omap_uart_recalibrate_baud_cb(struct notifier_block *nb,
 
 			baud_quot = up->port.uartclk/(up->baud_rate * divisor);
 
-			serial_write_reg(uart, UART_OMAP_MDR1, 0x7);
 			serial_write_reg(uart, UART_LCR,
 					OMAP_UART_LCR_CONF_MDB);
 			serial_write_reg(uart, UART_DLL, baud_quot & 0xff);
 			serial_write_reg(uart, UART_DLM, baud_quot >> 8);
-			serial_write_reg(uart, UART_LCR, UART_LCR_WLEN8);
-			/* UART 16x mode */
-			serial_write_reg(uart, UART_OMAP_MDR1, 0x00);
+			serial_write_reg(uart, UART_LCR, uart->dpll_lcr_state);
+			serial_write_reg(uart, UART_IER, uart->dpll_ier_state);
+			/* Based on the Baud change the UART 16x or 13x mode
+			 * Restore the UART mode which is disabled in Pre
+			 * DPLL state.
+			 */
+			if (up->baud_rate > OMAP_MODE13X_SPEED &&
+				up->baud_rate != 3000000)
+				serial_write_reg(uart, UART_OMAP_MDR1,
+						OMAP_MDR1_MODE13X);
+			else
+				serial_write_reg(uart, UART_OMAP_MDR1,
+						OMAP_MDR1_MODE16X);
 #if 0
 			dev_dbg(uart->pdev->dev, "Per Functional Clock Changed"
 					" %u Hz Change baud DLL %d DLM %d\n",
@@ -717,8 +744,11 @@ static int omap_uart_recalibrate_baud_cb(struct notifier_block *nb,
 			/* Do the Required thing for the Devices in Post
 			 * State
 			 */
-			if (omap_is_console_port(&up->port))
-				console_start(up->port.cons);
+			if (omap_is_console_port(&up->port)) {
+				up->port.cons->flags |= CON_ENABLED;
+				if (up->try_locked)
+					spin_unlock(&up->port.lock);
+			}
 
 			omap_uart_disable_rtspullup(uart);
 		}
