@@ -2729,7 +2729,7 @@ static int __init omap_voltage_init(void)
 			omap_ctrl_writel(0x0400040f,
 			OMAP4_CTRL_MODULE_CORE_LDOSRAM_IVA_VOLTAGE_CTRL);
 			/* write value of 0x0 to VDAC as per trim recomendation */
-			omap_ctrl_writel(0x000001c0,
+			omap4_ctrl_pad_writel(0x000001c0,
 			OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_EFUSE_1);
 		} else {
 			/*
@@ -2754,7 +2754,7 @@ static int __init omap_voltage_init(void)
 	 * Smart IO override efuse with P:16/N:16 and P:0/N:0 respectively
 	 */
 	if (cpu_is_omap44xx())
-		omap_ctrl_writel(0x00084000,
+		omap4_ctrl_pad_writel(0x00084000,
 			OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_EFUSE_2);
 
 
