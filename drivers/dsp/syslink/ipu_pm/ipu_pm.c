@@ -68,6 +68,7 @@
 #include "../../../../arch/arm/mach-omap2/prm.h"
 #include "../../../../arch/arm/mach-omap2/prcm-common.h"
 #include "../../../../arch/arm/mach-omap2/prm44xx.h"
+#include "../../../../arch/arm/mach-omap2/prm-regbits-44xx.h"
 #include "ipu_pm.h"
 
 /** ============================================================================
@@ -1339,25 +1340,29 @@ static inline int ipu_pm_get_iva_hd(struct ipu_pm_object *handle,
 				    struct ipu_pm_params *params)
 {
 	int retval;
-
 	if (params->pm_iva_hd_counter) {
 		pr_err("%s %d IVA_HD already requested\n", __func__, __LINE__);
 		return PM_UNSUPPORTED;
 	}
-
+	/* set Next State to ON for IVAHD */
+	prm_rmw_mod_reg_bits(OMAP4430_POWERSTATEST_MASK,
+		(PWRDM_POWER_ON << OMAP4430_POWERSTATEST_SHIFT),
+		OMAP4430_PRM_IVAHD_MOD, OMAP4_PM_IVAHD_PWRSTCTRL_OFFSET);
+	/* Requesting IVA_HD */
 	retval = ipu_pm_module_start(rcb_p->sub_type);
 	if (retval) {
 		pr_err("%s %d Error requesting IVA_HD\n", __func__, __LINE__);
 		return PM_UNSUPPORTED;
 	}
-	/* set Next State to INACTIVE for IVAHD */
-	prm_write_mod_reg(0xff0e02,
-			 OMAP4430_PRM_IVAHD_MOD,
-			 OMAP4_PM_IVAHD_PWRSTCTRL_OFFSET);
-
-	params->pm_iva_hd_counter++;
 	pr_debug("Request IVA_HD\n");
-
+	/* Requesting SL2 */
+	retval = ipu_pm_module_start(SL2_RESOURCE);
+	if (retval) {
+		pr_err("%s %d Error requesting SL2\n", __func__, __LINE__);
+		return PM_UNSUPPORTED;
+	}
+	pr_debug("Request SL2\n");
+	params->pm_iva_hd_counter++;
 #ifdef CONFIG_OMAP_PM
 	pr_debug("Request MPU wakeup latency\n");
 	retval = omap_pm_set_max_mpu_wakeup_lat(&pm_qos_handle,
@@ -1367,7 +1372,6 @@ static inline int ipu_pm_get_iva_hd(struct ipu_pm_object *handle,
 		return PM_UNSUPPORTED;
 	}
 #endif
-
 	return PM_SUCCESS;
 }
 
@@ -1483,16 +1487,6 @@ static inline int ipu_pm_get_ivaseq1(struct ipu_pm_object *handle,
 	}
 	params->pm_ivaseq1_counter++;
 	pr_debug("Request IVASEQ1\n");
-
-	/*Requesting SL2*/
-	/* FIXME: sl2if should be moved to a independent function */
-	retval = ipu_pm_module_start(SL2_RESOURCE);
-	if (retval) {
-		pr_err("%s %d Error requesting sl2if\n", __func__, __LINE__);
-		return PM_UNSUPPORTED;
-	}
-	params->pm_sl2if_counter++;
-	pr_debug("Request sl2if\n");
 
 	return PM_SUCCESS;
 }
@@ -1930,33 +1924,25 @@ static inline int ipu_pm_rel_iva_hd(struct ipu_pm_object *handle,
 				    struct ipu_pm_params *params)
 {
 	int retval;
-
 	if (!params->pm_iva_hd_counter) {
 		pr_err("%s %d IVA_HD not requested\n", __func__, __LINE__);
 		goto error;
 	}
-
 	/* Releasing SL2 */
-	/* FIXME: sl2if should be moved to a independent function */
-	if (params->pm_sl2if_counter) {
-		retval = ipu_pm_module_stop(SL2_RESOURCE);
-		if (retval) {
-			pr_err("%s %d Error releasing sl2if\n"
-							, __func__, __LINE__);
-			return PM_UNSUPPORTED;
-		}
-		params->pm_sl2if_counter--;
-		pr_debug("Release SL2IF\n");
+	retval = ipu_pm_module_stop(SL2_RESOURCE);
+	if (retval) {
+		pr_err("%s %d Error releasing SL2\n", __func__, __LINE__);
+		return PM_UNSUPPORTED;
 	}
-
+	pr_debug("Release SL2\n");
+	/* Releasing IVA_HD */
 	retval = ipu_pm_module_stop(rcb_p->sub_type);
 	if (retval) {
 		pr_err("%s %d Error releasing IVA_HD\n", __func__, __LINE__);
 		return PM_UNSUPPORTED;
 	}
-	params->pm_iva_hd_counter--;
 	pr_debug("Release IVA_HD\n");
-
+	params->pm_iva_hd_counter--;
 #ifdef CONFIG_OMAP_PM
 	if (params->pm_iva_hd_counter == 0 && params->pm_iss_counter == 0) {
 		pr_debug("Release MPU wakeup latency\n");
