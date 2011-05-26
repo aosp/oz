@@ -2717,17 +2717,17 @@ static int __init omap_voltage_init(void)
 	if (cpu_is_omap44xx()
 		&& (omap_rev() == CHIP_IS_OMAP4430ES2_2)) {
 		is_trimmed = omap_ctrl_readl(
-			OMAP4_CTRL_MODULE_CORE_LDOSRAM_MPU_VOLTAGE_CTRL);
+			OMAP4_CTRL_MODULE_CORE_LDOSRAM_MPU_VOLTAGE_CTRL_OFFSET);
 		if (!is_trimmed) {
 			/* Trimm value is 0 for this unit.
 			 * we set force overide, insted of efuse.
 			 */
 			omap_ctrl_writel(0x0400040f,
-			OMAP4_CTRL_MODULE_CORE_LDOSRAM_MPU_VOLTAGE_CTRL);
+			OMAP4_CTRL_MODULE_CORE_LDOSRAM_MPU_VOLTAGE_CTRL_OFFSET);
 			omap_ctrl_writel(0x0400040f,
-			OMAP4_CTRL_MODULE_CORE_LDOSRAM_CORE_VOLTAGE_CTRL);
+			OMAP4_CTRL_MODULE_CORE_LDOSRAM_CORE_VOLTAGE_CTRL_OFFSET);
 			omap_ctrl_writel(0x0400040f,
-			OMAP4_CTRL_MODULE_CORE_LDOSRAM_IVA_VOLTAGE_CTRL);
+			OMAP4_CTRL_MODULE_CORE_LDOSRAM_IVA_VOLTAGE_CTRL_OFFSET);
 			/* write value of 0x0 to VDAC as per trim recomendation */
 			omap_ctrl_writel(0x000001c0,
 			OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_EFUSE_1);
