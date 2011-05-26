@@ -749,7 +749,7 @@ static irqreturn_t omap_talert_irq_handler(int irq, void *data)
 	t_hot = omap_temp_sensor_readl(temp_sensor, BGAP_STATUS_OFFSET)
 	    & OMAP4_HOT_FLAG_MASK;
 	t_cold = omap_temp_sensor_readl(temp_sensor, BGAP_STATUS_OFFSET)
-	    & OMAP4_T_COLD_MASK;
+	    & OMAP4_COLD_FLAG_MASK;
 	temp = omap_temp_sensor_readl(temp_sensor, BGAP_CTRL_OFFSET);
 	if (t_hot) {
 		temp &= ~(OMAP4_MASK_HOT_MASK);
