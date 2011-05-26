@@ -486,7 +486,6 @@ static int __devinit twl6030_usb_probe(struct platform_device *pdev)
 
 	twl->asleep = 0;
 	pdata->phy_init(dev);
-	twl6030_enable_irq(&twl->otg);
 	dev_info(&pdev->dev, "Initialized TWL6030 USB module\n");
 
 	return 0;
