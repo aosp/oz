@@ -2844,7 +2844,7 @@ static int vidioc_qbuf(struct file *file, void *fh, struct v4l2_buffer *buffer)
 	struct s3d_ovl_device *dev = fh;
 	struct videobuf_queue *q = &dev->vbq;
 	int r = 0;
-	bool push_buf = false;
+	bool buf_queue_empty = false;
 
 	mutex_lock(&dev->lock);
 	if ((V4L2_BUF_TYPE_VIDEO_OUTPUT != buffer->type) ||
@@ -2855,9 +2855,8 @@ static int vidioc_qbuf(struct file *file, void *fh, struct v4l2_buffer *buffer)
 	}
 
 	if (dev->streaming && dssdev_manually_updated(dev->cur_disp) &&
-		list_empty(&dev->videobuf_q) &&
-		(dev->cur_buf == dev->next_buf))
-		push_buf = true;
+		list_empty(&dev->videobuf_q))
+		buf_queue_empty = true;
 
 	r = videobuf_qbuf(q, buffer);
 	if (r)
@@ -2868,7 +2867,8 @@ static int vidioc_qbuf(struct file *file, void *fh, struct v4l2_buffer *buffer)
 		goto exit;
 	}
 
-	if (push_buf) {
+	if (buf_queue_empty && !list_empty(&dev->videobuf_q) &&
+		(dev->cur_buf == dev->next_buf)) {
 		dev->next_buf = list_entry(dev->videobuf_q.next,
 					struct videobuf_buffer, queue);
 		list_del(&dev->next_buf->queue);
