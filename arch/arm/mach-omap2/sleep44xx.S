@@ -72,7 +72,7 @@ POR_params:
 .word 1, 5
 
 POR_4460_params:
-.word 1, 0x70000009
+.word 1, 0x52000009
 
 /*
  * CPUx Wakeup Non-Secure Physical Address for
@@ -149,7 +149,6 @@ enable_smp_bit:
 	isb
 skip_enable_smp_bit:			@ GP device should execute from here
 #ifdef CONFIG_CACHE_L2X0
-	/* FIXME : Add POR register restore as well */
 	ldr	r2, =OMAP44XX_L2CACHE_BASE
 	ldr	r0, [r2, #L2X0_CTRL]
 	and	r0, #0x0f
@@ -160,7 +159,7 @@ skip_enable_smp_bit:			@ GP device should execute from here
 	ldr	r1, =A9_ES1_REV
 	cmp	r0, r1
 	bne	check_por
-	ldr	r0, =OMAP4_L2X0_AUXCTL_VALUE_ES1
+	ldr	r0, =OMAP443X_L2X0_AUXCTL_VALUE_ES1
 	ldr     r12, =0x109		@ Setup L2 AUXCTL value
 	dsb
 	smc     #0
@@ -177,10 +176,21 @@ check_por:
 	adrne	r3, POR_params
 	LM_CALL_PPA_SERVICE_PA
 skip_por:
+	/*
+	 * Restore the L2X0 lockdown registers before enabling L2X0.
+	 * OMAP4430 restore values will be 0x0
+	 */
+	ldr	r2, =OMAP44XX_L2CACHE_BASE
+	ldr	r4, =OMAP44XX_SAR_RAM_BASE
+	ldr	r9, [r4, #L2X0_LOCKDOWN_OFFSET0]
+	str	r9, [r2, #0x900]
+	str	r9, [r2, #0x904]
+	str	r9, [r2, #0x908]
+	str	r9, [r2, #0x90c]
 	IS_CPU_OMAP4460
 	ite	eq
-	ldreq	r0, =OMAP446x_L2X0_AUXCTL_VALUE
-	ldrne	r0, =OMAP4_L2X0_AUXCTL_VALUE
+	ldreq	r0, =OMAP446X_L2X0_AUXCTL_VALUE
+	ldrne	r0, =OMAP443X_L2X0_AUXCTL_VALUE
 	ldr     r12, =0x109		@ Setup L2 AUXCTL value
 	dsb
 	smc     #0
