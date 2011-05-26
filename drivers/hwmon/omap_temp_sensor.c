@@ -44,6 +44,7 @@
 #include <plat/temperature_sensor.h>
 #include <mach/ctrl_module_core_44xx.h>
 #include <mach/gpio.h>
+#include <linux/reboot.h>
 
 /* This DEBUG flag is used to enable the sysfs entries
  * for the thermal shutdown thresholds, uncomment #define
@@ -730,7 +731,7 @@ static irqreturn_t omap_tshut_irq_handler(int irq, void *data)
 	 * to avoid restart again at kernel level
 	 */
 	if (temp_sensor->is_efuse_valid)
-		arm_machine_restart('s', NULL);
+		kernel_restart(NULL);
 	else
 		pr_err("%s:Invalid EFUSE, Non-trimmed BGAP, \
 				No thermal shutdown\n", __func__);
