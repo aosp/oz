@@ -294,11 +294,10 @@ static ssize_t set_temp_max(struct device *dev,
 
 	/*
 	 * If user sets the HIGH threshold(t_hot) greater than the current
-	 * temperature(temp) unmask the HOT interrupts
+	 * or equal to temperature(temp) unmask the HOT interrupts
 	 */
-	if (t_hot > temp) {
+	if (t_hot >= temp) {
 		reg_val = omap_temp_sensor_readl(temp_sensor, BGAP_CTRL_OFFSET);
-		reg_val = reg_val & ~(OMAP4_MASK_COLD_MASK);
 		reg_val = reg_val | OMAP4_MASK_HOT_MASK;
 		omap_temp_sensor_writel(temp_sensor, reg_val, BGAP_CTRL_OFFSET);
 	}
@@ -389,12 +388,11 @@ static ssize_t set_temp_max_hyst(struct device *dev,
 	temp = temp & (OMAP4_BGAP_TEMP_SENSOR_DTEMP_MASK);
 
 	/*
-	 * If user sets the LOW threshold(t_cold) lower than the current
-	 * temperature(temp) unmask the COLD interrupts
+	 * If user sets the LOW threshold(t_cold) lower than or equal to the
+	 * current temperature(temp) unmask the COLD interrupts
 	 */
-	if (t_cold < temp) {
+	if (t_cold <= temp) {
 		reg_val = omap_temp_sensor_readl(temp_sensor, BGAP_CTRL_OFFSET);
-		reg_val = reg_val & ~(OMAP4_MASK_HOT_MASK);
 		reg_val = reg_val | OMAP4_MASK_COLD_MASK;
 		omap_temp_sensor_writel(temp_sensor, reg_val, BGAP_CTRL_OFFSET);
 	}
