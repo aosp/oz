@@ -286,7 +286,7 @@ int d2l_write_register(u16 reg, u32 value)
 	ret = dsi_vc_send_long(lcd_ix, CMD_VC_CHANNEL, dsi_buf.data_type,
 			       (u8 *) dsi_buf.Data_buf, 6, 0);
 
-	mdelay(100);
+	udelay(100);
 
 	return ret;
 }
