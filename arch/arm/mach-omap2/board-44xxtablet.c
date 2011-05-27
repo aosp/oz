@@ -57,18 +57,20 @@
 #include <plat/omap-serial.h>
 #include <plat/serial.h>
 #endif
-#include <linux/wakelock.h>
 #include <plat/opp_twl_tps.h>
 #include <plat/mmc.h>
-#include <linux/qtouch_obp_ts.h>
-#include <linux/gpio_keys.h>
+#include <plat/temperature_sensor.h>
 #include <plat/hwspinlock.h>
 #include <plat/nokia-dsi-panel.h>
 #include <plat/toshiba-dsi-panel.h>
+#include <linux/wakelock.h>
+#include <linux/qtouch_obp_ts.h>
+#include <linux/gpio_keys.h>
 #include "mux.h"
 #include "hsmmc.h"
 #include "smartreflex-class3.h"
 #include "board-4430sdp-wifi.h"
+#include "omap_tps6236x.h"
 
 #include <linux/skbuff.h>
 #include <linux/ti_wilink_st.h>
@@ -1524,13 +1526,34 @@ static void enable_board_wakeup_source(void)
 
 }
 
-static struct omap_volt_pmic_info omap_pmic_core = {
+static struct omap_volt_pmic_info omap4430_pmic_core = {
 	.name = "twl",
 	.slew_rate = 4000,
 	.step_size = 12500,
 	.i2c_addr = 0x12,
 	.i2c_vreg = 0x61,
 	.i2c_cmdreg = 0x62,
+	.vsel_to_uv = omap_twl_vsel_to_uv,
+	.uv_to_vsel = omap_twl_uv_to_vsel,
+	.onforce_cmd = omap_twl_onforce_cmd,
+	.on_cmd = omap_twl_on_cmd,
+	.sleepforce_cmd = omap_twl_sleepforce_cmd,
+	.sleep_cmd = omap_twl_sleep_cmd,
+	.vp_config_erroroffset = 0,
+	.vp_vstepmin_vstepmin = 0x01,
+	.vp_vstepmax_vstepmax = 0x04,
+	.vp_vlimitto_timeout_us = 0x200,
+	.vp_vlimitto_vddmin = 0xA,
+	.vp_vlimitto_vddmax = 0x28,
+};
+
+static struct omap_volt_pmic_info omap4460_pmic_core = {
+	.name = "twl",
+	.slew_rate = 4000,
+	.step_size = 12500,
+	.i2c_addr = 0x12,
+	.i2c_vreg = 0x55,
+	.i2c_cmdreg = 0x56,
 	.vsel_to_uv = omap_twl_vsel_to_uv,
 	.uv_to_vsel = omap_twl_uv_to_vsel,
 	.onforce_cmd = omap_twl_onforce_cmd,
@@ -1585,6 +1608,21 @@ static struct omap_volt_pmic_info omap_pmic_iva = {
 	.vp_vlimitto_timeout_us = 0x200,
 	.vp_vlimitto_vddmin = 0xA,
 	.vp_vlimitto_vddmax = 0x2D,
+};
+
+static struct omap_volt_vc_data vc446x_config = {
+	.vdd0_on = 1350000,	/* 1.35v */
+	.vdd0_onlp = 1350000,	/* 1.35v */
+	.vdd0_ret = 837500,	/* 0.8375v */
+	.vdd0_off = 600000,	/* 0.6 v */
+	.vdd1_on = 1350000,	/* 1.35v */
+	.vdd1_onlp = 1350000,	/* 1.35v */
+	.vdd1_ret = 837500,	/* 0.8375v */
+	.vdd1_off = 600000,	/* 0.6 v */
+	.vdd2_on = 1350000,	/* 1.35v */
+	.vdd2_onlp = 1350000,	/* 1.35v */
+	.vdd2_ret = 837500,	/* .8375v */
+	.vdd2_off = 600000,	/* 0.6 v */
 };
 
 static struct omap_volt_vc_data vc_config = {
@@ -1739,6 +1777,49 @@ static void omap4_4430sdp_wifi_init(void)
 }
 #endif
 
+static void __init tps62361_board_init(void)
+{
+	int  error;
+
+	omap_mux_init_gpio(TPS62361_GPIO, OMAP_PIN_OUTPUT);
+	error = gpio_request(TPS62361_GPIO, "tps62361");
+	if (error < 0) {
+		pr_err("%s:failed to request GPIO %d, error %d\n",
+			__func__, TPS62361_GPIO, error);
+		return;
+	}
+
+	error = gpio_direction_output(TPS62361_GPIO , 1);
+	if (error < 0) {
+		pr_err("%s: GPIO configuration failed: GPIO %d,error %d\n",
+			__func__, TPS62361_GPIO, error);
+		gpio_free(TPS62361_GPIO);
+	}
+}
+
+static int omap_tshut_init(void)
+{
+	int status;
+
+	/* Request for gpio_86 line */
+	status = gpio_request(OMAP_TSHUT_GPIO, "tshut");
+	if (status < 0) {
+		pr_err("Failed to request TSHUT GPIO: %d\n", OMAP_TSHUT_GPIO);
+		return status;
+	}
+	status = gpio_direction_input(OMAP_TSHUT_GPIO);
+	if (status < 0) {
+		pr_err(" GPIO configuration failed for TSHUT GPIO: %d\n",
+							OMAP_TSHUT_GPIO);
+		gpio_free(OMAP_TSHUT_GPIO);
+		return status;
+	}
+
+	return 0;
+}
+
+
+
 static void __init omap_44xxtablet_init(void)
 {
 	int status;
@@ -1812,10 +1893,26 @@ static void __init omap_44xxtablet_init(void)
 	omap_display_init(&blazetablet_dss_data);
 
 	enable_board_wakeup_source();
-	omap_voltage_register_pmic(&omap_pmic_core, "core");
-	omap_voltage_register_pmic(&omap_pmic_mpu, "mpu");
+
+	if (cpu_is_omap443x()) {
+		omap_voltage_register_pmic(&omap4430_pmic_core, "core");
+		omap_voltage_register_pmic(&omap_pmic_mpu, "mpu");
+	} else if (cpu_is_omap446x()) {
+		omap_voltage_register_pmic(&omap4460_pmic_core, "core");
+		tps62361_board_init();
+		omap4_tps62361_init();
+		status = omap_tshut_init();
+		if (status)
+			pr_err("TSHUT gpio initialization failed\n");
+	}
+
 	omap_voltage_register_pmic(&omap_pmic_iva, "iva");
-	omap_voltage_init_vc(&vc_config);
+
+	if (cpu_is_omap446x())
+		omap_voltage_init_vc(&vc446x_config);
+	else
+		omap_voltage_init_vc(&vc_config);
+
 }
 
 static void __init omap_4430sdp_map_io(void)
