@@ -2714,7 +2714,7 @@ static int __init omap_voltage_init(void)
 	 * 2. trim VDAC value for TV output as per recomendation
 	 */
 	if (cpu_is_omap44xx()
-		&& (omap_rev() == CHIP_IS_OMAP4430ES2_2)) {
+		&& (omap_rev() >= OMAP4430_REV_ES2_2)) {
 		is_trimmed = omap_ctrl_readl(
 			OMAP4_CTRL_MODULE_CORE_LDOSRAM_MPU_VOLTAGE_CTRL_OFFSET);
 		if (!is_trimmed) {
@@ -2735,16 +2735,18 @@ static int __init omap_voltage_init(void)
 			 * Set SRAM MPU/CORE/IVA LDO RETMODE
 			 * Setting RETMODE for un-trimmed units cause random
 			 * system hang. So enabling it only for trimmed units.
+			 * For 4430 series keep MPU SLDO at 0,that boards can hung on
+			 * RET -> ON transition, 4460 not impacted.
 			 */
 			prm_rmw_mod_reg_bits(OMAP4430_RETMODE_ENABLE_MASK,
 				0x1 << OMAP4430_RETMODE_ENABLE_SHIFT,
 				OMAP4430_PRM_DEVICE_MOD, OMAP4_PRM_LDO_SRAM_CORE_CTRL_OFFSET);
-				prm_rmw_mod_reg_bits(OMAP4430_RETMODE_ENABLE_MASK,
+			prm_rmw_mod_reg_bits(OMAP4430_RETMODE_ENABLE_MASK,
+				(cpu_is_omap446x()?0x1:0x0) << OMAP4430_RETMODE_ENABLE_SHIFT,
+				OMAP4430_PRM_DEVICE_MOD, OMAP4_PRM_LDO_SRAM_MPU_CTRL_OFFSET);
+			prm_rmw_mod_reg_bits(OMAP4430_RETMODE_ENABLE_MASK,
 				0x1 << OMAP4430_RETMODE_ENABLE_SHIFT,
-			OMAP4430_PRM_DEVICE_MOD, OMAP4_PRM_LDO_SRAM_MPU_CTRL_OFFSET);
-				prm_rmw_mod_reg_bits(OMAP4430_RETMODE_ENABLE_MASK,
-				0x1 << OMAP4430_RETMODE_ENABLE_SHIFT,
-			OMAP4430_PRM_DEVICE_MOD, OMAP4_PRM_LDO_SRAM_IVA_CTRL_OFFSET);
+				OMAP4430_PRM_DEVICE_MOD, OMAP4_PRM_LDO_SRAM_IVA_CTRL_OFFSET);
 		}
 	}
 
