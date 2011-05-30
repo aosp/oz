@@ -1139,20 +1139,20 @@ static void __init omap4_init_voltagecontroller(void)
 			(vdd_info[icore].pmic->i2c_cmdreg <<
 			 OMAP4430_VOLRA_VDD_CORE_L_SHIFT));
 	voltage_write_reg(OMAP4_PRM_VC_CFG_CHANNEL_OFFSET,
-			OMAP4430_RAV_VDD_MPU_L_MASK |
-			OMAP4430_CMD_VDD_MPU_L_MASK |
-			((vdd_info[impu].pmic->i2c_addr ==
-				vdd_info[icore].pmic->i2c_addr) ?
-					0 : OMAP4430_SA_VDD_MPU_L_MASK) |
-			OMAP4430_RAV_VDD_IVA_L_MASK |
-			OMAP4430_CMD_VDD_IVA_L_MASK |
+			 OMAP4430_RAC_VDD_MPU_L_MASK |
+			 OMAP4430_RAV_VDD_MPU_L_MASK |
+			 OMAP4430_CMD_VDD_MPU_L_MASK |
+			 OMAP4430_RAV_VDD_IVA_L_MASK |
+			 OMAP4430_CMD_VDD_IVA_L_MASK |
+			 OMAP4430_RAC_VDD_IVA_L_MASK |
 			((vdd_info[iiva].pmic->i2c_addr ==
-				vdd_info[icore].pmic->i2c_addr) ?
+			  vdd_info[impu].pmic->i2c_addr) ?
 					0 : OMAP4430_SA_VDD_IVA_L_MASK) |
-			OMAP4430_RAV_VDD_CORE_L_MASK |
-			OMAP4430_CMD_VDD_CORE_L_MASK |
-			((vdd_info[iiva].pmic->i2c_addr ==
-			vdd_info[icore].pmic->i2c_addr) ?
+			 OMAP4430_RAV_VDD_CORE_L_MASK |
+			 OMAP4430_RAC_VDD_CORE_L_MASK |
+			 OMAP4430_CMD_VDD_CORE_L_MASK |
+			((vdd_info[icore].pmic->i2c_addr ==
+			  vdd_info[impu].pmic->i2c_addr) ?
 					0 : OMAP4430_SA_VDD_CORE_L_MASK));
 	/*
 	 * Configure SR I2C in HS Mode. Is there really a need to configure
