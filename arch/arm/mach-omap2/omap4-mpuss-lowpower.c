@@ -828,6 +828,8 @@ cpu_prepare:
 
 void __init omap4_mpuss_init(void)
 {
+	u32 reg;
+
 	/*
 	 * Find out how many interrupts are supported.
 	 * The GIC only supports up to 1020 interrupt sources.
@@ -864,7 +866,15 @@ void __init omap4_mpuss_init(void)
 	} else {
 		writel(0x0, sar_ram_base + OMAP_TYPE_OFFSET);
 	}
+#ifdef CONFIG_CACHE_L2X0
+	if (cpu_is_omap446x()) {
+		reg = readl_relaxed(l2cache_base + 0x900);
+		writel_relaxed(reg, sar_ram_base + L2X0_LOCKDOWN_OFFSET0);
+	} else {
+		writel_relaxed(0x0, sar_ram_base + L2X0_LOCKDOWN_OFFSET0);
+	}
 
+#endif
 }
 
 #else

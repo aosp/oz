@@ -32,6 +32,7 @@
 #define CPU0_TWD_OFFSET			0xd30
 #define CPU1_TWD_OFFSET			0xd38
 #define OMAP_TYPE_OFFSET		0xd48
+#define L2X0_LOCKDOWN_OFFSET0		0xd50
 
 /*
  * Secure low power context save/restore API index
@@ -47,8 +48,6 @@
 #define PPA_SERVICE_PL310_POR		0x23
 #define PPA_SERVICE_NS_SMP		0x25
 
-#define PL310_POR			5
-#define OMAP446x_PL310_POR		0x70000009
 /*
  * Secure HAL API flags
  */
@@ -68,9 +67,13 @@
 #define OMAP4_USBHOST_CLKSEL_UTMI_P2_EXT_P1_EXT		0x3
 
 /* L2 controller AUXCTRL value */
-#define OMAP4_L2X0_AUXCTL_VALUE_ES1			0x0e050000
-#define OMAP4_L2X0_AUXCTL_VALUE				0x1e470000
-#define OMAP446x_L2X0_AUXCTL_VALUE			0x7e470000
+#define OMAP443X_L2X0_AUXCTL_VALUE_ES1			0x0e050000
+#define OMAP443X_L2X0_AUXCTL_VALUE			0x1e470000
+#define OMAP446X_L2X0_AUXCTL_VALUE			0x5e470000
+
+/* POR register settings */
+#define OMAP443X_PL310_POR				5
+#define OMAP446x_PL310_POR				0x52000009
 
 #define A9_ES1_REV					0x410FC091
 
