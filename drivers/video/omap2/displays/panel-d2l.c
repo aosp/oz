@@ -39,8 +39,8 @@
 /* DSI Command Virtual channel */
 #define CMD_VC_CHANNEL 1
 
-#define DRIVER_NAME "d2l_i2c_drv"
-#define DEVICE_NAME "d2l_i2c"
+#define DRIVER_NAME     "d2l"
+#define I2C_DRIVER_NAME "d2l_i2c_driver"
 
 /* define this if you want debug print messages */
 /* #define DEB */
@@ -286,7 +286,7 @@ int d2l_write_register(u16 reg, u32 value)
 	ret = dsi_vc_send_long(lcd_ix, CMD_VC_CHANNEL, dsi_buf.data_type,
 			       (u8 *) dsi_buf.Data_buf, 6, 0);
 
-	mdelay(100);
+	udelay(100);
 
 	return ret;
 }
@@ -979,7 +979,7 @@ static struct omap_dss_driver d2l_driver = {
 	.check_timings = d2l_check_timings,
 
 	.driver = {
-		   .name = "d2l",
+		   .name  = DRIVER_NAME,
 		   .owner = THIS_MODULE,
 		   },
 };
@@ -1018,7 +1018,7 @@ static int __devexit d2l_i2c_remove(struct i2c_client *client)
 }
 
 static const struct i2c_device_id d2l_i2c_idtable[] = {
-	{DEVICE_NAME, 0},
+	{I2C_DRIVER_NAME, 0},
 	{},
 };
 
@@ -1027,13 +1027,25 @@ static struct i2c_driver d2l_i2c_driver = {
 	.remove = __exit_p(d2l_i2c_remove),
 	.id_table = d2l_i2c_idtable,
 	.driver = {
-		   .name = DRIVER_NAME},
+		   .name  = DRIVER_NAME,
+		   .owner = THIS_MODULE,
+	},
 };
 
 static int __init d2l_init(void)
 {
-	omap_dss_register_driver(&d2l_driver);;
-	i2c_add_driver(&d2l_i2c_driver);
+	int r;
+	r = i2c_add_driver(&d2l_i2c_driver);
+	if (r < 0) {
+		printk(KERN_WARNING "d2l i2c driver registration failed\n");
+		return r;
+	}
+
+	r = omap_dss_register_driver(&d2l_driver);
+	if (r < 0) {
+		printk(KERN_WARNING "d2l driver registration failed\n");
+		return r;
+	}
 	return 0;
 }
 

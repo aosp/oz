@@ -41,6 +41,7 @@
 #include <linux/delay.h>
 #include <linux/string.h>
 #include <linux/platform_device.h>
+#include <linux/switch.h>
 #include <plat/display.h>
 #include <plat/cpu.h>
 #include <plat/hdmi_lib.h>
@@ -131,6 +132,9 @@ static bool in_dispc_digit_reset;
 
 #define HDMI_PLLCTRL		0x58006200
 #define HDMI_PHY		0x58006300
+
+/* switch class based hot-plug reporting */
+static struct switch_dev sdev;
 
 static u8 edid[HDMI_EDID_MAX_LENGTH] = {0};
 static u8 edid_set;
@@ -608,6 +612,7 @@ static int set_hdmi_hot_plug_status(struct omap_dss_device *dssdev, bool onoff)
 		DSSINFO("hot plug event %d", onoff);
 		ret = kobject_uevent(&dssdev->dev.kobj,
 					onoff ? KOBJ_ADD : KOBJ_REMOVE);
+		switch_set_state(&sdev, onoff);
 		if (ret)
 			DSSWARN("error sending hot plug event %d (%d)",
 								onoff, ret);
@@ -1093,12 +1098,17 @@ int hdmi_init(struct platform_device *pdev)
 	hdmi_irq = platform_get_irq(pdev, 0);
 	r = request_irq(hdmi_irq, hdmi_irq_handler, 0, "OMAP HDMI", (void *)0);
 
+	sdev.name = "hdmi";
+	if (switch_dev_register(&sdev))
+		printk(KERN_WARNING "HDMI switch failed to register");
+
 	return omap_dss_register_driver(&hdmi_driver);
 }
 
 void hdmi_exit(void)
 {
 	hdmi_lib_exit();
+	switch_dev_unregister(&sdev);
 	destroy_workqueue(irq_wq);
 	free_irq(OMAP44XX_IRQ_DSS_HDMI, NULL);
 	iounmap(hdmi.base_pll);
@@ -1342,6 +1352,7 @@ retry:
 		/* signal suspend request to audio */
 		hdmi_notify_pwrchange(HDMI_EVENT_POWEROFF);
 
+		DSSINFO("Audio powering OFf...\n");
 		/* allow audio power to go off */
 		res = wait_event_interruptible_timeout(audio_wq,
 			!audio_on, msecs_to_jiffies(1000));
@@ -1411,17 +1422,22 @@ static int hdmi_is_connected(void)
 	return hdmi_rxdet();
 }
 
-static void hdmi_notify_status(struct omap_dss_device *dssdev)
+static void hdmi_notify_status(struct omap_dss_device *dssdev, bool onoff)
 {
+	bool notify = !audio_on && !onoff;
+	/* turn off hdmi audio if ON */
+	if (!onoff)
+		hdmi_audio_power_off();
+	else {
+		mutex_unlock(&hdmi.lock_aux);
+		hdmi_notify_pwrchange(HDMI_EVENT_POWERON);
+		mutex_unlock(&hdmi.lock);
+		mdelay(100);
+		mutex_lock(&hdmi.lock);
+		mutex_lock(&hdmi.lock_aux);
+	}
 
-	mutex_unlock(&hdmi.lock_aux);
-	hdmi_notify_pwrchange(HDMI_EVENT_POWERON);
-	mutex_unlock(&hdmi.lock);
-	mdelay(100);
-	mutex_lock(&hdmi.lock);
-	mutex_lock(&hdmi.lock_aux);
-
-	set_hdmi_hot_plug_status(dssdev, true);
+	set_hdmi_hot_plug_status(dssdev, onoff ? true : false);
 
 	/* Allow suffecient delay to stabilize the Digital channel
 	 * from sync lost digit errors
@@ -1430,6 +1446,8 @@ static void hdmi_notify_status(struct omap_dss_device *dssdev)
 	mutex_unlock(&hdmi.lock);
 	mdelay(100);
 	mutex_lock(&hdmi.lock);
+	if (notify)
+		hdmi_notify_pwrchange(HDMI_EVENT_POWEROFF);
 	mutex_lock(&hdmi.lock_aux);
 }
 
@@ -1441,7 +1459,6 @@ static void hdmi_work_queue(struct work_struct *ws)
 	int r = work->r;
 	unsigned long time;
 	static ktime_t last_connect, last_disconnect;
-	bool notify;
 	int action = 0;
 
 	mutex_lock(&hdmi.lock);
@@ -1486,20 +1503,7 @@ static void hdmi_work_queue(struct work_struct *ws)
 		if (hdmi_connected)
 			goto done;
 
-		/* turn audio power off */
-		notify = !audio_on; /* notification is sent if audio is on */
-		hdmi_audio_power_off();
-
-		set_hdmi_hot_plug_status(dssdev, false);
-		/* ignore return value for now */
-
-		mutex_unlock(&hdmi.lock_aux);
-		mutex_unlock(&hdmi.lock);
-		mdelay(100);
-		mutex_lock(&hdmi.lock);
-		if (notify)
-			hdmi_notify_pwrchange(HDMI_EVENT_POWEROFF);
-		mutex_lock(&hdmi.lock_aux);
+		hdmi_notify_status(dssdev, false);
 
 		if (dssdev->state != OMAP_DSS_DISPLAY_ACTIVE)
 			/* HDMI is disabled, no need to process */
@@ -1533,7 +1537,7 @@ static void hdmi_work_queue(struct work_struct *ws)
 	    custom_set) {
 		user_hpd_state = false;
 
-		hdmi_notify_status(dssdev);
+		hdmi_notify_status(dssdev, true);
 	}
 
 	if ((action & HDMI_CONNECT) && (video_power == HDMI_POWER_MIN) &&
@@ -1583,12 +1587,16 @@ done:
 			 * send any hot plug event to the userspace in this case
 			 *  and reset irq's before returning.
 			 */
-			hdmi_set_irqs(0);
-			goto hpd_modify;
+			if (hdmi_opt_clk_state) {
+				hdmi_set_irqs(0);
+				goto hpd_modify;
+			} else
+				goto done2;
+
 		}
 
 		hdmi_reconfigure(dssdev);
-		hdmi_notify_status(dssdev);
+		hdmi_notify_status(dssdev, true);
 		DSSINFO("Enabling display Done- HDMI_FIRST_HPD\n\n");
 	}
 
@@ -1596,33 +1604,23 @@ hpd_modify:
 	if (r & HDMI_HPD_MODIFY) {
 		struct omap_overlay *ovl;
 		int i;
+		bool found = false;
 
 		/* check if any overlays are connected to TV and
-		 * return if connected after resetting the IRQ's
+		 * send disconnect event before reconfiguring the phy
 		 */
 		for (i = 0; i < dssdev->manager->num_overlays; i++) {
 			ovl = dssdev->manager->overlays[i];
 			if (!(strcmp(ovl->manager->name, "tv")))
 				if (ovl->info.enabled) {
-					DSSINFO("Overlay %d is still "
-						"attached to tv\n", ovl->id);
-					DSSINFO("Cannot Rconfigure HDMI when "
-						"overlays are still attached "
-						"to tv\n"
-						"Dettach the overlays before "
-						"reconfiguring the HDMI\n\n");
-
-					/* clear the IRQ's*/
-					hdmi_set_irqs(0);
-
-					/* HDCP start callback must be called to
-					 * restart authentication
-					 */
-					if (hdmi.hdmi_start_frame_cb)
-						(*hdmi.hdmi_start_frame_cb)();
-
-					goto done2;
+					DSSINFO("Dettach overlays before"
+						 "reconfiguring HDMI - "
+						 "HDMI_HPD_MODIFY\n");
+					hdmi_notify_status(dssdev, false);
+					found = true;
 				}
+			if (found)
+				break;
 		}
 
 		/*
@@ -1635,7 +1633,7 @@ hpd_modify:
 		edid_set = false;
 		custom_set = false;
 		hdmi_reconfigure(dssdev);
-		hdmi_notify_status(dssdev);
+		hdmi_notify_status(dssdev, true);
 		DSSINFO("Reconfigure HDMI PHY Done- HDMI_HPD_MODIFY\n\n");
 	}
 
