@@ -86,7 +86,7 @@ static int als_gain_table[4] = {
 	1, 8, 16, 120
 };
 
-static uint32_t als_prox_debug = 0xf;
+static uint32_t als_prox_debug;
 module_param_named(tsl2771_debug, als_prox_debug, uint, 0664);
 
 #ifdef TSL2771_DEBUG
