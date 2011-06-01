@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2006-2010 Trusted Logic S.A.
+ * Copyright (c) 2011 Trusted Logic S.A.
  * All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or
@@ -78,7 +78,7 @@ label_smc:
 	dsb
 	dmb
 
-#ifdef CONFIG_SMC_BENCH_SECURE_CYCLE
+#ifdef CONFIG_BENCH_SECURE_CYCLE
 	/* Come from Non Secure: activate counter 1 (write to 0 are ignored) */
 	mov	r4, #0x00000002
 
@@ -96,7 +96,7 @@ label_smc:
 	b	service_end
 	nop
 
-#ifdef CONFIG_SMC_BENCH_SECURE_CYCLE
+#ifdef CONFIG_BENCH_SECURE_CYCLE
 	/* Come from Secure: activate counter 0 (write to 0 are ignored) */
 	mov	r4, #0x00000001
 
@@ -123,7 +123,7 @@ label_smc:
 service_end:
 
 schedule_secure_world_exit:
-#ifdef CONFIG_SMC_BENCH_SECURE_CYCLE
+#ifdef CONFIG_BENCH_SECURE_CYCLE
 	/* Come from Secure: activate counter 0 (write to 0 are ignored) */
 	mov	r4, #0x00000001
 
@@ -145,7 +145,7 @@ schedule_secure_world_exit:
 rpc_handler:
 	.global rpc_handler
 
-#ifdef CONFIG_SMC_BENCH_SECURE_CYCLE
+#ifdef CONFIG_BENCH_SECURE_CYCLE
 	/* Come from Secure: activate counter 0 (write to 0 are ignored) */
 	mov	r4, #0x00000001
 
@@ -178,10 +178,10 @@ rpc_handler:
 	/* Restore registers */
 	pop	{r4-r12, pc}
 
-#ifdef CONFIG_SMC_BENCH_SECURE_CYCLE
+#ifdef CONFIG_BENCH_SECURE_CYCLE
 
-setupCounters:
-	.global setupCounters
+setup_counters:
+	.global setup_counters
 
 	push	{r14}
 
@@ -195,8 +195,8 @@ setupCounters:
 
 	pop	{pc}
 
-runCodeSpeed:
-	.global runCodeSpeed
+run_code_speed:
+	.global run_code_speed
 
 	push	{r14}
 
@@ -204,18 +204,18 @@ runCodeSpeed:
 	mov	r2, #0
 	mcr	p15, 0, r2, c9, c13, 0
 
-runCodeSpeed_loop:
+run_code_speed_loop:
 	sub	r0, r0, #1
 	cmp	r0, #0
-	bne	runCodeSpeed_loop
+	bne	run_code_speed_loop
 
 	/* Read cycle counter */
 	mrc	p15, 0, r0, c9, c13, 0
 
 	pop	{pc}
 
-runDataSpeed:
-	.global runDataSpeed
+run_data_speed:
+	.global run_data_speed
 
 	push	{r14}
 
@@ -223,11 +223,11 @@ runDataSpeed:
 	mov	r2, #0
 	mcr	p15, 0, r2, c9, c13, 0
 
-runDataSpeed_loop:
+run_data_speed_loop:
 	sub	r0, r0, #1
 	ldr	r2, [r1]
 	cmp	r0, #0
-	bne	runDataSpeed_loop
+	bne	run_data_speed_loop
 
 	/* read cycle counter */
 	mrc	p15, 0, r0, c9, c13, 0
