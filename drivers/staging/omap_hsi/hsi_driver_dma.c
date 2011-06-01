@@ -637,6 +637,6 @@ int __init hsi_gdd_init(struct hsi_dev *hsi_ctrl, const char *irq_name)
 
 void hsi_gdd_exit(struct hsi_dev *hsi_ctrl)
 {
-	tasklet_disable(&hsi_ctrl->hsi_gdd_tasklet);
+	tasklet_kill(&hsi_ctrl->hsi_gdd_tasklet);
 	free_irq(hsi_ctrl->gdd_irq, hsi_ctrl);
 }

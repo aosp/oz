@@ -665,6 +665,6 @@ int __init hsi_mpu_init(struct hsi_port *hsi_p, const char *irq_name)
 
 void hsi_mpu_exit(struct hsi_port *hsi_p)
 {
-	tasklet_disable(&hsi_p->hsi_tasklet);
+	tasklet_kill(&hsi_p->hsi_tasklet);
 	free_irq(hsi_p->irq, hsi_p);
 }
