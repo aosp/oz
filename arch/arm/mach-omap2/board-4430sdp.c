@@ -37,6 +37,7 @@
 #include <plat/mmc.h>
 #include <plat/omap4-keypad.h>
 #include <plat/syntm12xx.h>
+
 #include <video/omapdss.h>
 #include <video/omap-panel-nokia-dsi.h>
 
@@ -822,6 +823,7 @@ static struct omap_dss_device sdp4430_lcd_device = {
 	.type			= OMAP_DISPLAY_TYPE_DSI,
 	.data			= &dsi1_panel,
 	.phy.dsi		= {
+		.type		= OMAP_DSS_DSI_TYPE_CMD_MODE,
 		.clk_lane	= 1,
 		.clk_pol	= 0,
 		.data1_lane	= 2,
@@ -974,7 +976,7 @@ static void __init omap_4430sdp_init(void)
 
 	if (omap_rev() == OMAP4430_REV_ES1_0)
 		package = OMAP_PACKAGE_CBL;
-	omap4_mux_init(board_mux, package);
+	omap4_mux_init(board_mux, NULL, package);
 
 	omap_board_config = sdp4430_config;
 	omap_board_config_size = ARRAY_SIZE(sdp4430_config);

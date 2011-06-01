@@ -772,11 +772,11 @@ static struct omap_hwmod_class omap44xx_bandgap_hwmod_class = {
 };
 
 /* bandgap */
-static struct omap_hwmod_opt_clk bandgap_opt_clks[] = {
+static struct omap_hwmod_opt_clk bandgap443x_opt_clks[] = {
 	{ .role = "fclk", .clk = "bandgap_fclk" },
 };
 
-static struct omap_hwmod omap44xx_bandgap_hwmod = {
+static struct omap_hwmod omap443x_bandgap_hwmod = {
 	.name		= "bandgap",
 	.class		= &omap44xx_bandgap_hwmod_class,
 	.prcm		= {
@@ -784,9 +784,26 @@ static struct omap_hwmod omap44xx_bandgap_hwmod = {
 			.clkctrl_reg = OMAP4430_CM_WKUP_BANDGAP_CLKCTRL,
 		},
 	},
-	.opt_clks	= bandgap_opt_clks,
-	.opt_clks_cnt	= ARRAY_SIZE(bandgap_opt_clks),
-	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP44XX),
+	.opt_clks	= bandgap443x_opt_clks,
+	.opt_clks_cnt	= ARRAY_SIZE(bandgap443x_opt_clks),
+	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
+};
+
+static struct omap_hwmod_opt_clk bandgap446x_opt_clks[] = {
+	{ .role = "fclk", .clk = "bandgap_ts_fclk" },
+};
+
+static struct omap_hwmod omap446x_bandgap_hwmod = {
+	.name		= "bandgap",
+	.class		= &omap44xx_bandgap_hwmod_class,
+	.prcm		= {
+		.omap4 = {
+			.clkctrl_reg = OMAP4430_CM_WKUP_BANDGAP_CLKCTRL,
+		},
+	},
+	.opt_clks	= bandgap446x_opt_clks,
+	.opt_clks_cnt	= ARRAY_SIZE(bandgap446x_opt_clks),
+	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4460),
 };
 
 /*
@@ -1758,6 +1775,7 @@ static struct omap_hwmod_opt_clk gpio1_opt_clks[] = {
 static struct omap_hwmod omap443x_gpio1_hwmod = {
 	.name		= "gpio1",
 	.class		= &omap44xx_gpio_hwmod_class,
+	.flags		= HWMOD_INIT_NO_IDLE | HWMOD_INIT_NO_RESET,
 	.mpu_irqs	= omap44xx_gpio1_irqs,
 	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_gpio1_irqs),
 	.main_clk	= "gpio1_ick",
@@ -1830,7 +1848,8 @@ static struct omap_hwmod_opt_clk gpio2_opt_clks[] = {
 static struct omap_hwmod omap44xx_gpio2_hwmod = {
 	.name		= "gpio2",
 	.class		= &omap44xx_gpio_hwmod_class,
-	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET,
+	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET | HWMOD_INIT_NO_IDLE |
+				HWMOD_INIT_NO_RESET,
 	.mpu_irqs	= omap44xx_gpio2_irqs,
 	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_gpio2_irqs),
 	.main_clk	= "gpio2_ick",
@@ -1883,7 +1902,8 @@ static struct omap_hwmod_opt_clk gpio3_opt_clks[] = {
 static struct omap_hwmod omap44xx_gpio3_hwmod = {
 	.name		= "gpio3",
 	.class		= &omap44xx_gpio_hwmod_class,
-	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET,
+	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET | HWMOD_INIT_NO_IDLE |
+				HWMOD_INIT_NO_RESET,
 	.mpu_irqs	= omap44xx_gpio3_irqs,
 	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_gpio3_irqs),
 	.main_clk	= "gpio3_ick",
@@ -1936,7 +1956,8 @@ static struct omap_hwmod_opt_clk gpio4_opt_clks[] = {
 static struct omap_hwmod omap44xx_gpio4_hwmod = {
 	.name		= "gpio4",
 	.class		= &omap44xx_gpio_hwmod_class,
-	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET,
+	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET | HWMOD_INIT_NO_IDLE |
+				HWMOD_INIT_NO_RESET,
 	.mpu_irqs	= omap44xx_gpio4_irqs,
 	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_gpio4_irqs),
 	.main_clk	= "gpio4_ick",
@@ -1989,7 +2010,8 @@ static struct omap_hwmod_opt_clk gpio5_opt_clks[] = {
 static struct omap_hwmod omap44xx_gpio5_hwmod = {
 	.name		= "gpio5",
 	.class		= &omap44xx_gpio_hwmod_class,
-	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET,
+	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET | HWMOD_INIT_NO_IDLE |
+				HWMOD_INIT_NO_RESET,
 	.mpu_irqs	= omap44xx_gpio5_irqs,
 	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_gpio5_irqs),
 	.main_clk	= "gpio5_ick",
@@ -2042,7 +2064,8 @@ static struct omap_hwmod_opt_clk gpio6_opt_clks[] = {
 static struct omap_hwmod omap44xx_gpio6_hwmod = {
 	.name		= "gpio6",
 	.class		= &omap44xx_gpio_hwmod_class,
-	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET,
+	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET | HWMOD_INIT_NO_IDLE |
+				HWMOD_INIT_NO_RESET,
 	.mpu_irqs	= omap44xx_gpio6_irqs,
 	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_gpio6_irqs),
 	.main_clk	= "gpio6_ick",
@@ -5155,7 +5178,8 @@ static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
 /*	&omap44xx_aess_hwmod, */
 
 	/* bandgap class */
-	&omap44xx_bandgap_hwmod,
+	&omap443x_bandgap_hwmod,
+	&omap446x_bandgap_hwmod,
 
 	/* counter class */
 /*	&omap44xx_counter_32k_hwmod, */

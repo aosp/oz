@@ -330,7 +330,7 @@ static int omap3_noncore_dpll_program(struct clk *clk, u16 m, u8 n, u16 freqsel)
 	if (cpu_is_omap446x() && !strcmp(clk->name, "dpll_mpu_ck")) {
 		/* DCC control */
 		v = __raw_readl(dd->mult_div1_reg);
-		if (dd->last_rounded_rate >1000000000)
+		if (dd->last_rounded_rate > 1000000000)
 			v |= OMAP4460_DCC_EN_MASK; /* Enable DCC */
 		else
 			v &= ~OMAP4460_DCC_EN_MASK; /* Disable DCC */
