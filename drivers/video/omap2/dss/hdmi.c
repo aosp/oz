@@ -1782,7 +1782,7 @@ static int hdmi_set_power(struct omap_dss_device *dssdev,
 	enum hdmi_dev_state state_need;
 
 	/* calculate HDMI combined power and state */
-	if (_audio_on)
+	if (_audio_on && !in_hdmi_restart)
 		power_need = HDMI_POWER_FULL;
 	else
 		power_need = suspend ? HDMI_POWER_OFF : v_power;
@@ -1826,7 +1826,9 @@ static int hdmi_set_power(struct omap_dss_device *dssdev,
 			     state_need == HDMI_SUSPENDED ? 'S' : 'D'), r);
 
 	if (cpu_is_omap44xx())
-		if ((power_need < HDMI_POWER_FULL) && hdmi_opt_clk_state)
+		if ((power_need < HDMI_POWER_FULL) &&
+		    hdmi_opt_clk_state &&
+		    !in_hdmi_restart)
 			/* Release clocks, L3 and core constraints*/
 			hdmi_set_48Mhz_l3_cstr(dssdev, false);
 
@@ -2587,8 +2589,21 @@ void hdmi_restart(void)
 	struct omap_dss_device *dssdev = get_hdmi_device();
 
 	in_hdmi_restart = true;
+
+	printk(KERN_INFO "\n\n<%s> powering OFF HDMI_PHY, audio_on = %d, "
+			 "hdmi_power = %d\n",
+	       __func__, audio_on, hdmi_power);
+	hdmi_notify_pwrchange(HDMI_EVENT_POWERPHYOFF);
 	set_video_power(dssdev, HDMI_POWER_OFF);
+
+
+	printk(KERN_INFO "\n<%s> powering ON HDMI_PHY, audio_on = %d, "
+			 "hdmi_power = %d\n",
+	       __func__, audio_on, hdmi_power);
 	set_video_power(dssdev, HDMI_POWER_FULL);
+	hdmi_notify_pwrchange(HDMI_EVENT_POWERPHYON);
+	printk(KERN_INFO "\n\n");
+
 	in_hdmi_restart = false;
 }
 EXPORT_SYMBOL(hdmi_restart);
