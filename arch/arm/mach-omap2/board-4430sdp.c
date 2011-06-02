@@ -45,6 +45,7 @@
 #include "hsmmc.h"
 #include "timer-gp.h"
 #include "control.h"
+#include "pm.h"
 
 #define ETH_KS8851_IRQ			34
 #define ETH_KS8851_POWER_ON		48
@@ -60,6 +61,8 @@
 #define LED_PWM2ON		0x03
 #define LED_PWM2OFF		0x04
 #define TWL6030_TOGGLE3		0x92
+
+#define TPS62361_GPIO   7
 
 static const int sdp4430_keymap[] = {
 	KEY(0, 0, KEY_E),
@@ -605,6 +608,30 @@ static struct regulator_init_data sdp4430_clk32kg = {
 	},
 };
 
+static void omap4_audio_conf(void)
+{
+	/* twl6040 naudint */
+	omap_mux_init_signal("sys_nirq2.sys_nirq2", \
+		OMAP_PIN_INPUT_PULLUP);
+}
+
+static struct twl4030_codec_audio_data twl6040_audio = {
+	/* Add audio only data */
+};
+
+static struct twl4030_codec_vibra_data twl6040_vibra = {
+	.max_timeout	= 15000,
+	.initial_vibrate = 0,
+};
+
+static struct twl4030_codec_data twl6040_codec = {
+	.audio		= &twl6040_audio,
+	.vibra		= &twl6040_vibra,
+	.audpwron_gpio	= 127,
+	.naudint_irq	= OMAP44XX_IRQ_SYS_2N,
+	.irq_base	= TWL6040_CODEC_IRQ_BASE,
+};
+
 static struct twl4030_platform_data sdp4430_twldata = {
 	.irq_base	= TWL6030_IRQ_BASE,
 	.irq_end	= TWL6030_IRQ_END,
@@ -621,7 +648,10 @@ static struct twl4030_platform_data sdp4430_twldata = {
 	.vaux2		= &sdp4430_vaux2,
 	.vaux3		= &sdp4430_vaux3,
 	.clk32kg	= &sdp4430_clk32kg,
-	.usb		= &omap4_usbphy_data
+	.usb		= &omap4_usbphy_data,
+
+	/* children */
+	.codec		= &twl6040_codec,
 };
 
 static struct i2c_board_info __initdata sdp4430_i2c_boardinfo[] = {
@@ -982,6 +1012,7 @@ static void __init omap_4430sdp_init(void)
 	omap_board_config_size = ARRAY_SIZE(sdp4430_config);
 
 	omap4_i2c_init();
+	omap4_audio_conf();
 	omap_sfh7741prox_init();
 	platform_add_devices(sdp4430_devices, ARRAY_SIZE(sdp4430_devices));
 	board_serial_init();
@@ -1003,7 +1034,16 @@ static void __init omap_4430sdp_init(void)
 		pr_err("Keypad initialization failed: %d\n", status);
 
 	omap_4430sdp_display_init();
+
 	omap4_panda_android_init();
+
+	if (cpu_is_omap446x()) {
+		/* Vsel0 = gpio, vsel1 = gnd */
+		status = omap_tps6236x_board_setup(true, TPS62361_GPIO, -1,
+					OMAP_PIN_OFF_OUTPUT_HIGH, -1);
+		if (status)
+			pr_err("TPS62361 initialization failed: %d\n", status);
+	}
 }
 
 static void __init omap_4430sdp_map_io(void)
