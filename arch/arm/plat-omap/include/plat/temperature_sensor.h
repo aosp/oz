@@ -48,4 +48,8 @@ struct omap_temp_sensor_pdata {
 	int irq;
 };
 
+void omap_temp_sensor_resume_idle(void);
+void omap_temp_sensor_prepare_idle(void);
+void omap_temp_sensor_idle(int idle_state);
+
 #endif

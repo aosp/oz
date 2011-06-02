@@ -28,6 +28,16 @@
 #include "pm.h"
 #include <plat/temperature_sensor.h>
 
+void omap_temp_sensor_resume_idle()
+{
+	omap_temp_sensor_idle(0);
+}
+
+void omap_temp_sensor_prepare_idle()
+{
+	omap_temp_sensor_idle(1);
+}
+
 static struct omap_device_pm_latency omap_temp_sensor_latency[] = {
 	{
 	 .deactivate_func = omap_device_idle_hwmods,

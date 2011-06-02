@@ -99,6 +99,7 @@ struct omap_temp_sensor_regs {
 };
 
 static struct omap_temp_sensor_regs temp_sensor_context;
+static struct omap_temp_sensor *temp_sensor_pm;
 #endif
 
 #ifdef TEMP_DEBUG
@@ -948,6 +949,8 @@ static int __devinit omap_temp_sensor_probe(struct platform_device *pdev)
 	dev_info(&pdev->dev, "%s : '%s'\n", dev_name(temp_sensor->dev),
 			pdata->name);
 
+	temp_sensor_pm = temp_sensor;
+
 	return 0;
 
 req_thsut_irq_err:
@@ -1041,6 +1044,17 @@ static int omap_temp_sensor_resume(struct platform_device *pdev)
 	omap_temp_sensor_restore_ctxt(temp_sensor);
 
 	return 0;
+}
+
+void omap_temp_sensor_idle(int idle_state)
+{
+	if (idle_state) {
+		omap_temp_sensor_save_ctxt(temp_sensor_pm);
+		omap_temp_sensor_enable(temp_sensor_pm, 0);
+	} else {
+		omap_temp_sensor_enable(temp_sensor_pm, 1);
+		omap_temp_sensor_restore_ctxt(temp_sensor_pm);
+	}
 }
 
 #else

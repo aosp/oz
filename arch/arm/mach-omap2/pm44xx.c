@@ -25,6 +25,7 @@
 #include <plat/powerdomain.h>
 #include <plat/clockdomain.h>
 #include <plat/serial.h>
+#include <plat/temperature_sensor.h>
 #include <plat/common.h>
 #include <plat/usb.h>
 #include <plat/display.h>
@@ -232,6 +233,9 @@ void omap4_enter_sleep(unsigned int cpu, unsigned int power_state)
 		 * optimized.
 		 */
 
+		if (cpu_is_omap446x())
+			omap_temp_sensor_prepare_idle();
+
 		omap_uart_prepare_idle(0);
 		omap_uart_prepare_idle(1);
 		omap_uart_prepare_idle(2);
@@ -323,6 +327,10 @@ void omap4_enter_sleep(unsigned int cpu, unsigned int power_state)
 		omap_uart_resume_idle(1);
 		omap_uart_resume_idle(2);
 		omap_uart_resume_idle(3);
+
+		if (cpu_is_omap446x())
+			omap_temp_sensor_resume_idle();
+
 
 	}
 
