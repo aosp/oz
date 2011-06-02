@@ -52,6 +52,7 @@
  */
 
 /* #define TSHUT_DEBUG	1 */
+#define TEMP_DEBUG 1
 
 #define TSHUT_THRESHOLD_TSHUT_HOT	122000	/* 122 deg C */
 #define TSHUT_THRESHOLD_TSHUT_COLD	100000	/* 100 deg C */
@@ -84,6 +85,8 @@ struct omap_temp_sensor {
 	int is_efuse_valid;
 	u8 clk_on;
 	u32 clk_rate;
+	int debug;
+	int debug_temp;
 };
 
 #ifdef CONFIG_PM
@@ -98,6 +101,10 @@ struct omap_temp_sensor_regs {
 static struct omap_temp_sensor_regs temp_sensor_context;
 #endif
 
+#ifdef TEMP_DEBUG
+static uint32_t debug_thermal;
+module_param_named(temp_sensor_debug, debug_thermal, uint, 0664);
+#endif
 /*
  *Temperature vlaues in milli degress celsius ADC code values from 530 to 923
  */
@@ -483,6 +490,11 @@ static int omap_temp_sensor_read_temp(struct device *dev,
 
 	mutex_lock(&temp_sensor->sensor_mutex);
 
+	if (temp_sensor->debug) {
+		temp = temp_sensor->debug_temp;
+		goto out;
+	}
+
 	temp = omap_temp_sensor_readl(temp_sensor, TEMP_SENSOR_CTRL_OFFSET);
 	temp = temp & (OMAP4_BGAP_TEMP_SENSOR_DTEMP_MASK);
 
@@ -506,6 +518,62 @@ out:
 	else
 		return ret;
 }
+
+#ifdef TEMP_DEBUG
+static ssize_t show_temp_user_space(struct device *dev,
+			struct device_attribute *devattr, char *buf)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct omap_temp_sensor *temp_sensor = platform_get_drvdata(pdev);
+
+	return sprintf(buf, "%d\n", temp_sensor->debug_temp);
+}
+
+static ssize_t set_temp_user_space(struct device *dev,
+			struct device_attribute *devattr,
+			const char *buf, size_t count)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct omap_temp_sensor *temp_sensor = platform_get_drvdata(pdev);
+	long val;
+
+	mutex_lock(&temp_sensor->sensor_mutex);
+
+	if (strict_strtol(buf, 10, &val)) {
+		count = -EINVAL;
+		goto out;
+	}
+
+	if (!temp_sensor->debug && debug_thermal) {
+		pr_info("%s: Going into debug mode\n", __func__);
+		disable_irq_nosync(temp_sensor->irq);
+		temp_sensor->debug = 1;
+	} else if (temp_sensor->debug && !debug_thermal) {
+		pr_info("%s:Reenable temp sensor dbg mode %i\n",
+			__func__, temp_sensor->debug);
+		enable_irq(temp_sensor->irq);
+		temp_sensor->debug = 0;
+		temp_sensor->debug_temp = 0;
+	} else if ((temp_sensor->debug == 0) &&
+			(debug_thermal == 0)) {
+		pr_info("%s:Not in debug mode\n", __func__);
+		goto out;
+	} else {
+		pr_info("%s:Debug mode %i and setting temp to %li\n",
+			__func__, temp_sensor->debug, val);
+	}
+
+	/* Set new temperature */
+	temp_sensor->debug_temp = val;
+
+	/* Send a kobj_change */
+	kobject_uevent(&temp_sensor->dev->kobj, KOBJ_CHANGE);
+
+out:
+	mutex_unlock(&temp_sensor->sensor_mutex);
+	return count;
+}
+#endif
 
 #ifdef TSHUT_DEBUG
 static ssize_t show_temp_crit(struct device *dev,
@@ -600,7 +668,6 @@ static ssize_t set_temp_crit_hyst(struct device *dev,
 		count = -EINVAL;
 		goto out;
 	}
-
 	temp = temp_to_adc_conversion(val);
 	if ((temp < OMAP_ADC_START_VALUE || temp > OMAP_ADC_END_VALUE)) {
 		pr_err("invalid range\n");
@@ -622,7 +689,11 @@ static SENSOR_DEVICE_ATTR(temp1_crit, S_IWUSR | S_IRUGO, show_temp_crit,
 			  set_temp_crit, 0);
 static SENSOR_DEVICE_ATTR(temp1_crit_hyst, S_IWUSR | S_IRUGO, show_temp_crit_hyst,
 			  set_temp_crit_hyst, 0);
+#endif
 
+#ifdef TEMP_DEBUG
+static SENSOR_DEVICE_ATTR(debug_user, S_IWUSR | S_IRUGO, show_temp_user_space,
+			  set_temp_user_space, 0);
 #endif
 
 static SENSOR_DEVICE_ATTR(temp1_input, S_IRUGO, omap_temp_sensor_read_temp,
@@ -641,6 +712,9 @@ static struct attribute *omap_temp_sensor_attributes[] = {
 #ifdef TSHUT_DEBUG
 	&sensor_dev_attr_temp1_crit.dev_attr.attr,
 	&sensor_dev_attr_temp1_crit_hyst.dev_attr.attr,
+#endif
+#ifdef TEMP_DEBUG
+	&sensor_dev_attr_debug_user.dev_attr.attr,
 #endif
 	&sensor_dev_attr_update_rate.dev_attr.attr,
 	NULL
@@ -799,6 +873,8 @@ static int __devinit omap_temp_sensor_probe(struct platform_device *pdev)
 	temp_sensor->clk_rate = 0;
 	temp_sensor->clk_on = 0;
 	temp_sensor->is_efuse_valid = 0;
+	temp_sensor->debug = 0;
+	temp_sensor->debug_temp = 0;
 
 	/*
 	 * check if the efuse has a non-zero value if not
