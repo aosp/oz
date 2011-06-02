@@ -72,7 +72,7 @@ POR_params:
 .word 1, 5
 
 POR_4460_params:
-.word 1, 0x52000009
+.word 1, 0x42000009
 
 /*
  * CPUx Wakeup Non-Secure Physical Address for
@@ -176,6 +176,13 @@ check_por:
 	adrne	r3, POR_params
 	LM_CALL_PPA_SERVICE_PA
 skip_por:
+	IS_CPU_OMAP4460
+	ite	eq
+	ldreq	r0, =OMAP446X_L2X0_AUXCTL_VALUE
+	ldrne	r0, =OMAP443X_L2X0_AUXCTL_VALUE
+	ldr     r12, =0x109		@ Setup L2 AUXCTL value
+	dsb
+	smc     #0
 	/*
 	 * Restore the L2X0 lockdown registers before enabling L2X0.
 	 * OMAP4430 restore values will be 0x0
@@ -187,13 +194,6 @@ skip_por:
 	str	r9, [r2, #0x904]
 	str	r9, [r2, #0x908]
 	str	r9, [r2, #0x90c]
-	IS_CPU_OMAP4460
-	ite	eq
-	ldreq	r0, =OMAP446X_L2X0_AUXCTL_VALUE
-	ldrne	r0, =OMAP443X_L2X0_AUXCTL_VALUE
-	ldr     r12, =0x109		@ Setup L2 AUXCTL value
-	dsb
-	smc     #0
 	mov     r0, #0x1
 	ldr     r12, =0x102		@ Enable L2 Cache controller
 	dsb
