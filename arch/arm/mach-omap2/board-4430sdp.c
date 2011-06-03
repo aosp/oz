@@ -64,6 +64,8 @@
 
 #define TPS62361_GPIO   7
 
+#define OMAP4SDP_MDM_PWR_EN_GPIO        157
+
 static const int sdp4430_keymap[] = {
 	KEY(0, 0, KEY_E),
 	KEY(0, 1, KEY_R),
@@ -997,6 +999,38 @@ static inline void board_serial_init(void)
 }
  #endif
 
+#ifdef CONFIG_USB_EHCI_HCD_OMAP
+static const struct usbhs_omap_board_data usbhs_bdata __initconst = {
+	.port_mode[0] = OMAP_EHCI_PORT_MODE_PHY,
+	.port_mode[1] = OMAP_USBHS_PORT_MODE_UNUSED,
+	.port_mode[2] = OMAP_USBHS_PORT_MODE_UNUSED,
+	.phy_reset  = false,
+	.reset_gpio_port[0]  = -EINVAL,
+	.reset_gpio_port[1]  = -EINVAL,
+	.reset_gpio_port[2]  = -EINVAL
+};
+
+static void __init omap4_ehci_init(void)
+{
+	omap_mux_init_signal("usbb2_ulpitll_clk.gpio_157", \
+		OMAP_PIN_OUTPUT | \
+		OMAP_PIN_OFF_NONE);
+
+        /* Power on the ULPI PHY */
+        if (gpio_is_valid(OMAP4SDP_MDM_PWR_EN_GPIO)) {
+		gpio_request(OMAP4SDP_MDM_PWR_EN_GPIO, "USBB1 PHY VMDM_3V3");
+		gpio_direction_output(OMAP4SDP_MDM_PWR_EN_GPIO, 1);
+        }
+
+	usbhs_init(&usbhs_bdata);
+
+	return;
+
+}
+#else
+static void __init omap4_ehci_init(void){}
+#endif
+
 extern void __init omap4_panda_android_init(void);
 
 static void __init omap_4430sdp_init(void)
@@ -1017,7 +1051,7 @@ static void __init omap_4430sdp_init(void)
 	platform_add_devices(sdp4430_devices, ARRAY_SIZE(sdp4430_devices));
 	board_serial_init();
 	omap4_twl6030_hsmmc_init(mmc);
-
+	omap4_ehci_init();
 	usb_musb_init(&musb_board_data);
 
 	status = omap_ethernet_init();
