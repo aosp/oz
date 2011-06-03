@@ -1462,10 +1462,6 @@ static int taal_update(struct omap_dss_device *dssdev,
 	if (r)
 		goto err;
 
-	r = taal_wake_up(dssdev);
-	if (r)
-		goto err;
-
 	if (!td->enabled) {
 		r = 0;
 		goto err;
@@ -1702,10 +1698,6 @@ static int taal_run_test(struct omap_dss_device *dssdev, int test_num)
 	if (r)
 		goto err2;
 
-	r = taal_wake_up(dssdev);
-	if (r)
-		goto err2;
-
 	r = taal_dcs_read_1(td, DCS_GET_ID1, &id1);
 	if (r)
 		goto err2;
@@ -1751,10 +1743,6 @@ static int taal_memory_read(struct omap_dss_device *dssdev,
 			dssdev->panel.timings.y_res * 3);
 
 	dsi_bus_lock(dssdev);
-
-	r = taal_wake_up(dssdev);
-	if (r)
-		goto err2;
 
 	r = taal_wake_up(dssdev);
 	if (r)
@@ -1850,12 +1838,6 @@ static void taal_esd_work(struct work_struct *work)
 	}
 
 	dsi_bus_lock(dssdev);
-
-	r = taal_wake_up(dssdev);
-	if (r) {
-		dev_err(&dssdev->dev, "failed to exit ULPS\n");
-		goto err;
-	}
 
 	r = taal_wake_up(dssdev);
 	if (r) {
