@@ -379,6 +379,11 @@ int __init musb_platform_init(struct musb *musb)
 	/* Fixme this can be enabled when load the gadget driver also*/
 	musb_platform_resume(musb);
 
+	/* Fixme set OTG_INTERFSEL to HW default value for charger detection */
+	val = musb_readl(musb->mregs, OTG_INTERFSEL);
+	val |= ULPI_12PIN;
+	musb_writel(musb->mregs, OTG_INTERFSEL, val);
+
 	pr_debug("HS USB OTG: revision 0x%x, sysconfig 0x%02x, "
 			"sysstatus 0x%x, intrfsel 0x%x, simenable  0x%x\n",
 			musb_readl(musb->mregs, OTG_REVISION),
