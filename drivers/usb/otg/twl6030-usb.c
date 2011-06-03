@@ -292,8 +292,11 @@ static irqreturn_t twl6030_usb_irq(int irq, void *_twl)
 		} else if (charger_type == POWER_SUPPLY_TYPE_USB_DCP) {
 			status = USB_EVENT_CHARGER;
 			twl->usb_cinlimit_mA = 1800;
-		} else
+		} else {
+			twl->prev_vbus = vbus_state;
+			sysfs_notify(&twl->dev->kobj, NULL, "vbus");
 			return IRQ_HANDLED;
+		}
 
 		blocking_notifier_call_chain(&twl->otg.notifier,
 					status, &charger_type);
