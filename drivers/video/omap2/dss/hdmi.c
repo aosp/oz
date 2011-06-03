@@ -2317,8 +2317,6 @@ static int hdmi_enable_s3d(struct omap_dss_device *dssdev, bool enable)
 	int r = 0;
 
 	/* Timings change between S3D and 2D mode, hence phy needs to reset */
-	mutex_lock(&hdmi.lock);
-	mutex_lock(&hdmi.lock_aux);
 	if (hdmi.s3d_enabled == enable)
 		goto done;
 
@@ -2363,9 +2361,6 @@ static int hdmi_enable_s3d(struct omap_dss_device *dssdev, bool enable)
 		dssdev->panel.s3d_info.order = S3D_DISP_ORDER_L;
 	}
 done:
-	mutex_unlock(&hdmi.lock_aux);
-	mutex_unlock(&hdmi.lock);
-
 	return r;
 }
 
