@@ -762,7 +762,7 @@ static struct omap_dss_board_info sdp4430_dss_data = {
 };
 
 static unsigned long retry_suspend;
-int plat_kim_suspend(struct platform_device *pdev, pm_message_t state)
+static int plat_kim_suspend(struct platform_device *pdev, pm_message_t state)
 {
 	struct kim_data_s *kim_gdata;
 	struct st_data_s *core_data;
@@ -783,7 +783,7 @@ static int plat_kim_resume(struct platform_device *pdev)
 	return 0;
 }
 
-int plat_kim_chip_enable(struct kim_data_s *kim_data)
+static int plat_kim_chip_enable(struct kim_data_s *kim_data)
 {
 	printk(KERN_INFO"%s\n", __func__);
 	/* Configure BT nShutdown to HIGH state */
@@ -796,7 +796,7 @@ int plat_kim_chip_enable(struct kim_data_s *kim_data)
 	return 0;
 }
 
-int plat_kim_chip_disable(struct kim_data_s *kim_data)
+static int plat_kim_chip_disable(struct kim_data_s *kim_data)
 {
 	printk(KERN_INFO"%s\n", __func__);
 	/* By default configure BT nShutdown to LOW state */
