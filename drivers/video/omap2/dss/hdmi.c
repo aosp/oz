@@ -1364,6 +1364,9 @@ retry:
 		goto retry;
 	}
 
+#ifdef CONFIG_OMAP_HDMI_AUDIO_WA
+	hdmi_lib_stop_acr_wa();
+#endif
 	return 0;
 }
 

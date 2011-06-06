@@ -233,6 +233,7 @@ static struct {
 	struct omap_chip_id audio_wa_chip_ids;
 	struct task_struct *wa_task;
 	u32 ack_payload;
+	bool audio_wa_started; /* HDMI WA guard*/
 #endif
 	u32 pixel_clock;
 } hdmi;
@@ -1458,11 +1459,23 @@ int hdmi_lib_acr_wa_send_event(u32 payload)
 }
 int hdmi_lib_start_acr_wa(void)
 {
-	return hdmi_lib_acr_wa_send_event(hdmi.cts_interval);
+	int ret = 0;
+	if (!hdmi.audio_wa_started) {
+		ret = hdmi_lib_acr_wa_send_event(hdmi.cts_interval);
+		if (!ret)
+			hdmi.audio_wa_started = true;
+	}
+	return ret;
 }
 int hdmi_lib_stop_acr_wa(void)
 {
-	return hdmi_lib_acr_wa_send_event(0);
+	int ret = 0;
+	if (hdmi.audio_wa_started) {
+		ret = hdmi_lib_acr_wa_send_event(0);
+		if (!ret)
+			hdmi.audio_wa_started = false;
+	}
+	return ret;
 }
 
 void hdmi_notify_event_ack_func(u16 proc_id, u16 line_id, u32 event_id,
@@ -1779,6 +1792,7 @@ int hdmi_lib_init(void)
 	hdmi.notify_event_reg = HDMI_NOTIFY_EVENT_NOTREG;
 	hdmi.audio_wa_chip_ids.oc = CHIP_IS_OMAP4430ES2 |
 			CHIP_IS_OMAP4430ES2_1 | CHIP_IS_OMAP4430ES2_2;
+	hdmi.audio_wa_started = false;
 #endif
 
 	INIT_LIST_HEAD(&hdmi.notifier_head);
@@ -2065,6 +2079,7 @@ int hdmi_w1_stop_audio_transfer(u32 instanceName)
 	hdmi_w1_audio_stop();
 	/* if audio is not used, switch to smart-idle & wakeup capable*/
 	REG_FLD_MOD(HDMI_WP, HDMI_WP_SYSCONFIG, 0x3, 3, 2);
+	printk(KERN_INFO "Stop audio transfer...\n");
 	return 0;
 }
 
