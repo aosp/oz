@@ -55,6 +55,9 @@ enum dss_feat_id {
 	FEAT_OVL_VID3			= 1 << 23,
 	FEAT_OVL_ZORDER			= 1 << 24,
 	FEAT_VENC_REQUIRES_TV_DAC_CLK	= 1 << 25,
+	FEAT_CPR			= 1 << 26,
+	FEAT_PRELOAD			= 1 << 27,
+	FEAT_FIR_COEF_V			= 1 << 28,
 };
 
 /* DSS register field id */
