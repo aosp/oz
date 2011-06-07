@@ -79,7 +79,7 @@ static int (*_omap_save_secure_sram)(u32 *addr);
 
 static struct powerdomain *mpu_pwrdm, *neon_pwrdm;
 static struct powerdomain *core_pwrdm, *per_pwrdm;
-static struct powerdomain *cam_pwrdm;
+static struct powerdomain *cam_pwrdm, *dss_pwrdm;
 
 static void omap3_enable_io_chain(void)
 {
@@ -371,6 +371,8 @@ void omap_sram_idle(void)
 	/* save_state = 2 => Only L2 lost */
 	/* save_state = 3 => L1, L2 and logic lost */
 	int save_state = 0;
+	int dss_next_state = PWRDM_POWER_ON;
+	int dss_state_modified = 0;
 	int mpu_next_state = PWRDM_POWER_ON;
 	int per_next_state = PWRDM_POWER_ON;
 	int core_next_state = PWRDM_POWER_ON;
@@ -386,6 +388,7 @@ void omap_sram_idle(void)
 	pwrdm_clear_all_prev_pwrst(neon_pwrdm);
 	pwrdm_clear_all_prev_pwrst(core_pwrdm);
 	pwrdm_clear_all_prev_pwrst(per_pwrdm);
+	pwrdm_clear_all_prev_pwrst(dss_pwrdm);
 
 	mpu_next_state = pwrdm_read_next_pwrst(mpu_pwrdm);
 	switch (mpu_next_state) {
@@ -411,10 +414,29 @@ void omap_sram_idle(void)
 	/* Enable IO-PAD and IO-CHAIN wakeups */
 	per_next_state = pwrdm_read_next_pwrst(per_pwrdm);
 	core_next_state = pwrdm_read_next_pwrst(core_pwrdm);
+	dss_next_state = pwrdm_read_next_pwrst(dss_pwrdm);
+
 	if (per_next_state < PWRDM_POWER_ON ||
 			core_next_state < PWRDM_POWER_ON) {
 		prm_set_mod_reg_bits(OMAP3430_EN_IO_MASK, WKUP_MOD, PM_WKEN);
 		omap3_enable_io_chain();
+	}
+
+	/* DSS */
+	if(dss_next_state < PWRDM_POWER_ON){
+		if(dss_next_state == PWRDM_POWER_OFF){
+			if(core_next_state == PWRDM_POWER_ON){
+				dss_next_state = PWRDM_POWER_RET;
+				pwrdm_set_next_pwrst(dss_pwrdm, dss_next_state);
+				dss_state_modified = 1;
+			}
+			/* allow dss sleep */
+			clkdm_add_sleepdep(dss_pwrdm->pwrdm_clkdms[0],
+					mpu_pwrdm->pwrdm_clkdms[0]);
+		}else{
+			dss_next_state = PWRDM_POWER_RET;
+			pwrdm_set_next_pwrst(dss_pwrdm, dss_next_state);
+		}
 	}
 
 	/* PER */
@@ -525,6 +547,17 @@ void omap_sram_idle(void)
 
 		if (per_state_modified)
 			pwrdm_set_next_pwrst(per_pwrdm, PWRDM_POWER_OFF);
+	}
+
+	/* DSS */
+	if (dss_next_state < PWRDM_POWER_ON) {
+		if (dss_next_state == PWRDM_POWER_OFF){
+			/* return to the previous state. */
+			clkdm_del_sleepdep(dss_pwrdm->pwrdm_clkdms[0],
+					mpu_pwrdm->pwrdm_clkdms[0]);
+		}
+		if (dss_state_modified)
+			pwrdm_set_next_pwrst(dss_pwrdm, PWRDM_POWER_OFF);
 	}
 
 	/* Disable IO-PAD and IO-CHAIN wakeup */
@@ -1122,6 +1155,7 @@ static int __init omap3_pm_init(void)
 	per_pwrdm = pwrdm_lookup("per_pwrdm");
 	core_pwrdm = pwrdm_lookup("core_pwrdm");
 	cam_pwrdm = pwrdm_lookup("cam_pwrdm");
+	dss_pwrdm = pwrdm_lookup("dss_pwrdm");
 
 	neon_clkdm = clkdm_lookup("neon_clkdm");
 	mpu_clkdm = clkdm_lookup("mpu_clkdm");
