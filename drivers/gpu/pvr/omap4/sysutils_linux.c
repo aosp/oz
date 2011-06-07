@@ -59,13 +59,25 @@
 extern struct platform_device *gpsPVRLDMDev;
 #endif
 
-static IMG_VOID PowerLockWrap(SYS_SPECIFIC_DATA *psSysSpecData)
+static PVRSRV_ERROR PowerLockWrap(SYS_SPECIFIC_DATA *psSysSpecData, IMG_BOOL bTryLock)
 {
 	if (!in_interrupt())
 	{
-		mutex_lock(&psSysSpecData->sPowerLock);
-
+		if (bTryLock)
+		{
+			int locked = mutex_trylock(&psSysSpecData->sPowerLock);
+			if (locked == 0)
+			{
+				return PVRSRV_ERROR_RETRY;
+			}
+		}
+		else
+		{
+			mutex_lock(&psSysSpecData->sPowerLock);
+		}
 	}
+
+	return PVRSRV_OK;
 }
 
 static IMG_VOID PowerLockUnwrap(SYS_SPECIFIC_DATA *psSysSpecData)
@@ -76,15 +88,13 @@ static IMG_VOID PowerLockUnwrap(SYS_SPECIFIC_DATA *psSysSpecData)
 	}
 }
 
-PVRSRV_ERROR SysPowerLockWrap(IMG_VOID)
+PVRSRV_ERROR SysPowerLockWrap(IMG_BOOL bTryLock)
 {
 	SYS_DATA	*psSysData;
 
 	SysAcquireData(&psSysData);
 
-	PowerLockWrap(psSysData->pvSysSpecificData);
-
-	return PVRSRV_OK;
+	return PowerLockWrap(psSysData->pvSysSpecificData, bTryLock);
 }
 
 IMG_VOID SysPowerLockUnwrap(IMG_VOID)

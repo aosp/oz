@@ -153,7 +153,7 @@ static IMG_VOID SGXResetSleep(PVRSRV_SGXDEV_INFO	*psDevInfo,
 							  IMG_UINT32			ui32PDUMPFlags,
 							  IMG_BOOL				bPDump)
 {
-#if defined(PDUMP)
+#if defined(PDUMP) || defined(EMULATOR)
 	IMG_UINT32	ui32ReadRegister;
 
 	#if defined(SGX_FEATURE_MP)
@@ -178,6 +178,11 @@ static IMG_VOID SGXResetSleep(PVRSRV_SGXDEV_INFO	*psDevInfo,
 #endif
 	}
 
+#if defined(EMULATOR)
+
+
+	OSReadHWReg(psDevInfo->pvRegsBaseKM, ui32ReadRegister);
+#endif
 }
 
 
@@ -399,6 +404,10 @@ IMG_VOID SGXReset(PVRSRV_SGXDEV_INFO	*psDevInfo,
 		#else
 			
 			ui32RegVal = MNE_CR_CTRL_BYP_CC_MASK;
+		#endif
+		#if defined(FIX_HW_BRN_34028)
+
+			ui32RegVal |= (8 << MNE_CR_CTRL_BYPASS_SHIFT);
 		#endif
 	#endif 
 	OSWriteHWReg(psDevInfo->pvRegsBaseKM, MNE_CR_CTRL, ui32RegVal);

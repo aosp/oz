@@ -83,8 +83,11 @@
 #if defined(PVR_LINUX_USING_WORKQUEUES) && !defined(CONFIG_PREEMPT)
 #error "A preemptible Linux kernel is required when using workqueues"
 #endif
-
+#if defined(EMULATOR)
+#define EVENT_OBJECT_TIMEOUT_MS		(2000)
+#else
 #define EVENT_OBJECT_TIMEOUT_MS		(100)
+#endif
 #define PVR_FULL_CACHE_OP_THRESHOLD	(0x7D000)
 
 #if !defined(DEBUG_LINUX_MEMORY_ALLOCATIONS)
@@ -1049,8 +1052,10 @@ IMG_BOOL OSIsResourceLocked (PVRSRV_RESOURCE *psResource, IMG_UINT32 ui32ID)
 
 
 #if !defined(SYS_CUSTOM_POWERLOCK_WRAP)
-PVRSRV_ERROR OSPowerLockWrap (IMG_VOID)
+PVRSRV_ERROR OSPowerLockWrap (IMG_BOOL bTryLock)
 {
+	PVR_UNREFERENCED_PARAMETER(bTryLock);
+
 	return PVRSRV_OK;
 }
 
