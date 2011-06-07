@@ -50,7 +50,7 @@ static PVRSRV_DEVICE_NODE *gpsSGXDevNode;
 static IMG_CPU_VIRTADDR gsSGXRegsCPUVAddr;
 #endif
 
-#if defined(LDM_PLATFORM) && !defined(PVR_DRI_DRM_NOT_PCI)
+#if defined(PVR_LINUX_DYNAMIC_SGX_RESOURCE_INFO)
 extern struct platform_device *gpsPVRLDMDev;
 #endif
 
