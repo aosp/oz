@@ -81,7 +81,7 @@ ccflags-$(CONFIG_SGX_540_BUILD_DEBUG) += \
 	-DSUPPORT_HW_RECOVERY \
 	-DDEBUG_LOG_PATH_TRUNCATE="\"eurasia_km\""
 
-ccflags-$(CONFIG_SGX_PDUMP) += -Idrivers/gpu/pvr/pdump \
+ccflags-$(CONFIG_SGX_PDUMP) += -Idrivers/gpu/pvr/dbgdrv \
 	-DPDUMP \
 	-DSUPPORT_DBGDRV_EVENT_OBJECTS
 
@@ -147,12 +147,12 @@ omaplfb-y := \
 	omaplfb/omaplfb_linux.o
 
 dbgdrv-$(CONFIG_SGX_PDUMP) := \
-	pdump/main.o \
-	pdump/dbgdriv.o \
-	pdump/ioctl.o \
-	pdump/handle.o \
-	pdump/hostfunc.o \
-	pdump/hotkey.o
+	dbgdrv/main.o \
+	dbgdrv/dbgdriv.o \
+	dbgdrv/ioctl.o \
+	dbgdrv/handle.o \
+	dbgdrv/hostfunc.o \
+	dbgdrv/hotkey.o
 
 obj-$(CONFIG_SGX540) := pvr_common.o sgx.o omaplfb.o pvr540.o
 obj-$(CONFIG_SGX530) := pvr_common.o sgx.o omaplfb.o pvr530.o

@@ -1121,11 +1121,13 @@ IMG_VOID SGXOSTimer(IMG_VOID *pvData)
 	PVRSRV_SGXDEV_INFO *psDevInfo = psDeviceNode->pvDevice;
 	static IMG_UINT32	ui32EDMTasks = 0;
 	static IMG_UINT32	ui32LockupCounter = 0; 
+	static IMG_UINT32	ui32OpenCLDelayCounter = 0;
 	static IMG_UINT32	ui32NumResets = 0;
 #if defined(FIX_HW_BRN_31093)
 	static IMG_BOOL		bBRN31093Inval = IMG_FALSE;
 #endif
 	IMG_UINT32		ui32CurrentEDMTasks;
+	IMG_UINT32		ui32CurrentOpenCLDelayCounter=0;
 	IMG_BOOL		bLockup = IMG_FALSE;
 	IMG_BOOL		bPoweredDown;
 
@@ -1162,7 +1164,19 @@ IMG_VOID SGXOSTimer(IMG_VOID *pvData)
 			if (ui32LockupCounter == 3)
 			{
 				ui32LockupCounter = 0;
-	
+				ui32CurrentOpenCLDelayCounter = (psDevInfo->psSGXHostCtl)->ui32OpenCLDelayCount;
+				if(0 != ui32CurrentOpenCLDelayCounter)
+				{
+					if(ui32OpenCLDelayCounter != ui32CurrentOpenCLDelayCounter){
+						ui32OpenCLDelayCounter = ui32CurrentOpenCLDelayCounter;
+					}else{
+						ui32OpenCLDelayCounter -= 1;
+						(psDevInfo->psSGXHostCtl)->ui32OpenCLDelayCount = ui32OpenCLDelayCounter;
+					}
+					goto SGX_NoUKernel_LockUp;
+				}
+
+
 	#if defined(FIX_HW_BRN_31093)
 				if (bBRN31093Inval == IMG_FALSE)
 				{
@@ -1192,9 +1206,10 @@ IMG_VOID SGXOSTimer(IMG_VOID *pvData)
 				{
 				PVR_DPF((PVR_DBG_ERROR, "SGXOSTimer() detected SGX lockup (0x%x tasks)", ui32EDMTasks));
 
-				bLockup = IMG_TRUE;
+					bLockup = IMG_TRUE;
+					(psDevInfo->psSGXHostCtl)->ui32OpenCLDelayCount = 0;
+				}
 			}
-		}
 		}
 		else
 		{
@@ -1206,6 +1221,7 @@ IMG_VOID SGXOSTimer(IMG_VOID *pvData)
 			ui32NumResets = psDevInfo->ui32NumResets;
 		}
 	}
+SGX_NoUKernel_LockUp:
 
 	if (bLockup)
 	{
@@ -1434,7 +1450,7 @@ static IMG_VOID SGXCacheInvalidate(PVRSRV_DEVICE_NODE *psDeviceNode)
 	psDevInfo->ui32CacheControl |= SGXMKIF_CC_INVAL_BIF_SL;
 	#else
 	PVR_UNREFERENCED_PARAMETER(psDevInfo);
-	#endif
+	#endif 
 }
 
 PVRSRV_ERROR SGXRegisterDevice (PVRSRV_DEVICE_NODE *psDeviceNode)

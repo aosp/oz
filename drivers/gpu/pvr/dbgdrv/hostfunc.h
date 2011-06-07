@@ -24,20 +24,35 @@
  *
  ******************************************************************************/
 
-#ifndef __REGPATHS_H__
-#define __REGPATHS_H__
+#ifndef _HOSTFUNC_
+#define _HOSTFUNC_
 
-#define POWERVR_REG_ROOT 	   			"Drivers\\Display\\PowerVR"
-#define POWERVR_CHIP_KEY				"\\SGX1\\"
+#define HOST_PAGESIZE			(4096)
+#define DBG_MEMORY_INITIALIZER	(0xe2)
 
-#define POWERVR_EURASIA_KEY				"PowerVREurasia\\"
+IMG_UINT32 HostReadRegistryDWORDFromString(IMG_CHAR *pcKey, IMG_CHAR *pcValueName, IMG_UINT32 *pui32Data);
 
-#define POWERVR_SERVICES_KEY			"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\PowerVR\\"
+IMG_VOID * HostPageablePageAlloc(IMG_UINT32 ui32Pages);
+IMG_VOID HostPageablePageFree(IMG_VOID * pvBase);
+IMG_VOID * HostNonPageablePageAlloc(IMG_UINT32 ui32Pages);
+IMG_VOID HostNonPageablePageFree(IMG_VOID * pvBase);
 
-#define PVRSRV_REGISTRY_ROOT			POWERVR_EURASIA_KEY "HWSettings\\PVRSRVKM"
+IMG_VOID * HostMapKrnBufIntoUser(IMG_VOID * pvKrnAddr, IMG_UINT32 ui32Size, IMG_VOID * *ppvMdl);
+IMG_VOID HostUnMapKrnBufFromUser(IMG_VOID * pvUserAddr, IMG_VOID * pvMdl, IMG_VOID * pvProcess);
 
+IMG_VOID HostCreateRegDeclStreams(IMG_VOID);
 
-#define MAX_REG_STRING_SIZE 128
+IMG_VOID * HostCreateMutex(IMG_VOID);
+IMG_VOID HostAquireMutex(IMG_VOID * pvMutex);
+IMG_VOID HostReleaseMutex(IMG_VOID * pvMutex);
+IMG_VOID HostDestroyMutex(IMG_VOID * pvMutex);
 
+#if defined(SUPPORT_DBGDRV_EVENT_OBJECTS)
+IMG_INT32 HostCreateEventObjects(IMG_VOID);
+IMG_VOID HostWaitForEvent(DBG_EVENT eEvent);
+IMG_VOID HostSignalEvent(DBG_EVENT eEvent);
+IMG_VOID HostDestroyEventObjects(IMG_VOID);
+#endif	
 
-#endif 
+#endif
+

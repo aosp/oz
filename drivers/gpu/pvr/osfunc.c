@@ -24,11 +24,14 @@
  *
  ******************************************************************************/
 
+#include <linux/version.h>
+
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,38))
 #ifndef AUTOCONF_INCLUDED
- #include <linux/config.h>
+#include <linux/config.h>
+#endif
 #endif
 
-#include <linux/version.h>
 #include <asm/io.h>
 #include <asm/page.h>
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,22))
@@ -123,7 +126,7 @@ static inline int is_vmalloc_addr(const void *pvCpuVAddr)
 	return lAddr >= VMALLOC_START && lAddr < VMALLOC_END;
 }
 
-#endif
+#endif 
 
 #if !defined(DEBUG_LINUX_MEMORY_ALLOCATIONS)
 PVRSRV_ERROR OSFreeMem_Impl(IMG_UINT32 ui32Flags, IMG_UINT32 ui32Size, IMG_PVOID pvCpuVAddr, IMG_HANDLE hBlockAlloc)
@@ -1729,12 +1732,16 @@ PVRSRV_ERROR OSPCIResumeDev(PVRSRV_PCI_DEV_HANDLE hPVRPCI)
             return PVRSRV_ERROR_UNKNOWN_POWER_STATE;
     }
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,38))
+    pci_restore_state(psPVRPCI->psPCIDev);
+#else
     err = pci_restore_state(psPVRPCI->psPCIDev);
     if (err != 0)
     {
         PVR_DPF((PVR_DBG_ERROR, "OSPCIResumeDev: pci_restore_state failed (%d)", err));
         return PVRSRV_ERROR_PCI_CALL_FAILED;
     }
+#endif
 
     err = pci_enable_device(psPVRPCI->psPCIDev);
     if (err != 0)
@@ -3026,7 +3033,7 @@ IMG_BOOL OSFlushCPUCacheRangeKM(IMG_HANDLE hOSMemHandle,
 								IMG_UINT32 ui32Length)
 {
 	if (ui32Length)
-		dma_cache_wback_inv((IMG_UINTPTR_T)pvRangeAddrStart, ui32Length);
+		dma_cache_wback_inv((IMG_UINTPTR_T)pvRangeAddrStart, ui32Length);	
 	return IMG_TRUE;
 }
 
