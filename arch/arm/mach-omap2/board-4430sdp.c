@@ -925,7 +925,7 @@ void omap_4430sdp_display_init(void)
 
 #ifdef CONFIG_OMAP_MUX
 static struct omap_board_mux board_mux[] __initdata = {
-	OMAP4_MUX(USBB2_ULPITLL_CLK, OMAP_MUX_MODE4 | OMAP_PIN_OUTPUT),
+	OMAP4_MUX(USBB2_ULPITLL_CLK, OMAP_MUX_MODE3 | OMAP_PIN_OUTPUT),
 	{ .reg_offset = OMAP_MUX_TERMINATOR },
 };
 
@@ -1002,7 +1002,7 @@ static inline void board_serial_init(void)
 #ifdef CONFIG_USB_EHCI_HCD_OMAP
 static const struct usbhs_omap_board_data usbhs_bdata __initconst = {
 	.port_mode[0] = OMAP_EHCI_PORT_MODE_PHY,
-	.port_mode[1] = OMAP_USBHS_PORT_MODE_UNUSED,
+	.port_mode[1] = OMAP_OHCI_PORT_MODE_PHY_6PIN_DATSE0,
 	.port_mode[2] = OMAP_USBHS_PORT_MODE_UNUSED,
 	.phy_reset  = false,
 	.reset_gpio_port[0]  = -EINVAL,
@@ -1012,6 +1012,7 @@ static const struct usbhs_omap_board_data usbhs_bdata __initconst = {
 
 static void __init omap4_ehci_init(void)
 {
+
 	omap_mux_init_signal("usbb2_ulpitll_clk.gpio_157", \
 		OMAP_PIN_OUTPUT | \
 		OMAP_PIN_OFF_NONE);
