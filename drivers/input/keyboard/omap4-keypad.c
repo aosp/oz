@@ -147,9 +147,15 @@ static int omap4_keypad_open(struct input_dev *input)
 			keypad_data->base + OMAP4_KBD_IRQSTATUS);
 	__raw_writel(OMAP4_DEF_IRQENABLE_EVENTEN | OMAP4_DEF_IRQENABLE_LONGKEY,
 			keypad_data->base + OMAP4_KBD_IRQENABLE);
+
+	/* For some reason enableing wakeup events from keyboard prevents
+	 * Mpu and COre to go to retention on suspend, after any key is pressed
+	 */
+#if 0
 	__raw_writel(OMAP4_DEF_WUP_EVENT_ENA | OMAP4_DEF_WUP_LONG_KEY_ENA,
 			keypad_data->base + OMAP4_KBD_WAKEUPENABLE);
 
+#endif
 	enable_irq(keypad_data->irq);
 
 	return 0;
@@ -327,9 +333,20 @@ static int __devexit omap4_keypad_remove(struct platform_device *pdev)
 	return 0;
 }
 
+static int omap4_keypad_resume(struct platform_device *pdev)
+{
+	struct omap4_keypad *keypad_data = platform_get_drvdata(pdev);
+
+	__raw_writel(0xff,
+			keypad_data->base + OMAP4_KBD_IRQSTATUS);
+
+	return 0;
+}
+
 static struct platform_driver omap4_keypad_driver = {
 	.probe		= omap4_keypad_probe,
 	.remove		= __devexit_p(omap4_keypad_remove),
+	.resume		= omap4_keypad_resume,
 	.driver		= {
 		.name	= "omap4-keypad",
 		.owner	= THIS_MODULE,
