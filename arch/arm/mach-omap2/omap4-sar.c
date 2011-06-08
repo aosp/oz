@@ -79,7 +79,11 @@ static void save_sar_bank3(void)
 	l4_secure_clkdm = clkdm_lookup("l4_secure_clkdm");
 	omap2_clkdm_wakeup(l4_secure_clkdm);
 
-	sar_save(NB_REGS_CONST_SETS_RAM3_HW, SAR_BANK3_OFFSET, sar_ram3_layout);
+	if (cpu_is_omap446x())
+		sar_save(OMAP446X_NB_REGS_CONST_SETS_RAM3_HW, SAR_BANK3_OFFSET, omap446x_sar_ram3_layout);
+	else
+		sar_save(NB_REGS_CONST_SETS_RAM3_HW, SAR_BANK3_OFFSET, sar_ram3_layout);
+
 
 	omap2_clkdm_allow_idle(l4_secure_clkdm);
 }
@@ -107,15 +111,22 @@ void omap4_sar_save(void)
 	clk_enable(usb_tll_ck);
 
 	/* Save SAR BANK1 */
-	sar_save(NB_REGS_CONST_SETS_RAM1_HW, SAR_BANK1_OFFSET, sar_ram1_layout);
+	if (cpu_is_omap446x())
+		sar_save(OMAP446X_NB_REGS_CONST_SETS_RAM1_HW, SAR_BANK1_OFFSET, omap446x_sar_ram1_layout);
+	else
+		sar_save(NB_REGS_CONST_SETS_RAM1_HW, SAR_BANK1_OFFSET, sar_ram1_layout);
 
 	pwrdm_disable_hdwr_sar(l3init_pwrdm);
 	clk_disable(usb_host_ck);
 	clk_disable(usb_tll_ck);
 
 	/* Save SAR BANK2 */
-	sar_save(NB_REGS_CONST_SETS_RAM2_HW, SAR_BANK2_OFFSET, sar_ram2_layout);
+	if (cpu_is_omap446x())
+		sar_save(OMAP446X_NB_REGS_CONST_SETS_RAM2_HW, SAR_BANK2_OFFSET, omap446x_sar_ram2_layout);
+	else
+		sar_save(NB_REGS_CONST_SETS_RAM2_HW, SAR_BANK2_OFFSET, sar_ram2_layout);
 }
+
 /**
  * omap4_sar_overwrite :
  * This API overwrite some of the SAR locations as a special cases
@@ -135,7 +146,11 @@ void omap4_sar_save(void)
 void omap4_sar_overwrite(void)
 {
 	u32 val = 0;
+	u32 offset = 0;
 
+
+	if (cpu_is_omap446x())
+		offset = 0x04;
 
 	/* Overwriting Phase1 data to be restored */
 	/* CM2 MEMIF_CLKTRCTRL = SW_WKUP, before FREQ UPDATE*/
@@ -157,25 +172,25 @@ void omap4_sar_overwrite(void)
 
 	/* Overwriting Phase2a data to be restored */
 	/* CM_L3INIT_USB_HOST_CLKCTRL: SAR_MODE = 1, MODULEMODE = 2 */
-	__raw_writel(0x00000012, sar_ram_base + SAR_BANK1_OFFSET + 0x2ec);
+	__raw_writel(0x00000012, sar_ram_base + SAR_BANK1_OFFSET + 0x2ec + offset);
 	/* CM_L3INIT_USB_TLL_CLKCTRL: SAR_MODE = 1, MODULEMODE = 1 */
-	__raw_writel(0x00000011, sar_ram_base + SAR_BANK1_OFFSET + 0x2f0);
+	__raw_writel(0x00000011, sar_ram_base + SAR_BANK1_OFFSET + 0x2f0 + offset);
 	/* CM2 CM_SDMA_STATICDEP : Enable static depedency for SAR modules */
-	__raw_writel(0x000090e8, sar_ram_base + SAR_BANK1_OFFSET + 0x2f4);
+	__raw_writel(0x000090e8, sar_ram_base + SAR_BANK1_OFFSET + 0x2f4 + offset);
 
 	/* Overwriting Phase2b data to be restored */
 	/* CM_L3INIT_USB_HOST_CLKCTRL: SAR_MODE = 0, MODULEMODE = 0 */
 	val = __raw_readl(OMAP4430_CM_L3INIT_USB_HOST_CLKCTRL);
 	val &= (OMAP4430_CLKSEL_UTMI_P1_MASK | OMAP4430_CLKSEL_UTMI_P2_MASK);
-	__raw_writel(val, sar_ram_base + SAR_BANK1_OFFSET + 0x91c);
+	__raw_writel(val, sar_ram_base + SAR_BANK1_OFFSET + 0x91c + offset);
 	/* CM_L3INIT_USB_TLL_CLKCTRL: SAR_MODE = 0, MODULEMODE = 0 */
-	__raw_writel(0x0000000, sar_ram_base + SAR_BANK1_OFFSET + 0x920);
+	__raw_writel(0x0000000, sar_ram_base + SAR_BANK1_OFFSET + 0x920 + offset);
 	/* CM2 CM_SDMA_STATICDEP : Clear the static depedency */
-	__raw_writel(0x00000040, sar_ram_base + SAR_BANK1_OFFSET + 0x924);
+	__raw_writel(0x00000040, sar_ram_base + SAR_BANK1_OFFSET + 0x924 + offset);
 
 	/* readback to ensure data reaches to SAR RAM */
 	barrier();
-	val = __raw_readl(sar_ram_base + SAR_BANK1_OFFSET + 0x924);
+	val = __raw_readl(sar_ram_base + SAR_BANK1_OFFSET + 0x924 + offset);
 }
 
 /*
@@ -238,6 +253,7 @@ static int __init omap4_sar_ram_init(void)
 	 * phase DMA takes an abort. Hence save these conents only once
 	 * in init to avoid the issue while waking up from device OFF
 	 */
+
 	if (omap_type() == OMAP2_DEVICE_TYPE_GP)
 		save_sar_bank3();
 	/*
@@ -245,14 +261,16 @@ static int __init omap4_sar_ram_init(void)
 	 * SECURE_EMIF1_SDRAM_CONFIG2_REG
 	 * SECURE_EMIF2_SDRAM_CONFIG2_REG
 	 */
-	secure_ctrl_mod = ioremap(OMAP4_CTRL_MODULE_WKUP, SZ_4K);
-	BUG_ON(!secure_ctrl_mod);
-	__raw_writel(0x10,
+	if (!cpu_is_omap446x()) {
+		secure_ctrl_mod = ioremap(OMAP4_CTRL_MODULE_WKUP, SZ_4K);
+		BUG_ON(!secure_ctrl_mod);
+		__raw_writel(0x10,
 		secure_ctrl_mod + OMAP4_CTRL_SECURE_EMIF1_SDRAM_CONFIG2_REG);
-	__raw_writel(0x10,
-	secure_ctrl_mod + OMAP4_CTRL_SECURE_EMIF2_SDRAM_CONFIG2_REG);
-	wmb();
-	iounmap(secure_ctrl_mod);
+		__raw_writel(0x10,
+		secure_ctrl_mod + OMAP4_CTRL_SECURE_EMIF2_SDRAM_CONFIG2_REG);
+		wmb();
+		iounmap(secure_ctrl_mod);
+	}
 
 	/*
 	 * L3INIT PD and clocks are needed for SAR save phase
