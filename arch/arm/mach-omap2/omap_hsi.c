@@ -300,22 +300,25 @@ int omap_hsi_prepare_suspend(int hsi_port, bool dev_may_wakeup)
 */
 int omap_hsi_wakeup(int hsi_port)
 {
-	struct platform_device *pdev;
-	struct hsi_dev *hsi_ctrl;
+	static struct platform_device *pdev;
+	static struct hsi_dev *hsi_ctrl;
 
-	/* TODO: optimize and call this only once, then store and use result
-	 * for subsequent accesses */
-	pdev = hsi_get_hsi_platform_device();
-	if (!pdev)
-		return -ENODEV;
+	if (!pdev) {
+		pdev = hsi_get_hsi_platform_device();
+		if (!pdev)
+			return -ENODEV;
+	}
+
 	if (!device_may_wakeup(&pdev->dev)) {
 		dev_info(&pdev->dev, "Modem not allowed to wakeup platform");
 		return -EPERM;
 	}
 
-	hsi_ctrl = hsi_get_hsi_controller_data(pdev);
-	if (!hsi_ctrl)
-		return -ENODEV;
+	if (!hsi_ctrl) {
+		hsi_ctrl = hsi_get_hsi_controller_data(pdev);
+		if (!hsi_ctrl)
+			return -ENODEV;
+	}
 
 	dev_dbg(hsi_ctrl->dev, "Modem wakeup detected from HSI CAWAKE Pad");
 
