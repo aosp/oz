@@ -40,6 +40,7 @@
 #include <linux/slab.h>
 #include <linux/i2c-omap.h>
 #include <linux/pm_runtime.h>
+#include <linux/pm_qos_params.h>
 
 /* I2C controller revisions */
 #define OMAP_I2C_REV_2			0x20
@@ -179,8 +180,6 @@ struct omap_i2c_dev {
 	struct completion	cmd_complete;
 	struct resource		*ioarea;
 	u32			latency;	/* maximum mpu wkup latency */
-	void			(*set_mpu_wkup_lat)(struct device *dev,
-						    long latency);
 	u32			speed;		/* Speed of bus in Khz */
 	u16			cmd_err;
 	u8			*buf;
@@ -250,6 +249,8 @@ const static u8 omap4_reg_map[] = {
 	[OMAP_I2C_IRQENABLE_SET] = 0x2c,
 	[OMAP_I2C_IRQENABLE_CLR] = 0x30,
 };
+
+static struct pm_qos_request_list *qos_request;
 
 static inline void omap_i2c_write_reg(struct omap_i2c_dev *i2c_dev,
 				      int reg, u16 val)
@@ -648,8 +649,13 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
 	if (r < 0)
 		goto out;
 
-	if (dev->set_mpu_wkup_lat != NULL)
-		dev->set_mpu_wkup_lat(dev->dev, dev->latency);
+	/*
+	 * When waiting for completion of a i2c transfer, we need to
+	 * set a wake up latency constraint for the MPU. This is to
+	 * ensure quick enough wakeup from idle, when transfer
+	 * completes.
+	 */
+	pm_qos_update_request(qos_request, dev->latency);
 
 	for (i = 0; i < num; i++) {
 		r = omap_i2c_xfer_msg(adap, &msgs[i], (i == (num - 1)));
@@ -657,8 +663,7 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
 			break;
 	}
 
-	if (dev->set_mpu_wkup_lat != NULL)
-		dev->set_mpu_wkup_lat(dev->dev, -1);
+	pm_qos_update_request(qos_request, PM_QOS_DEFAULT_VALUE);
 
 	if (r == 0)
 		r = num;
@@ -982,6 +987,10 @@ omap_i2c_probe(struct platform_device *pdev)
 	int r;
 	u32 speed = 0;
 
+	qos_request = kzalloc(sizeof(struct pm_qos_request_list), GFP_KERNEL);
+	pm_qos_add_request(qos_request, PM_QOS_CPU_DMA_LATENCY,
+						PM_QOS_DEFAULT_VALUE);
+
 	/* NOTE: driver uses the static register mapping */
 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (!mem) {
@@ -1007,13 +1016,10 @@ omap_i2c_probe(struct platform_device *pdev)
 		goto err_release_region;
 	}
 
-	if (pdata != NULL) {
+	if (pdata != NULL)
 		speed = pdata->clkrate;
-		dev->set_mpu_wkup_lat = pdata->set_mpu_wkup_lat;
-	} else {
+	else
 		speed = 100;	/* Default speed */
-		dev->set_mpu_wkup_lat = NULL;
-	}
 
 	dev->speed = speed;
 	dev->idle = 1;
@@ -1067,8 +1073,7 @@ omap_i2c_probe(struct platform_device *pdev)
 			dev->b_hw = 1; /* Enable hardware fixes */
 		}
 		/* calculate wakeup latency constraint for MPU */
-		if (dev->set_mpu_wkup_lat != NULL)
-			dev->latency = (1000000 * dev->fifo_size) /
+		dev->latency = (1000000 * dev->fifo_size) /
 				       (1000 * speed / 8);
 	}
 
@@ -1117,6 +1122,7 @@ err_free_mem:
 	kfree(dev);
 err_release_region:
 	release_mem_region(mem->start, resource_size(mem));
+	kfree(qos_request);
 
 	return r;
 }
@@ -1134,8 +1140,11 @@ omap_i2c_remove(struct platform_device *pdev)
 	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
 	iounmap(dev->base);
 	kfree(dev);
+	pm_qos_remove_request(qos_request);
+	kfree(qos_request);
 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	release_mem_region(mem->start, resource_size(mem));
+
 	return 0;
 }
 
