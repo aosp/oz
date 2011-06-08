@@ -44,6 +44,31 @@ struct vib_data {
 
 struct vib_data *misc_data;
 
+static irqreturn_t twl6040_vib_irq_handler(int irq, void *data)
+{
+	struct vib_data *misc_data = data;
+	struct twl6040_codec *twl6040 = misc_data->twl6040;
+	u8 intid = 0, status = 0;
+
+	intid = twl6040_reg_read(twl6040, TWL6040_REG_INTID);
+
+	if (intid & TWL6040_VIBINT) {
+		status = twl6040_reg_read(twl6040, TWL6040_REG_STATUS);
+		if (status & TWL6040_VIBLOCDET) {
+			pr_warn("Vibra left overcurrent detected\n");
+			twl6040_clear_bits(twl6040, TWL6040_REG_VIBCTLL,
+					   TWL6040_VIBENAL);
+		}
+		if (status & TWL6040_VIBROCDET) {
+			pr_warn("Vibra right overcurrent detected\n");
+			twl6040_clear_bits(twl6040, TWL6040_REG_VIBCTLR,
+					   TWL6040_VIBENAR);
+		}
+	}
+
+	return IRQ_HANDLED;
+}
+
 static void vib_set(int on)
 {
 	struct twl6040_codec *twl6040 = misc_data->twl6040;
@@ -207,6 +232,14 @@ static int vib_probe(struct platform_device *pdev)
 	misc_data = data;
 	platform_set_drvdata(pdev, data);
 
+	ret = twl6040_request_irq(data->twl6040, TWL6040_IRQ_VIB,
+				  twl6040_vib_irq_handler, 0,
+				  "twl6040_irq_vib", data);
+	if (ret) {
+		pr_err("%s: VIB IRQ request failed: %d\n", __func__, ret);
+		goto err2;
+	}
+
 	twl6040_enable(data->twl6040);
 	vib_enable(&data->dev, data->pdata->initial_vibrate);
 
@@ -228,7 +261,7 @@ static int vib_remove(struct platform_device *pdev)
 		data->pdata->exit();
 
 	twl6040_disable(data->twl6040);
-
+	twl6040_free_irq(data->twl6040, TWL6040_IRQ_VIB, data);
 	timed_output_dev_unregister(&data->dev);
 	kfree(data);
 
