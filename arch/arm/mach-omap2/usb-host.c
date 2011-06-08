@@ -465,15 +465,15 @@ static void setup_4430ohci_io_mux(const enum usbhs_omap_port_mode *port_mode)
 
 	case OMAP_OHCI_PORT_MODE_PHY_3PIN_DATSE0:
 	case OMAP_OHCI_PORT_MODE_TLL_3PIN_DATSE0:
-		omap_mux_init_signal("usbb2_mm_txen",
+		omap_mux_init_signal("abe_mcbsp2_fsx.usbb2_mm_txen",
 			OMAP_PIN_INPUT_PULLDOWN);
 
 
 	case OMAP_OHCI_PORT_MODE_TLL_2PIN_DATSE0:
 	case OMAP_OHCI_PORT_MODE_TLL_2PIN_DPDM:
-		omap_mux_init_signal("usbb2_mm_txdat",
+		omap_mux_init_signal("abe_dmic_din1.usbb2_mm_txdat",
 			OMAP_PIN_INPUT_PULLDOWN);
-		omap_mux_init_signal("usbb2_mm_txse0",
+		omap_mux_init_signal("abe_dmic_clk1.usbb2_mm_txse0",
 			OMAP_PIN_INPUT_PULLDOWN);
 		break;
 
