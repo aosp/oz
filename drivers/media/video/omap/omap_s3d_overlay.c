@@ -1668,8 +1668,13 @@ static int change_s3d_mode(struct s3d_ovl_device *dev,
 			mgr->get_manager_info(mgr, &info);
 			info.alpha_enabled = false;
 			r = mgr->set_manager_info(mgr, &info);
-			if (r)
-				S3DERR("failed to set alpha blender\n");
+			if (r) {
+				/* Alpha blender is always enabled in OMAP4 manager
+				driver so just give warning here but do not return
+				error */
+				S3DWARN("failed to disable alpha blender\n");
+				r = 0;
+			}
 		} else {
 			S3DERR("invalid manager");
 			r = -EINVAL;
