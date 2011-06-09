@@ -39,6 +39,9 @@
 #include <plat/omap-pm.h>
 
 #include <mach/omap_hsi.h>
+#include <plat/clockdomain.h>
+#include <plat/powerdomain.h>
+
 #include <linux/hsi_driver_if.h>
 
 /* Channel states */

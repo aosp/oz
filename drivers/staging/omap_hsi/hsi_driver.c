@@ -657,6 +657,9 @@ void hsi_clocks_disable_channel(struct device *dev, u8 channel_number,
 * @channel_number - channel number which requests clock to be enabled
 *		    0xFF means no particular channel
 *
+* Returns: -EEXIST if clocks were already active
+*	   0 if clocks were previously inactive
+*
 * Note : there is no real HW clock management per HSI channel, this is only
 * virtual to keep track of active channels and ease debug
 *
