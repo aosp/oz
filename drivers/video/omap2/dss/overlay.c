@@ -92,7 +92,7 @@ static ssize_t overlay_manager_store(struct omap_overlay *ovl, const char *buf,
 		ovl->get_overlay_info(ovl, &info);
 		if (mgr->device->panel.timings.x_res < info.out_width ||
 			mgr->device->panel.timings.y_res < info.out_height) {
-			printk(KERN_ERR"output window size exceeds panel dimensions");
+			printk(KERN_ERR "output window size exceeds panel dimensions");
 			return -EINVAL;
 		}
 	}
@@ -227,7 +227,7 @@ static ssize_t overlay_output_size_store(struct omap_overlay *ovl,
 	if (sysfs_streq(ovl->manager->name, "tv")) {
 		if (ovl->manager->device->panel.timings.x_res < out_width ||
 		ovl->manager->device->panel.timings.y_res < out_height)
-		printk(KERN_ERR"TV does not support downscaling , Wrong output size");
+		printk(KERN_ERR "TV does not support downscaling , Wrong output size");
 		return -EINVAL;
 	}
 
@@ -523,7 +523,7 @@ int dss_check_overlay(struct omap_overlay *ovl, struct omap_dss_device *dssdev)
 	info = &ovl->info;
 
 	if (info->paddr == 0) {
-		DSSDBG("check_overlay failed: paddr 0\n");
+		DSSERR("check_overlay failed: paddr 0\n");
 		return -EINVAL;
 	}
 
@@ -556,13 +556,13 @@ int dss_check_overlay(struct omap_overlay *ovl, struct omap_dss_device *dssdev)
 	}
 
 	if ((dw < info->pos_x + outw) && !info->out_wb) {
-		DSSDBG("check_overlay failed 1: %d < %d + %d\n",
+		DSSERR("check_overlay failed 1: %d < %d + %d\n",
 				dw, info->pos_x, outw);
 		return -EINVAL;
 	}
 
 	if ((dh < info->pos_y + outh) && !info->out_wb) {
-		DSSDBG("check_overlay failed 2: %d < %d + %d\n",
+		DSSERR("check_overlay failed 2: %d < %d + %d\n",
 				dh, info->pos_y, outh);
 		return -EINVAL;
 	}
