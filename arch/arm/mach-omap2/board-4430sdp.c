@@ -1762,15 +1762,15 @@ static struct omap_volt_vc_data vc446x_config = {
 	.vdd0_on = 1350000,	/* 1.35v */
 	.vdd0_onlp = 1350000,	/* 1.35v */
 	.vdd0_ret = 837500,	/* 0.8375v */
-	.vdd0_off = 600000,	/* 0.6 v */
+	.vdd0_off = 0,		/* 0 v */
 	.vdd1_on = 1350000,	/* 1.35v */
 	.vdd1_onlp = 1350000,	/* 1.35v */
 	.vdd1_ret = 837500,	/* 0.8375v */
-	.vdd1_off = 600000,	/* 0.6 v */
+	.vdd1_off = 0,		/* 0 v */
 	.vdd2_on = 1350000,	/* 1.35v */
 	.vdd2_onlp = 1350000,	/* 1.35v */
 	.vdd2_ret = 837500,	/* .8375v */
-	.vdd2_off = 600000,	/* 0.6 v */
+	.vdd2_off = 0,		/* 0 v */
 };
 
 static void plat_hold_wakelock(void *up, int flag)
