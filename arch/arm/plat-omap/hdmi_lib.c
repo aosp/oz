@@ -688,12 +688,19 @@ static void hdmi_core_audio_config(u32 name,
 
 	/* CTS_MODE */
 	WR_REG_32(name, HDMI_CORE_AV__ACR_CTRL,
-		/* MCLK_EN (0: Mclk is not used) */
+		/*
+		 * MCLK_EN: use TCLK for ACR packets. For devices that use
+		 * the MCLK, this is the first part of the MCLK initialization
+		 */
 		(0x0 << 2) |
 		/* Set ACR packets while audio is not present */
 		(acr_en << 1) |
 		/* CTS Source Select (1:SW, 0:HW) */
 		(audio_cfg->cts_mode << 0));
+
+	/* For devices using MCLK, this completes its initialization. */
+	if (!omap_chip_is(hdmi.audio_must_use_tclk))
+		REG_FLD_MOD(name, HDMI_CORE_AV__ACR_CTRL, 1, 2, 2);
 
 	REG_FLD_MOD(name, HDMI_CORE_AV__FREQ_SVAL, 0, 2, 0);
 	REG_FLD_MOD(name, HDMI_CORE_AV__N_SVAL1, audio_cfg->n, 7, 0);
