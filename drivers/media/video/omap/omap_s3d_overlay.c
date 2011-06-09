@@ -386,10 +386,21 @@ static void set_default_window(struct s3d_ovl_device *dev,
 				struct v4l2_window *win)
 {
 	struct omap_video_timings *timings = &dev->cur_disp->panel.timings;
-	win->w.width = timings->x_res;
-	win->w.height = timings->y_res;
+
+	dev->fbuf.fmt.width = timings->x_res;
+	dev->fbuf.fmt.height = timings->y_res;
+
 	win->w.top = 0;
 	win->w.left = 0;
+	win->w.width = timings->x_res;
+	win->w.height = timings->y_res;
+
+	if (dev->cur_disp->panel.s3d_info.type == S3D_DISP_OVERUNDER) {
+		win->w.height = (win->w.height -
+			dev->cur_disp->panel.s3d_info.gap) / 2;
+	} else if (dev->cur_disp->panel.s3d_info.type == S3D_DISP_SIDEBYSIDE)
+		win->w.width = (win->w.width -
+			dev->cur_disp->panel.s3d_info.gap) / 2;
 }
 
 static int calculate_offset(const struct v4l2_rect *crop,
@@ -724,6 +735,8 @@ static int change_display(struct s3d_ovl_device *dev,
 
 	omap_dss_put_device(dev->cur_disp);
 	dev->cur_disp = display;
+	set_default_window(dev, &dev->win);
+
 	return 0;
 }
 
@@ -941,6 +954,7 @@ static int fill_dst(struct s3d_ovl_device *dev,
 			unsigned int dst_width,
 			unsigned int dst_height)
 {
+	struct omap_video_timings *timings = &dev->cur_disp->panel.timings;
 	unsigned int pos_x = dev->win.w.left, pos_y = dev->win.w.top;
 
 	info->r_pos_x = pos_x;
@@ -972,15 +986,15 @@ static int fill_dst(struct s3d_ovl_device *dev,
 		break;
 	case S3D_DISP_OVERUNDER:
 		info->dst_w = dst_width;
-		info->dst_h = (dst_height - disp_info->gap) / 2;
-		pos_y += (dst_height + disp_info->gap) / 2;
+        info->dst_h = dst_height;
+		pos_y += (timings->y_res + disp_info->gap) / 2;
 		info->disp_ovls = 2;
 		info->a_view_per_ovl = true;
 		break;
 	case S3D_DISP_SIDEBYSIDE:
-		info->dst_w = (dst_width - disp_info->gap) / 2;
+        info->dst_w = dst_width;
 		info->dst_h = dst_height;
-		pos_x += (dst_width + disp_info->gap) / 2;
+		pos_x += (timings->x_res + disp_info->gap) / 2;
 		info->disp_ovls = 2;
 		info->a_view_per_ovl = true;
 		break;
@@ -1628,12 +1642,18 @@ static int change_s3d_mode(struct s3d_ovl_device *dev,
 		return -EFAULT;
 	}
 	if (disp->driver && disp->driver->enable_s3d) {
-		r = disp->driver->enable_s3d(dev->cur_disp, enable_s3d);
+		struct omap_video_timings timings = disp->panel.timings;
+		r = disp->driver->enable_s3d(disp, enable_s3d);
 		if (enable_s3d && r) {
 			S3DWARN("failed to enable S3D display\n");
 			/*fallback to anaglyph mode*/
 			mode = dev->s3d_mode = V4L2_S3D_MODE_ANAGLYPH;
 		}
+		/* If display resolution has changed after 3D switching
+		   reset the window setting */
+		if (timings.x_res != disp->panel.timings.x_res ||
+			timings.y_res != disp->panel.timings.y_res)
+			set_default_window(dev, &dev->win);
 	}
 
 	if (disp->panel.s3d_info.type == S3D_DISP_NONE &&
@@ -2815,10 +2835,12 @@ static int vidioc_s_ctrl(struct file *file, void *fh, struct v4l2_control *a)
 		}
 	case V4L2_CID_PRIVATE_S3D_MODE:
 		{
+			if (dev->streaming)
+				return -EBUSY;
 			if (a->value < 0 || a->value >= V4L2_S3D_MODE_MAX)
 				return -EINVAL;
 			mutex_lock(&dev->lock);
-			if (dev->streaming && change_s3d_mode(dev, a->value)) {
+			if (change_s3d_mode(dev, a->value)) {
 				mutex_unlock(&dev->lock);
 				return -EINVAL;
 			}
@@ -2937,10 +2959,6 @@ static int vidioc_streamon(struct file *file, void *fh, enum v4l2_buf_type i)
 		mutex_unlock(&dev->lock);
 		return r;
 	}
-
-	/*TODO: if the panel resolution changes after going to 3D
-	   what to do we do with the current window setting*/
-	/* set_default_window(dev, &dev->win); */
 
 	r = allocate_resources(dev);
 	if (r) {
