@@ -1146,8 +1146,6 @@ static void __init omap_4430sdp_init(void)
 
 	omap_4430sdp_display_init();
 
-	omap4_panda_android_init();
-
 	if (cpu_is_omap446x()) {
 		/* Vsel0 = gpio, vsel1 = gnd */
 		status = omap_tps6236x_board_setup(true, TPS62361_GPIO, -1,
