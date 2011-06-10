@@ -71,7 +71,6 @@ struct users {
  * pointer to
  * the struct users if found, else returns NULL.
  **/
-
 static struct users *user_lookup(struct device *dev)
 {
 	struct users *usr, *tmp_usr;
@@ -95,7 +94,6 @@ static struct users *user_lookup(struct device *dev)
  * failure
  * returns a ERR_PTR(-ENOMEM).
  **/
-
 static struct users *get_user(void)
 {
 	struct users *user;
@@ -225,7 +223,6 @@ unlock:
 /*
  * Device-driver-originated constraints (via board-*.c files)
  */
-
 int omap_pm_set_max_mpu_wakeup_lat(struct pm_qos_request_list **qos_request,
 					long t)
 {
@@ -234,8 +231,6 @@ int omap_pm_set_max_mpu_wakeup_lat(struct pm_qos_request_list **qos_request,
 
 	return -EINVAL;
 }
-
-
 
 int omap_pm_set_min_bus_tput(struct device *dev, u8 agent_id, long r)
 {
@@ -336,19 +331,6 @@ int omap_pm_set_max_dev_wakeup_lat(struct device *req_dev, struct device *dev,
 		ret = pwrdm_wakeuplat_set_constraint(pwrdm_dev, req_dev, t);
 	}
 
-	/*
-	 * For current Linux, this needs to map the device to a
-	 * powerdomain, then go through the list of current max lat
-	 * constraints on that powerdomain and find the smallest.  If
-	 * the latency constraint has changed, the code should
-	 * recompute the state to enter for the next powerdomain
-	 * state.  Conceivably, this code should also determine
-	 * whether to actually disable the device clocks or not,
-	 * depending on how long it takes to re-enable the clocks.
-	 *
-	 * TI CDP code can call constraint_set here.
-	 */
-
 	return ret;
 }
 
@@ -392,7 +374,6 @@ int omap_pm_set_min_clk_rate(struct device *dev, struct clk *c, long r)
 /*
  * DSP Bridge-specific constraints
  */
-
 const struct omap_opp *omap_pm_dsp_get_opp_table(void)
 {
 	WARN(1, "Deprecated %s: Not needed\n", __func__);
@@ -424,7 +405,6 @@ u8 omap_pm_dsp_get_opp(void)
  * In the future, this should be handled by custom OPP clocktype
  * functions.
  */
-
 struct cpufreq_frequency_table **omap_pm_cpu_get_freq_table(void)
 {
 	WARN(1, "Deprecated %s: Driver shouldn't be calling on to get"
