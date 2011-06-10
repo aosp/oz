@@ -189,6 +189,7 @@ int omap_hsi_is_io_wakeup_from_hsi(void)
 * omap_hsi_wakeup_enable - Enable HSI wakeup feature from RET/OFF mode
 *
 * @hsi_port - reference to the HSI port onto which enable wakeup feature.
+*	      Range [0, 1]
 *
 * Return value :* 0 if CAWAKE has been configured to wakeup platform
 *		* -ENODEV if CAWAKE is not muxed on padconf
@@ -211,6 +212,7 @@ static int omap_hsi_wakeup_enable(int hsi_port)
 * omap_hsi_wakeup_disable - Disable HSI wakeup feature from RET/OFF mode
 *
 * @hsi_port - reference to the HSI port onto which disable wakeup feature.
+*	      Range [0, 1]
 *
 * Return value :* 0 if CAWAKE has been configured to not wakeup platform
 *		* -ENODEV if CAWAKE is not muxed on padconf
@@ -295,8 +297,11 @@ int omap_hsi_prepare_suspend(int hsi_port, bool dev_may_wakeup)
 /**
 * omap_hsi_wakeup - Prepare HSI for wakeup from suspend mode (RET/OFF)
 *
-* Return value : 1 if IO wakeup source is HSI
-*		 0 if IO wakeup source is not HSI.
+* @hsi_port - reference to the HSI port which triggered wakeup.
+*	      Range [0, 1]
+*
+* Return value : 0 if HSI tasklet scheduled.
+*		 a negative value else.
 */
 int omap_hsi_wakeup(int hsi_port)
 {
@@ -319,6 +324,11 @@ int omap_hsi_wakeup(int hsi_port)
 		if (!hsi_ctrl)
 			return -ENODEV;
 	}
+
+	/* Check no other interrupt handler has already scheduled the tasklet */
+	if (test_and_set_bit(HSI_FLAGS_TASKLET_LOCK,
+			     &hsi_ctrl->hsi_port->flags))
+		return -EBUSY;
 
 	dev_dbg(hsi_ctrl->dev, "Modem wakeup detected from HSI CAWAKE Pad");
 

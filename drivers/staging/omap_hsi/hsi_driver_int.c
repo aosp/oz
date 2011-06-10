@@ -396,7 +396,7 @@ static void hsi_do_channel_rx(struct hsi_channel *ch)
 		}
 	}
 
-	/* Disable interrupts for polling if not needed */
+	/* Disable interrupts if not needed for polling */
 	if (!(ch->flags & HSI_CH_RX_POLL))
 		hsi_driver_disable_read_interrupt(ch);
 
@@ -680,6 +680,7 @@ static void do_hsi_tasklet(unsigned long hsi_port)
 		hsi_clear_dsp_wake_up(hsi_ctrl);
 
 	pport->in_int_tasklet = false;
+	clear_bit(HSI_FLAGS_TASKLET_LOCK, &pport->flags);
 	hsi_clocks_disable(hsi_ctrl->dev, __func__);
 	spin_unlock(&hsi_ctrl->lock);
 
@@ -689,6 +690,10 @@ static void do_hsi_tasklet(unsigned long hsi_port)
 static irqreturn_t hsi_mpu_handler(int irq, void *p)
 {
 	struct hsi_port *pport = p;
+
+	/* Check no other interrupt handler has already scheduled the tasklet */
+	if (test_and_set_bit(HSI_FLAGS_TASKLET_LOCK, &pport->flags))
+		return IRQ_HANDLED;
 
 	tasklet_hi_schedule(&pport->hsi_tasklet);
 
