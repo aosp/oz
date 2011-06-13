@@ -75,7 +75,11 @@ struct otg_transceiver {
 	void __iomem			*io_priv;
 
 	/* for notification of usb_xceiv_events */
+#if defined(CONFIG_TWL6030_USB) || defined(CONFIG_TWL4030_USB)
+	struct blocking_notifier_head	notifier;
+#else
 	struct atomic_notifier_head	notifier;
+#endif
 
 	/* to pass extra port status to the root hub */
 	u16			port_status;
@@ -235,13 +239,21 @@ otg_start_srp(struct otg_transceiver *otg)
 static inline int
 otg_register_notifier(struct otg_transceiver *otg, struct notifier_block *nb)
 {
+#if defined(CONFIG_TWL6030_USB) || defined(CONFIG_TWL4030_USB)
+	return blocking_notifier_chain_register(&otg->notifier, nb);
+#else
 	return atomic_notifier_chain_register(&otg->notifier, nb);
+#endif
 }
 
 static inline void
 otg_unregister_notifier(struct otg_transceiver *otg, struct notifier_block *nb)
 {
+#if defined(CONFIG_TWL6030_USB) || defined(CONFIG_TWL4030_USB)
+	blocking_notifier_chain_unregister(&otg->notifier, nb);
+#else
 	atomic_notifier_chain_unregister(&otg->notifier, nb);
+#endif
 }
 
 /* for OTG controller drivers (and maybe other stuff) */
