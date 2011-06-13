@@ -964,21 +964,26 @@ static int twl6040_mute(struct snd_soc_dai *codec_dai, int mute)
 	struct snd_soc_codec *codec = codec_dai->codec;
 	struct twl6040_data *priv = snd_soc_codec_get_drvdata(codec);
 
-	if (mute) {
-		priv->hfl_gain = twl6040_read_reg_cache(codec,
-						TWL6040_REG_HFLGAIN);
-		priv->hfr_gain = twl6040_read_reg_cache(codec,
-						TWL6040_REG_HFRGAIN);
-		priv->hs_gain = twl6040_read_reg_cache(codec,
+	if (codec_dai->id == TWL6040_DL1_DAI) {
+		if (mute) {
+			priv->hs_gain = twl6040_read_reg_cache(codec,
 						TWL6040_REG_HSGAIN);
-
-		twl6040_write(codec, TWL6040_REG_HFLGAIN, 0x1D);
-		twl6040_write(codec, TWL6040_REG_HFRGAIN, 0x1D);
-		twl6040_write(codec, TWL6040_REG_HSGAIN, 0xFF);
-	} else {
-		twl6040_write(codec, TWL6040_REG_HFLGAIN, priv->hfl_gain);
-		twl6040_write(codec, TWL6040_REG_HFRGAIN, priv->hfr_gain);
-		twl6040_write(codec, TWL6040_REG_HSGAIN, priv->hs_gain);
+			twl6040_write(codec, TWL6040_REG_HSGAIN, 0xFF);
+		} else {
+			twl6040_write(codec, TWL6040_REG_HSGAIN, priv->hs_gain);
+		}
+	} else if (codec_dai->id == TWL6040_DL2_DAI) {
+		if (mute) {
+			priv->hfl_gain = twl6040_read_reg_cache(codec,
+						TWL6040_REG_HFLGAIN);
+			priv->hfr_gain = twl6040_read_reg_cache(codec,
+						TWL6040_REG_HFRGAIN);
+			twl6040_write(codec, TWL6040_REG_HFLGAIN, 0x1D);
+			twl6040_write(codec, TWL6040_REG_HFRGAIN, 0x1D);
+		} else {
+			twl6040_write(codec, TWL6040_REG_HFLGAIN, priv->hfl_gain);
+			twl6040_write(codec, TWL6040_REG_HFRGAIN, priv->hfr_gain);
+		}
 	}
 
 	return 0;
