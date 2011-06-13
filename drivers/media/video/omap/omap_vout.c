@@ -3271,11 +3271,6 @@ static int vidioc_s_fbuf(struct file *file, void *fh,
 	if ((a->flags & V4L2_FBUF_FLAG_SRC_CHROMAKEY) &&
 			(a->flags & V4L2_FBUF_FLAG_CHROMAKEY))
 		return -EINVAL;
-	/* OMAP DSS Doesn't support the Destination color key
-	   and alpha blending together */
-	if ((a->flags & V4L2_FBUF_FLAG_CHROMAKEY) &&
-			(a->flags & V4L2_FBUF_FLAG_LOCAL_ALPHA))
-		return -EINVAL;
 
 	if ((a->flags & V4L2_FBUF_FLAG_SRC_CHROMAKEY)) {
 		vout->fbuf.flags |= V4L2_FBUF_FLAG_SRC_CHROMAKEY;
