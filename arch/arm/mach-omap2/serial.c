@@ -31,6 +31,7 @@
 
 #ifdef CONFIG_SERIAL_OMAP
 #include <plat/omap-serial.h>
+#include <plat/serial.h>
 #endif
 
 #include <plat/common.h>
@@ -731,7 +732,8 @@ core_initcall(omap_serial_early_init);
  * Don't mix calls to omap_serial_init_port() and omap_serial_init(),
  * use only one of the two.
  */
-void __init omap_serial_init_port(struct omap_board_data *bdata)
+void __init omap_serial_init_port(struct omap_board_data *bdata,
+			struct omap_uart_port_info *platform_data)
 {
 	struct omap_uart_state *uart;
 	struct omap_hwmod *oh;
@@ -809,12 +811,16 @@ void __init omap_serial_init_port(struct omap_board_data *bdata)
 
 	name = DRIVER_NAME;
 
-	omap_up.dma_enabled = uart->dma_enabled;
+	uart->dma_enabled = platform_data->use_dma;
+	omap_up.use_dma = platform_data->use_dma;
+	omap_up.dma_rx_buf_size = platform_data->dma_rx_buf_size;
+	omap_up.dma_rx_timeout = platform_data->dma_rx_timeout;
 	omap_up.uartclk = OMAP24XX_BASE_BAUD * 16;
 	omap_up.mapbase = oh->slaves[0]->addr->pa_start;
 	omap_up.membase = omap_hwmod_get_mpu_rt_va(oh);
 	omap_up.irqflags = IRQF_SHARED;
 	omap_up.flags = UPF_BOOT_AUTOCONF | UPF_SHARE_IRQ;
+	omap_up.idle_timeout = platform_data->idle_timeout;
 
 	pdata = &omap_up;
 	pdata_size = sizeof(struct omap_uart_port_info);
@@ -886,17 +892,18 @@ void __init omap_serial_init_port(struct omap_board_data *bdata)
  * can call this function when they want to have default behaviour
  * for serial ports (e.g initialize them all as serial ports).
  */
-void __init omap_serial_init(void)
+void __init omap_serial_init(struct omap_uart_port_info *platform_data)
 {
 	struct omap_uart_state *uart;
 	struct omap_board_data bdata;
+	unsigned int count = 0;
 
 	list_for_each_entry(uart, &uart_list, node) {
 		bdata.id = uart->num;
 		bdata.flags = 0;
 		bdata.pads = NULL;
 		bdata.pads_cnt = 0;
-		omap_serial_init_port(&bdata);
-
+		omap_serial_init_port(&bdata, &platform_data[count]);
+		count++;
 	}
 }

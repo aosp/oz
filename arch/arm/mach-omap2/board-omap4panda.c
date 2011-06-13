@@ -39,6 +39,10 @@
 #include <plat/board.h>
 #include <plat/common.h>
 #include <plat/usb.h>
+#ifdef CONFIG_SERIAL_OMAP
+#include <plat/omap-serial.h>
+#include <plat/serial.h>
+#endif
 #include <plat/mmc.h>
 #include <video/omap-panel-generic-dpi.h>
 #include "timer-gp.h"
@@ -471,6 +475,64 @@ static int __init omap4_panda_i2c_init(void)
 	return 0;
 }
 
+static struct omap_uart_port_info omap_serial_platform_data[] = {
+	{
+#if defined(CONFIG_SERIAL_OMAP_UART1_DMA)
+		.use_dma	= CONFIG_SERIAL_OMAP_UART1_DMA,
+		.dma_rx_buf_size = CONFIG_SERIAL_OMAP_UART1_RXDMA_BUFSIZE,
+		.dma_rx_timeout	= CONFIG_SERIAL_OMAP_UART1_RXDMA_TIMEOUT,
+#else
+		.use_dma	= 0,
+		.dma_rx_buf_size = 0,
+		.dma_rx_timeout	= 0,
+#endif /* CONFIG_SERIAL_OMAP_UART1_DMA */
+		.idle_timeout	= CONFIG_SERIAL_OMAP_IDLE_TIMEOUT,
+		.flags		= 1,
+	},
+	{
+#if defined(CONFIG_SERIAL_OMAP_UART2_DMA)
+		.use_dma	= CONFIG_SERIAL_OMAP_UART2_DMA,
+		.dma_rx_buf_size = CONFIG_SERIAL_OMAP_UART2_RXDMA_BUFSIZE,
+		.dma_rx_timeout	= CONFIG_SERIAL_OMAP_UART2_RXDMA_TIMEOUT,
+#else
+		.use_dma	= 0,
+		.dma_rx_buf_size = 0,
+		.dma_rx_timeout	= 0,
+#endif /* CONFIG_SERIAL_OMAP_UART2_DMA */
+		.idle_timeout	= CONFIG_SERIAL_OMAP_IDLE_TIMEOUT,
+		.flags		= 1,
+	},
+	{
+#if defined(CONFIG_SERIAL_OMAP_UART3_DMA)
+		.use_dma	= CONFIG_SERIAL_OMAP_UART3_DMA,
+		.dma_rx_buf_size = CONFIG_SERIAL_OMAP_UART3_RXDMA_BUFSIZE,
+		.dma_rx_timeout	= CONFIG_SERIAL_OMAP_UART3_RXDMA_TIMEOUT,
+#else
+		.use_dma	= 0,
+		.dma_rx_buf_size = 0,
+		.dma_rx_timeout	= 0,
+#endif /* CONFIG_SERIAL_OMAP_UART3_DMA */
+		.idle_timeout	= CONFIG_SERIAL_OMAP_IDLE_TIMEOUT,
+		.flags		= 1,
+	},
+	{
+#if defined(CONFIG_SERIAL_OMAP_UART4_DMA)
+		.use_dma	= CONFIG_SERIAL_OMAP_UART4_DMA,
+		.dma_rx_buf_size = CONFIG_SERIAL_OMAP_UART4_RXDMA_BUFSIZE,
+		.dma_rx_timeout	= CONFIG_SERIAL_OMAP_UART4_RXDMA_TIMEOUT,
+#else
+		.use_dma	= 0,
+		.dma_rx_buf_size = 0,
+		.dma_rx_timeout	= 0,
+#endif /* CONFIG_SERIAL_OMAP_UART4_DMA */
+		.idle_timeout	= CONFIG_SERIAL_OMAP_IDLE_TIMEOUT,
+		.flags		= 1,
+	},
+	{
+		.flags		= 0
+	}
+};
+
 #ifdef CONFIG_OMAP_MUX
 static struct omap_board_mux board_mux[] __initdata = {
 	/* WLAN IRQ - GPIO 53 */
@@ -602,11 +664,10 @@ static inline void board_serial_init(void)
 	bdata.pads_cnt  = 0;
 	bdata.id        = 0;
 	/* pass dummy data for UART1 */
-	omap_serial_init_port(&bdata);
-
-	omap_serial_init_port(&serial2_data);
-	omap_serial_init_port(&serial3_data);
-	omap_serial_init_port(&serial4_data);
+	omap_serial_init_port(&bdata, &omap_serial_platform_data[0]);
+	omap_serial_init_port(&serial2_data, &omap_serial_platform_data[1]);
+	omap_serial_init_port(&serial3_data, &omap_serial_platform_data[2]);
+	omap_serial_init_port(&serial4_data, &omap_serial_platform_data[3]);
 }
 #else
 #define board_mux	NULL

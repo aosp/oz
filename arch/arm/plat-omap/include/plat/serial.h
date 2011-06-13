@@ -101,11 +101,13 @@
 			})
 
 #ifndef __ASSEMBLER__
+struct omap_uart_port_info;
 
 struct omap_board_data;
 
-extern void omap_serial_init(void);
-extern void omap_serial_init_port(struct omap_board_data *bdata);
+extern void omap_serial_init(struct omap_uart_port_info *platform_data);
+extern void omap_serial_init_port(struct omap_board_data *bdata,
+			struct omap_uart_port_info *platform_data);
 extern int omap_uart_can_sleep(void);
 extern void omap_uart_check_wakeup(void);
 extern void omap_uart_prepare_suspend(void);
