@@ -53,6 +53,10 @@
 
 #define RX_TIMEOUT		(3 * HZ)
 #define OMAP_MAX_HSUART_PORTS	4
+#define UART1                  (0x0)
+#define UART2                  (0x1)
+#define UART3                  (0x2)
+#define UART4                  (0x3)
 
 #define MSR_SAVE_FLAGS		UART_MSR_ANY_DELTA
 
@@ -78,6 +82,7 @@ struct omap_uart_port_info {
 	int                     dma_rx_buf_size;/* DMA Rx Buffer Size */
 	int                     dma_rx_timeout; /* DMA RX timeout */
 	unsigned int            idle_timeout;   /* Omap Uart Idle Time out */
+	void			(*plat_hold_wakelock)(void *p, int flag);
 };
 
 struct uart_omap_dma {
@@ -126,6 +131,13 @@ struct uart_omap_port {
 	unsigned char		msr_saved_flags;
 	char			name[20];
 	unsigned long		port_activity;
+	void			(*plat_hold_wakelock)(void *up, int flag);
+};
+enum {
+	WAKELK_IRQ,
+	WAKELK_RESUME,
+	WAKELK_TX,
+	WAKELK_RX
 };
 int omap_uart_active(int num, u32 timeout);
 

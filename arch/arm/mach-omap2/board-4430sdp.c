@@ -38,6 +38,7 @@
 #include <plat/omap-serial.h>
 #include <plat/serial.h>
 #endif
+#include <linux/wakelock.h>
 #include <plat/mmc.h>
 #include <plat/omap4-keypad.h>
 #include <plat/syntm12xx.h>
@@ -68,6 +69,9 @@
 #define TPS62361_GPIO   7
 
 #define OMAP4SDP_MDM_PWR_EN_GPIO        157
+#define BLUETOOTH_UART UART2
+#define CONSOLE_UART UART3
+static struct wake_lock uart_lock;
 
 static const int sdp4430_keymap[] = {
 	KEY(0, 0, KEY_E),
@@ -916,8 +920,20 @@ void omap_4430sdp_display_init(void)
 	sdp4430_hdmi_mux_init();
 	omap_display_init(&sdp4430_dss_data);
 }
+static void plat_hold_wakelock(void *up, int flag)
+{
+	struct uart_omap_port *up2 = (struct uart_omap_port *)up;
+	/*Specific wakelock for bluetooth usecases*/
+	if ((up2->pdev->id == BLUETOOTH_UART)
+		&& ((flag == WAKELK_TX) || (flag == WAKELK_RX)))
+		wake_lock_timeout(&uart_lock, 2*HZ);
 
-#ifdef CONFIG_OMAP_MUX
+	/*Specific wakelock for console usecases*/
+	if ((up2->pdev->id == CONSOLE_UART)
+		&& ((flag == WAKELK_IRQ) || (flag == WAKELK_RESUME)))
+		wake_lock_timeout(&uart_lock, 5*HZ);
+	return;
+}
 
 static struct omap_uart_port_info omap_serial_platform_data[] = {
 	{
@@ -932,6 +948,7 @@ static struct omap_uart_port_info omap_serial_platform_data[] = {
 #endif /* CONFIG_SERIAL_OMAP_UART1_DMA */
 		.idle_timeout	= CONFIG_SERIAL_OMAP_IDLE_TIMEOUT,
 		.flags		= 1,
+		.plat_hold_wakelock = NULL,
 	},
 	{
 #if defined(CONFIG_SERIAL_OMAP_UART2_DMA)
@@ -945,6 +962,7 @@ static struct omap_uart_port_info omap_serial_platform_data[] = {
 #endif /* CONFIG_SERIAL_OMAP_UART2_DMA */
 		.idle_timeout	= CONFIG_SERIAL_OMAP_IDLE_TIMEOUT,
 		.flags		= 1,
+		.plat_hold_wakelock = plat_hold_wakelock,
 	},
 	{
 #if defined(CONFIG_SERIAL_OMAP_UART3_DMA)
@@ -958,6 +976,7 @@ static struct omap_uart_port_info omap_serial_platform_data[] = {
 #endif /* CONFIG_SERIAL_OMAP_UART3_DMA */
 		.idle_timeout	= CONFIG_SERIAL_OMAP_IDLE_TIMEOUT,
 		.flags		= 1,
+		.plat_hold_wakelock = plat_hold_wakelock,
 	},
 	{
 #if defined(CONFIG_SERIAL_OMAP_UART4_DMA)
@@ -971,11 +990,14 @@ static struct omap_uart_port_info omap_serial_platform_data[] = {
 #endif /* CONFIG_SERIAL_OMAP_UART3_DMA */
 		.idle_timeout	= CONFIG_SERIAL_OMAP_IDLE_TIMEOUT,
 		.flags		= 1,
+		.plat_hold_wakelock = plat_hold_wakelock,
 	},
 	{
 		.flags		= 0
 	}
 };
+
+#ifdef CONFIG_OMAP_MUX
 
 static struct omap_board_mux board_mux[] __initdata = {
 	OMAP4_MUX(USBB2_ULPITLL_CLK, OMAP_MUX_MODE3 | OMAP_PIN_OUTPUT),
@@ -1036,6 +1058,7 @@ static inline void board_serial_init(void)
 	bdata.pads	= NULL;
 	bdata.pads_cnt	= 0;
 	bdata.id	= 0;
+	wake_lock_init(&uart_lock, WAKE_LOCK_SUSPEND, "uart_wake_lock");
 	/* pass dummy data for UART1 */
 	omap_serial_init_port(&bdata, &omap_serial_platform_data[0]);
 	omap_serial_init_port(&serial2_data, &omap_serial_platform_data[1]);

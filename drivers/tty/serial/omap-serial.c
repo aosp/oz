@@ -235,8 +235,14 @@ static void transmit_chars(struct uart_omap_port *up)
 		serial_out(up, UART_TX, xmit->buf[xmit->tail]);
 		xmit->tail = (xmit->tail + 1) & (UART_XMIT_SIZE - 1);
 		up->port.icount.tx++;
-		if (uart_circ_empty(xmit))
+		if (uart_circ_empty(xmit)) {
+			/* This wake lock has to moved out to use case drivers
+			 * which require these.
+			 */
+			if (up->plat_hold_wakelock)
+				(up->plat_hold_wakelock(up, WAKELK_TX));
 			break;
+		}
 	} while (--count > 0);
 
 	if (uart_circ_chars_pending(xmit) < WAKEUP_CHARS)
@@ -343,6 +349,12 @@ static unsigned int check_modem_status(struct uart_omap_port *up)
 	return status;
 }
 
+inline bool omap_is_console_port(struct uart_port *port)
+{
+	return port->cons && port->cons->index == port->line;
+}
+EXPORT_SYMBOL(omap_is_console_port);
+
 /**
  * serial_omap_irq() - This handles the interrupt from one port
  * @irq: uart port irq number
@@ -362,8 +374,12 @@ static inline irqreturn_t serial_omap_irq(int irq, void *dev_id)
 	lsr = serial_in(up, UART_LSR);
 	if (iir & UART_IIR_RLSI) {
 		if (!up->use_dma) {
-			if (lsr & UART_LSR_DR)
+			if (lsr & UART_LSR_DR) {
 				receive_chars(up, &lsr);
+				if (omap_is_console_port(&up->port) &&
+						(up->plat_hold_wakelock))
+					up->plat_hold_wakelock(up, WAKELK_IRQ);
+			}
 		} else {
 			up->ier &= ~(UART_IER_RDI | UART_IER_RLSI);
 			serial_out(up, UART_IER, up->ier);
@@ -1075,6 +1091,8 @@ static int serial_omap_resume(struct platform_device *dev)
 {
 	struct uart_omap_port *up = platform_get_drvdata(dev);
 
+	if (omap_is_console_port(&up->port) && up->plat_hold_wakelock)
+		up->plat_hold_wakelock(up, WAKELK_RESUME);
 	if (up)
 		uart_resume_port(&serial_omap_reg, &up->port);
 	return 0;
@@ -1161,6 +1179,10 @@ static int serial_omap_start_rxdma(struct uart_omap_port *up)
 	mod_timer(&up->uart_dma.rx_timer, jiffies +
 				usecs_to_jiffies(up->uart_dma.rx_timeout));
 	up->uart_dma.rx_dma_used = true;
+
+	if (up->plat_hold_wakelock)
+		(up->plat_hold_wakelock(up, WAKELK_RX));
+
 	return ret;
 }
 
@@ -1214,6 +1236,8 @@ static void uart_tx_dma_callback(int lch, u16 ch_status, void *data)
 		serial_omap_stop_tx(&up->port);
 		up->uart_dma.tx_dma_used = false;
 		spin_unlock(&(up->uart_dma.tx_lock));
+			if (up->plat_hold_wakelock)
+				(up->plat_hold_wakelock(up, WAKELK_TX));
 	} else {
 		omap_stop_dma(up->uart_dma.tx_dma_channel);
 		serial_omap_continue_tx(up);
@@ -1282,6 +1306,7 @@ static int serial_omap_probe(struct platform_device *pdev)
 	up->port.irqflags = omap_up_info->irqflags;
 	up->port.uartclk = omap_up_info->uartclk;
 	up->uart_dma.uart_base = mem->start;
+	up->plat_hold_wakelock = omap_up_info->plat_hold_wakelock;
 
 	if (omap_up_info->use_dma) {
 		up->uart_dma.uart_dma_tx = dma_tx->start;
