@@ -658,6 +658,9 @@ static struct twl4030_codec_data twl6040_codec = {
 	.irq_base	= TWL6040_CODEC_IRQ_BASE,
 };
 
+static struct twl4030_bci_platform_data sdp4430_bci_data = {
+};
+
 static struct twl4030_platform_data sdp4430_twldata = {
 	.irq_base	= TWL6030_IRQ_BASE,
 	.irq_end	= TWL6030_IRQ_END,
@@ -678,6 +681,7 @@ static struct twl4030_platform_data sdp4430_twldata = {
 
 	/* children */
 	.codec		= &twl6040_codec,
+	.bci            = &sdp4430_bci_data,
 };
 
 static struct i2c_board_info __initdata sdp4430_i2c_boardinfo[] = {
