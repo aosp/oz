@@ -40,6 +40,8 @@
 #include <plat/gpmc.h>
 #include <plat/dma.h>
 #include <plat/usb.h>
+#include <plat/smartreflex.h>
+#include <plat/voltage.h>
 
 #include <asm/tlbflush.h>
 
@@ -402,6 +404,12 @@ void omap_sram_idle(void)
 	u32 sdrc_pwr = 0;
 	int per_state_modified = 0;
 	int per_context_saved = 0;
+	int cam_fclken;
+	int dss_fclken;
+	int sgx_fclken;
+	int usb_fclken;
+	int iva2_idlest;
+	int dma_idlest;
 
 	if (!_omap_sram_idle)
 		return;
@@ -437,6 +445,34 @@ void omap_sram_idle(void)
 	per_next_state = pwrdm_read_next_pwrst(per_pwrdm);
 	core_next_state = pwrdm_read_next_pwrst(core_pwrdm);
 	dss_next_state = pwrdm_read_next_pwrst(dss_pwrdm);
+
+	/*
+	 * Hardware maintains sleep dependencies which will keep the core
+	 * domain from sleeping if certain other domains are active.  However,
+	 * we will be making decisions based on what core is doing.  For
+	 * example, should we call set_dpll3_volt_freq() or not.  So let's
+	 * find out what core will really do.
+	 */
+	if (core_next_state < PWRDM_POWER_ON) {
+		cam_fclken = cm_read_mod_reg(OMAP3430_CAM_MOD, CM_FCLKEN);
+		dss_fclken = cm_read_mod_reg(OMAP3430_DSS_MOD, CM_FCLKEN);
+		sgx_fclken = cm_read_mod_reg(OMAP3430ES2_SGX_MOD, CM_FCLKEN);
+		usb_fclken = cm_read_mod_reg(OMAP3430ES2_USBHOST_MOD,
+							CM_FCLKEN);
+		iva2_idlest = cm_read_mod_reg(OMAP3430_IVA2_MOD, CM_IDLEST);
+                dma_idlest = cm_read_mod_reg(CORE_MOD, CM_IDLEST) &
+							OMAP3430_ST_SDMA_MASK;
+
+		if ((cam_fclken != 0) ||
+			(dss_fclken != 0) ||
+			(sgx_fclken != 0) ||
+			(usb_fclken != 0) ||
+			(iva2_idlest == 0) ||
+			(dma_idlest == 0)) {
+			core_next_state = PWRDM_POWER_ON;
+			pwrdm_set_next_pwrst(core_pwrdm, core_next_state);
+		}
+	}
 
 	if (per_next_state < PWRDM_POWER_ON ||
 			core_next_state < PWRDM_POWER_ON) {
@@ -478,6 +514,14 @@ void omap_sram_idle(void)
 	}
 
 	/* CORE */
+	if (core_next_state <= PWRDM_POWER_RET) {
+		set_dpll3_volt_freq(0);
+		cm_write_mod_reg((1 << OMAP3430_AUTO_PERIPH_DPLL_SHIFT) |
+				(1 << OMAP3430_AUTO_CORE_DPLL_SHIFT),
+				PLL_MOD,
+				CM_AUTOIDLE);
+	}
+
 	if (core_next_state < PWRDM_POWER_ON) {
 		omap_uart_prepare_idle(0);
 		omap_uart_prepare_idle(1);
@@ -561,10 +605,11 @@ void omap_sram_idle(void)
 						OMAP3430_GR_MOD,
 						OMAP3_PRM_VOLTCTRL_OFFSET);
 	}
-	cm_write_mod_reg((1 << OMAP3430_AUTO_PERIPH_DPLL_SHIFT) |
-				(1 << OMAP3430_AUTO_CORE_DPLL_SHIFT),
+	cm_write_mod_reg(1 << OMAP3430_AUTO_PERIPH_DPLL_SHIFT,
 				PLL_MOD,
 				CM_AUTOIDLE);
+	if (core_next_state <= PWRDM_POWER_RET)
+	    set_dpll3_volt_freq(1);
 
 	omap3_intc_resume_idle();
 
@@ -1000,8 +1045,7 @@ static void __init prcm_setup_regs(void)
 	cm_write_mod_reg(1 << OMAP3430_AUTO_MPU_DPLL_SHIFT,
 			 MPU_MOD,
 			 CM_AUTOIDLE2);
-	cm_write_mod_reg((1 << OMAP3430_AUTO_PERIPH_DPLL_SHIFT) |
-			 (1 << OMAP3430_AUTO_CORE_DPLL_SHIFT),
+	cm_write_mod_reg((1 << OMAP3430_AUTO_PERIPH_DPLL_SHIFT),
 			 PLL_MOD,
 			 CM_AUTOIDLE);
 	cm_write_mod_reg(1 << OMAP3430ES2_AUTO_PERIPH2_DPLL_SHIFT,
