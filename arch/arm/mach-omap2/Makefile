@@ -243,6 +243,7 @@ obj-$(CONFIG_MACH_IGEP0030)		+= board-igep0030.o \
 obj-$(CONFIG_MACH_OMAP3_TOUCHBOOK)	+= board-omap3touchbook.o \
 					   hsmmc.o
 obj-$(CONFIG_MACH_OMAP_4430SDP)		+= board-4430sdp.o \
+					   board-blaze-panel.o \
 					   board-blaze-sensors.o \
 					   hsmmc.o \
 					   omap_phy_internal.o
