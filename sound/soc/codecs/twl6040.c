@@ -89,6 +89,7 @@ struct twl6040_data {
 	int hfl_gain;
 	int hfr_gain;
 	int hs_gain;
+	int ear_gain;
 };
 
 /*
@@ -493,6 +494,14 @@ static irqreturn_t twl6040_audio_handler(int irq, void *data)
 	.private_value = (unsigned long)&(struct soc_mixer_control) \
 		{.reg = reg_left, .rreg = reg_right, .shift = xshift, \
 		.max = xmax, .platform_max = xmax, .invert = xinvert} }
+#define SOC_SINGLE_TLV_TWL6040_EAR(xname, reg, shift, max, invert, tlv_array) \
+{	.iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, \
+	.access = SNDRV_CTL_ELEM_ACCESS_TLV_READ |\
+		 SNDRV_CTL_ELEM_ACCESS_READWRITE,\
+	.tlv.p = (tlv_array), \
+	.info = snd_soc_info_volsw, .get = snd_soc_get_volsw,\
+	.put = snd_soc_put_volsw_twl6040_ear, \
+	.private_value =  SOC_SINGLE_VALUE(reg, shift, max, invert) }
 
 static int snd_soc_put_volsw_twl6040_hs(struct snd_kcontrol *kcontrol,
 	struct snd_ctl_elem_value *ucontrol)
@@ -562,6 +571,37 @@ static int snd_soc_put_volsw_2r_twl6040_hf(struct snd_kcontrol *kcontrol,
 
 	err = snd_soc_update_bits_locked(codec, reg2, val_mask, val2);
 	return err;
+}
+
+int snd_soc_put_volsw_twl6040_ear(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	struct soc_mixer_control *mc =
+		(struct soc_mixer_control *)kcontrol->private_value;
+	struct snd_soc_codec *codec = snd_kcontrol_chip(kcontrol);
+	unsigned int reg = mc->reg;
+	unsigned int shift = mc->shift;
+	unsigned int rshift = mc->rshift;
+	int max = mc->max;
+	unsigned int mask = (1 << fls(max)) - 1;
+	unsigned int invert = mc->invert;
+	unsigned int val, val2, val_mask;
+	struct twl6040_data *priv = snd_soc_codec_get_drvdata(codec);
+
+	val = (ucontrol->value.integer.value[0] & mask);
+	if (invert)
+		val = max - val;
+	val_mask = mask << shift;
+	val = val << shift;
+	if (shift != rshift) {
+		val2 = (ucontrol->value.integer.value[1] & mask);
+		if (invert)
+			val2 = max - val2;
+		val_mask |= mask << rshift;
+		val |= val2 << rshift;
+	}
+	priv->ear_gain = val;
+	return snd_soc_update_bits_locked(codec, reg, val_mask, val);
 }
 
 /*
@@ -669,7 +709,7 @@ static const struct snd_kcontrol_new twl6040_snd_controls[] = {
 		TWL6040_REG_HSGAIN, 0, 4, 0xF, 1, hs_tlv),
 	SOC_DOUBLE_R_TLV_TWL6040_HF("Handsfree Playback Volume",
 		TWL6040_REG_HFLGAIN, TWL6040_REG_HFRGAIN, 0, 0x1D, 1, hf_tlv),
-	SOC_SINGLE_TLV("Earphone Playback Volume",
+	SOC_SINGLE_TLV_TWL6040_EAR("Earphone Playback Volume",
 		TWL6040_REG_EARCTL, 1, 0xF, 1, ep_tlv),
 };
 
@@ -963,14 +1003,28 @@ static int twl6040_mute(struct snd_soc_dai *codec_dai, int mute)
 {
 	struct snd_soc_codec *codec = codec_dai->codec;
 	struct twl6040_data *priv = snd_soc_codec_get_drvdata(codec);
+	int data;
 
 	if (codec_dai->id == TWL6040_DL1_DAI) {
 		if (mute) {
+			/* headset */
 			priv->hs_gain = twl6040_read_reg_cache(codec,
 						TWL6040_REG_HSGAIN);
 			twl6040_write(codec, TWL6040_REG_HSGAIN, 0xFF);
+			/* earpiece */
+			priv->ear_gain = twl6040_read_reg_cache(codec,
+						TWL6040_REG_EARCTL) >> 1;
+			data = twl6040_read_reg_volatile(codec,
+						TWL6040_REG_EARCTL) & 0x01;
+			twl6040_write(codec, TWL6040_REG_EARCTL, data | 0x1E);
 		} else {
+			/* headset */
 			twl6040_write(codec, TWL6040_REG_HSGAIN, priv->hs_gain);
+			/* earpiece */
+			data = twl6040_read_reg_volatile(codec,
+						TWL6040_REG_EARCTL) & 0x01;
+			twl6040_write(codec, TWL6040_REG_EARCTL,
+				      data | (priv->ear_gain << 1));
 		}
 	} else if (codec_dai->id == TWL6040_DL2_DAI) {
 		if (mute) {
@@ -1164,6 +1218,7 @@ static int twl6040_probe(struct snd_soc_codec *codec)
 	priv->hfl_gain = twl6040_read_reg_cache(codec, TWL6040_REG_HFLGAIN);
 	priv->hfr_gain = twl6040_read_reg_cache(codec, TWL6040_REG_HFRGAIN);
 	priv->hs_gain = twl6040_read_reg_cache(codec, TWL6040_REG_HSGAIN);
+	priv->ear_gain = twl6040_read_reg_cache(codec, TWL6040_REG_EARCTL) << 1;
 
 	INIT_DELAYED_WORK(&priv->delayed_work, twl6040_accessory_work);
 	mutex_init(&priv->mutex);
