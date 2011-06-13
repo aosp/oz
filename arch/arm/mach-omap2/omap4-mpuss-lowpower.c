@@ -464,7 +464,8 @@ static inline void enable_gic_cpu_interface(void)
  */
 static inline void enable_gic_distributor(void)
 {
-	writel(0x1, gic_dist_base_addr + GIC_DIST_CTRL);
+	if(!(readl(gic_dist_base_addr + GIC_DIST_CTRL) & 0x1))
+		writel(0x1, gic_dist_base_addr + GIC_DIST_CTRL);
 	if (omap_type() == OMAP2_DEVICE_TYPE_GP)
 		writel(0x0, sar_bank3_base + SAR_BACKUP_STATUS_OFFSET);
 }
@@ -784,6 +785,22 @@ cpu_prepare:
 		restore_mmu_table_entry();
 		restore_local_timers(wakeup_cpu);
 	}
+	/*
+	 * GIC distributor control register has changed between
+	 * CortexA9 r1pX and r2pX. The Control Register secure
+	 * banked version is now composed of 2 bits:
+	 * bit 0 == Secure Enable
+	 * bit 1 == Non-Secure Enable
+	 * The Non-Secure banked register has not changed
+	 * Because the ROM Code is based on the r1pX GIC, the CPU1
+	 * GIC restoration will cause a problem to CPU0 Non-Secure SW.
+	 * The workaround must be:
+	 * 1) Before doing the CPU1 wakeup, CPU0 must disable
+	 * the GIC distributor
+	 * 2) CPU1 must re-enable the GIC distributor on
+	 * it's wakeup path.
+	 */
+	enable_gic_distributor();
 
 	/*
 	 * Check MPUSS previous power state and enable

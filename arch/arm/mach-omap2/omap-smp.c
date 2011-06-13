@@ -42,6 +42,11 @@ static inline unsigned int get_core_count(void)
 
 static DEFINE_SPINLOCK(boot_lock);
 
+static inline void disable_gic_distributor(void)
+{
+	writel_relaxed(0x0, gic_dist_base_addr + GIC_DIST_CTRL);
+}
+
 void __cpuinit platform_secondary_init(unsigned int cpu)
 {
 	trace_hardirqs_off();
@@ -92,6 +97,22 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
 	 */
 	if (booted) {
 		cpu1_clkdm = clkdm_lookup("mpu1_clkdm");
+		/*
+		 * GIC distributor control register has changed between
+		 * CortexA9 r1pX and r2pX. The Control Register secure
+		 * banked version is now composed of 2 bits:
+		 * bit 0 == Secure Enable
+		 * bit 1 == Non-Secure Enable
+		 * The Non-Secure banked register has not changed
+		 * Because the ROM Code is based on the r1pX GIC, the CPU1
+		 * GIC restoration will cause a problem to CPU0 Non-Secure SW.
+		 * The workaround must be:
+		 * 1) Before doing the CPU1 wakeup, CPU0 must disable
+		 * the GIC distributor
+		 * 2) CPU1 must re-enable the GIC distributor on
+		 * it's wakeup path.
+		 */
+		disable_gic_distributor();
 		omap2_clkdm_wakeup(cpu1_clkdm);
 		smp_cross_call(cpumask_of(cpu));
 	} else {
