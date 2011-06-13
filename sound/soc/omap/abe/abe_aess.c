@@ -189,4 +189,3 @@ int omap_abe_disable_irq(struct omap_abe *abe)
 	return 0;
 }
 EXPORT_SYMBOL(omap_abe_disable_irq);
-

@@ -456,4 +456,3 @@ const u32 abe_port_priority[LAST_PORT_ID - 1] = {
 	OMAP_ABE_BT_VX_UL_PORT,
 	OMAP_ABE_VIB_DL_PORT,
 };
-

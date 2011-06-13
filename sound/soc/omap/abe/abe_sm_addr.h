@@ -535,4 +535,3 @@
 
 #define OMAP_ABE_S_BT_DL_16K_TEMP_ADDR                0x44D0
 #define OMAP_ABE_S_BT_DL_16K_TEMP_SIZE                0x20
-

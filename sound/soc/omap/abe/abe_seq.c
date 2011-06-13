@@ -306,4 +306,3 @@ abehal_status abe_set_sequence_time_accuracy(u32 fast, u32 slow)
 	return 0;
 }
 EXPORT_SYMBOL(abe_set_sequence_time_accuracy);
-

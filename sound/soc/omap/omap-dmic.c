@@ -3,7 +3,7 @@
  *
  * Copyright (C) 2010 Texas Instruments
  *
- * Author: Liam Girdwood <lrg@slimlogic.co.uk>
+ * Author: Liam Girdwood <lrg@ti.com>
  *	   David Lambert <dlambert@ti.com>
  *	   Misael Lopez Cruz <misael.lopez@ti.com>
  *
@@ -22,8 +22,6 @@
  * 02110-1301 USA
  *
  */
-
-#undef DEBUG
 
 #include <linux/init.h>
 #include <linux/module.h>
@@ -60,6 +58,7 @@ struct omap_dmic {
 	int clk_freq;
 	int sysclk;
 	int active;
+	int running;
 	int channels;
 	int abe_mode;
 	u32 up_enable;
@@ -321,13 +320,17 @@ static void dmic_config_up_channels(struct omap_dmic *dmic, int dai_id,
 			}
 			break;
 		case OMAP4_ABE_DMIC0:
-			dmic->up_enable |= OMAP_DMIC_UP1_ENABLE;
-			break;
 		case OMAP4_ABE_DMIC1:
-			dmic->up_enable |= OMAP_DMIC_UP2_ENABLE;
-			break;
 		case OMAP4_ABE_DMIC2:
-			dmic->up_enable |= OMAP_DMIC_UP2_ENABLE;
+			/*
+			 * ABE expects all the DMIC interfaces to be
+			 * enabled, so enabling them when at least one
+			 * DMIC DAI is running
+			 */
+			if (dmic->running)
+				dmic->up_enable |= OMAP_DMIC_UP1_ENABLE |
+					OMAP_DMIC_UP2_ENABLE |
+					OMAP_DMIC_UP3_ENABLE;
 			break;
 		default:
 			break;
@@ -338,13 +341,14 @@ static void dmic_config_up_channels(struct omap_dmic *dmic, int dai_id,
 			dmic->up_enable = 0;
 			break;
 		case OMAP4_ABE_DMIC0:
-			dmic->up_enable &= ~OMAP_DMIC_UP1_ENABLE;
-			break;
 		case OMAP4_ABE_DMIC1:
-			dmic->up_enable &= ~OMAP_DMIC_UP2_ENABLE;
-			break;
 		case OMAP4_ABE_DMIC2:
-			dmic->up_enable &= ~OMAP_DMIC_UP2_ENABLE;
+			/*
+			 * Disable all DMIC interfaces only when
+			 * all DAIs are stopped
+			 */
+			if (!dmic->running)
+				dmic->up_enable = 0;
 			break;
 		default:
 			break;
@@ -370,10 +374,12 @@ static int omap_dmic_dai_trigger(struct snd_pcm_substream *substream,
 
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
+		dmic->running++;
 		dmic_config_up_channels(dmic, dai->id, 1);
 		dmic_set_up_channels(dmic);
 		break;
 	case SNDRV_PCM_TRIGGER_STOP:
+		dmic->running--;
 		dmic_config_up_channels(dmic, dai->id, 0);
 		dmic_set_up_channels(dmic);
 		break;
@@ -560,7 +566,9 @@ static __devinit int asoc_dmic_probe(struct platform_device *pdev)
 	pm_runtime_enable(dmic->dev);
 
 	/* Disable lines while request is ongoing */
+	pm_runtime_get_sync(dmic->dev);
 	omap_dmic_write(dmic, OMAP_DMIC_CTRL, 0x00);
+	pm_runtime_put_sync(dmic->dev);
 
 	ret = snd_soc_register_dais(&pdev->dev, omap_dmic_dai,
 			ARRAY_SIZE(omap_dmic_dai));

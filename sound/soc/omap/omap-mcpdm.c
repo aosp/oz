@@ -23,8 +23,6 @@
  *
  */
 
-#define DEBUG
-
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
@@ -43,7 +41,6 @@
 #include <sound/initval.h>
 #include <sound/soc.h>
 
-#include <plat/control.h>
 #include <plat/dma.h>
 #include <plat/omap_hwmod.h>
 #include "omap-mcpdm.h"
@@ -167,12 +164,21 @@ static void omap_mcpdm_start(struct omap_mcpdm *mcpdm, int stream)
 {
 	u32 ctrl = omap_mcpdm_read(mcpdm, MCPDM_CTRL);
 
-	if (stream)
+	if (stream) {
+		ctrl |= SW_UP_RST;
+		omap_mcpdm_write(mcpdm, MCPDM_CTRL, ctrl);
 		ctrl |= mcpdm->up_channels;
-	else
+		omap_mcpdm_write(mcpdm, MCPDM_CTRL, ctrl);
+		ctrl &= ~SW_UP_RST;
+		omap_mcpdm_write(mcpdm, MCPDM_CTRL, ctrl);
+	} else {
+		ctrl |= SW_DN_RST;
+		omap_mcpdm_write(mcpdm, MCPDM_CTRL, ctrl);
 		ctrl |= mcpdm->dn_channels;
-
-	omap_mcpdm_write(mcpdm, MCPDM_CTRL, ctrl);
+		omap_mcpdm_write(mcpdm, MCPDM_CTRL, ctrl);
+		ctrl &= ~SW_DN_RST;
+		omap_mcpdm_write(mcpdm, MCPDM_CTRL, ctrl);
+	}
 }
 
 /*
@@ -183,12 +189,22 @@ static void omap_mcpdm_stop(struct omap_mcpdm *mcpdm, int stream)
 {
 	u32 ctrl = omap_mcpdm_read(mcpdm, MCPDM_CTRL);
 
-	if (stream)
+	if (stream) {
+		ctrl |= SW_UP_RST;
+		omap_mcpdm_write(mcpdm, MCPDM_CTRL, ctrl);
 		ctrl &= ~mcpdm->up_channels;
-	else
+		omap_mcpdm_write(mcpdm, MCPDM_CTRL, ctrl);
+		ctrl &= ~SW_UP_RST;
+		omap_mcpdm_write(mcpdm, MCPDM_CTRL, ctrl);
+	} else {
+		ctrl |= SW_DN_RST;
+		omap_mcpdm_write(mcpdm, MCPDM_CTRL, ctrl);
 		ctrl &= ~mcpdm->dn_channels;
+		omap_mcpdm_write(mcpdm, MCPDM_CTRL, ctrl);
+		ctrl &= ~SW_DN_RST;
+		omap_mcpdm_write(mcpdm, MCPDM_CTRL, ctrl);
+	}
 
-	omap_mcpdm_write(mcpdm, MCPDM_CTRL, ctrl);
 }
 
 /*
@@ -476,7 +492,7 @@ static void omap_mcpdm_dai_shutdown(struct snd_pcm_substream *substream,
 	} else {
 		if (!--mcpdm->dl_active)
 			schedule_delayed_work(&mcpdm->delayed_work,
-					msecs_to_jiffies(11000)); /* TODO: pdata ? */
+					msecs_to_jiffies(1000)); /* TODO: pdata ? */
 	}
 
 	mutex_unlock(&mcpdm->mutex);
@@ -556,6 +572,8 @@ static int omap_mcpdm_prepare(struct snd_pcm_substream *substream,
 
 		/* wait 250us for ABE tick */
 		udelay(250);
+
+		omap_mcpdm_start(mcpdm, SNDRV_PCM_STREAM_PLAYBACK);
 	}
 
 	return 0;
@@ -571,6 +589,11 @@ static int omap_mcpdm_dai_trigger(struct snd_pcm_substream *substream,
 
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
+		/* ABE playback start handled by hw_params to prevent pop-noise */
+		if (dai->id == MCPDM_ABE_DAI_DL1 ||
+		    dai->id == MCPDM_ABE_DAI_DL2 ||
+		    dai->id == MCPDM_ABE_DAI_VIB)
+			return 0;
 		omap_mcpdm_start(mcpdm, stream);
 		break;
 	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
@@ -579,8 +602,9 @@ static int omap_mcpdm_dai_trigger(struct snd_pcm_substream *substream,
 		break;
 	case SNDRV_PCM_TRIGGER_STOP:
 		/* ABE playback stop handled by delayed work */
-		if (dai->id == MCPDM_ABE_DAI_DL1 || dai->id == MCPDM_ABE_DAI_DL2 ||
-			dai->id == MCPDM_ABE_DAI_VIB)
+		if (dai->id == MCPDM_ABE_DAI_DL1 ||
+		    dai->id == MCPDM_ABE_DAI_DL2 ||
+		    dai->id == MCPDM_ABE_DAI_VIB)
 			return 0;
 		omap_mcpdm_stop(mcpdm, stream);
 		break;
@@ -638,8 +662,8 @@ static struct snd_soc_dai_driver omap_mcpdm_dai[] = {
 	.id	= MCPDM_LEGACY_DAI_DL1,
 	.probe = omap_mcpdm_probe,
 	.remove = omap_mcpdm_remove,
-	.late_probe = 1,
-	.early_remove = 1,
+	.probe_order = SND_SOC_COMP_ORDER_LATE,
+	.remove_order = SND_SOC_COMP_ORDER_EARLY,
 	.playback = {
 		.channels_min = 1,
 		.channels_max = 4,
@@ -651,8 +675,8 @@ static struct snd_soc_dai_driver omap_mcpdm_dai[] = {
 {
 	.name = "mcpdm-ul",
 	.id	= MCPDM_LEGACY_DAI_UL1,
-	.late_probe = 1,
-	.early_remove = 1,
+	.probe_order = SND_SOC_COMP_ORDER_LATE,
+	.remove_order = SND_SOC_COMP_ORDER_EARLY,
 	.capture = {
 		.channels_min = 1,
 		.channels_max = 2,
@@ -666,8 +690,8 @@ static struct snd_soc_dai_driver omap_mcpdm_dai[] = {
 {
 	.name = "mcpdm-dl1",
 	.id	= MCPDM_ABE_DAI_DL1,
-	.late_probe = 1,
-	.early_remove = 1,
+	.probe_order = SND_SOC_COMP_ORDER_LATE,
+	.remove_order = SND_SOC_COMP_ORDER_EARLY,
 	.playback = {
 		.channels_min = 1,
 		.channels_max = 2,
@@ -679,8 +703,8 @@ static struct snd_soc_dai_driver omap_mcpdm_dai[] = {
 {
 	.name = "mcpdm-dl2",
 	.id	= MCPDM_ABE_DAI_DL2,
-	.late_probe = 1,
-	.early_remove = 1,
+	.probe_order = SND_SOC_COMP_ORDER_LATE,
+	.remove_order = SND_SOC_COMP_ORDER_EARLY,
 	.playback = {
 		.channels_min = 1,
 		.channels_max = 2,
@@ -692,8 +716,8 @@ static struct snd_soc_dai_driver omap_mcpdm_dai[] = {
 {
 	.name = "mcpdm-vib",
 	.id	= MCPDM_ABE_DAI_VIB,
-	.late_probe = 1,
-	.early_remove = 1,
+	.probe_order = SND_SOC_COMP_ORDER_LATE,
+	.remove_order = SND_SOC_COMP_ORDER_EARLY,
 	.playback = {
 		.channels_min = 1,
 		.channels_max = 2,
@@ -705,8 +729,8 @@ static struct snd_soc_dai_driver omap_mcpdm_dai[] = {
 {
 	.name = "mcpdm-ul1",
 	.id	= MCPDM_ABE_DAI_UL1,
-	.late_probe = 1,
-	.early_remove = 1,
+	.probe_order = SND_SOC_COMP_ORDER_LATE,
+	.remove_order = SND_SOC_COMP_ORDER_EARLY,
 	.capture = {
 		.channels_min = 1,
 		.channels_max = 2,
@@ -819,7 +843,7 @@ static int __devexit asoc_mcpdm_remove(struct platform_device *pdev)
 
 static struct platform_driver asoc_mcpdm_driver = {
 	.driver = {
-			.name = "omap-mcpdm-dai",
+			.name = "omap-mcpdm",
 			.owner = THIS_MODULE,
 	},
 

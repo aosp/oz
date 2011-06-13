@@ -315,4 +315,3 @@
 
 #define OMAP_ABE_C_BETACURRENT_BT_DL_ADDR             0x13E0
 #define OMAP_ABE_C_BETACURRENT_BT_DL_SIZE             0x4
-

@@ -202,10 +202,23 @@
 #define SOC_VALUE_ENUM_SINGLE_DECL(name, xreg, xshift, xmask, xtexts, xvalues) \
 	SOC_VALUE_ENUM_DOUBLE_DECL(name, xreg, xshift, xshift, xmask, xtexts, xvalues)
 
+/*
+ * Component probe and remove ordering levels for components with runtime
+ * dependencies.
+ */
+#define SND_SOC_COMP_ORDER_FIRST		-2
+#define SND_SOC_COMP_ORDER_EARLY		-1
+#define SND_SOC_COMP_ORDER_NORMAL		0
+#define SND_SOC_COMP_ORDER_LATE		1
+#define SND_SOC_COMP_ORDER_LAST		2
 
 /* DAI Link Host Mode Support */
 #define SND_SOC_DAI_LINK_NO_HOST		0x1
 #define SND_SOC_DAI_LINK_OPT_HOST		0x2
+
+#define snd_soc_get_enum_text(soc_enum, idx) \
+	(soc_enum->texts ? soc_enum->texts[idx] : soc_enum->dtexts[idx])
+
 
 /*
  * Bias levels
@@ -265,6 +278,11 @@ enum snd_soc_compress_type {
 	SND_SOC_RBTREE_COMPRESSION
 };
 
+enum snd_soc_pcm_subclass {
+	SND_SOC_MUTEX_FE	= 0,
+	SND_SOC_MUTEX_BE	= 1,
+};
+
 int snd_soc_codec_set_sysclk(struct snd_soc_codec *codec, int clk_id,
 			     unsigned int freq, int dir);
 int snd_soc_codec_set_pll(struct snd_soc_codec *codec, int pll_id, int source,
@@ -298,6 +316,11 @@ int snd_soc_default_volatile_register(struct snd_soc_codec *codec,
 				      unsigned int reg);
 int snd_soc_default_readable_register(struct snd_soc_codec *codec,
 				      unsigned int reg);
+unsigned int snd_soc_platform_read(struct snd_soc_platform *platform,
+					unsigned int reg);
+unsigned int snd_soc_platform_write(struct snd_soc_platform *platform,
+					unsigned int reg, unsigned int val);
+
 struct snd_pcm_substream *snd_soc_get_dai_substream(struct snd_soc_card *card,
 		const char *dai_link, int stream);
 struct snd_soc_pcm_runtime *snd_soc_get_pcm_runtime(struct snd_soc_card *card,
@@ -615,8 +638,8 @@ struct snd_soc_codec_driver {
 			     enum snd_soc_dapm_type, int);
 
 	/* probe ordering - for components with runtime dependencies */
-	bool late_probe;
-	bool early_remove;
+	int probe_order;
+	int remove_order;
 
 	/* codec stream completion event */
 	int (*stream_event)(struct snd_soc_dapm_context *dapm);
@@ -645,8 +668,8 @@ struct snd_soc_platform_driver {
 	struct snd_pcm_ops *ops;
 
 	/* probe ordering - for components with runtime dependencies */
-	bool late_probe;
-	bool early_remove;
+	int probe_order;
+	int remove_order;
 
 	int (*stream_event)(struct snd_soc_dapm_context *dapm);
 	int (*bespoke_trigger)(struct snd_pcm_substream *, int);
@@ -842,6 +865,7 @@ struct snd_soc_pcm_runtime  {
 	struct snd_soc_card *card;
 	struct snd_soc_dai_link *dai_link;
 	struct mutex pcm_mutex;
+	enum snd_soc_pcm_subclass pcm_subclass;
 	struct snd_pcm_ops ops;
 
 	unsigned int complete:1;
@@ -883,6 +907,7 @@ struct soc_enum {
 	unsigned int max;
 	unsigned int mask;
 	const char **texts;
+	char **dtexts;
 	const unsigned int *values;
 	void *dapm;
 };
@@ -891,10 +916,6 @@ struct soc_enum {
 unsigned int snd_soc_read(struct snd_soc_codec *codec, unsigned int reg);
 unsigned int snd_soc_write(struct snd_soc_codec *codec,
 			   unsigned int reg, unsigned int val);
-unsigned int snd_soc_platform_read(struct snd_soc_platform *platform,
-					unsigned int reg);
-unsigned int snd_soc_platform_write(struct snd_soc_platform *platform,
-					 unsigned int reg, unsigned int val);
 
 /* device driver data */
 

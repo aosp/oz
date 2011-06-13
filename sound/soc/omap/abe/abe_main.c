@@ -208,7 +208,7 @@ EXPORT_SYMBOL(abe_reset_hal);
 u32 abe_load_fw(void)
 {
 	omap_abe_load_fw(abe);
-	return 0; 
+	return 0;
 }
 EXPORT_SYMBOL(abe_load_fw);
 
@@ -726,4 +726,3 @@ abehal_status abe_use_compensated_gain(u32 on_off)
 	return 0;
 }
 EXPORT_SYMBOL(abe_use_compensated_gain);
-

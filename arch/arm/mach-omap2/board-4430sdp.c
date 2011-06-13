@@ -618,12 +618,15 @@ static void omap4_audio_conf(void)
 }
 
 static struct twl4030_codec_audio_data twl6040_audio = {
-	/* Add audio only data */
+	/* single-step ramp for headset and handsfree */
+	.hs_left_step	= 0x0f,
+	.hs_right_step	= 0x0f,
+	.hf_left_step	= 0x1d,
+	.hf_right_step	= 0x1d,
 };
 
 static struct twl4030_codec_vibra_data twl6040_vibra = {
-	.max_timeout	= 15000,
-	.initial_vibrate = 0,
+	/* Add vibra only data */
 };
 
 static struct twl4030_codec_data twl6040_codec = {
@@ -1046,8 +1049,8 @@ static void __init omap_4430sdp_init(void)
 	omap_board_config = sdp4430_config;
 	omap_board_config_size = ARRAY_SIZE(sdp4430_config);
 
-	omap4_i2c_init();
 	omap4_audio_conf();
+	omap4_i2c_init();
 	omap_sfh7741prox_init();
 	platform_add_devices(sdp4430_devices, ARRAY_SIZE(sdp4430_devices));
 	board_serial_init();

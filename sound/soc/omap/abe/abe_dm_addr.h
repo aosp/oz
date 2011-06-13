@@ -358,4 +358,3 @@
 
 #define OMAP_ABE_D_PONG_ADDR                          0xA000
 #define OMAP_ABE_D_PONG_SIZE                          0x6000
-

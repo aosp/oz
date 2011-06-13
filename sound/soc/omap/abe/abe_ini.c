@@ -102,7 +102,7 @@ void abe_init_mem(void __iomem **_io_base)
 
 	abe = kzalloc(sizeof(struct omap_abe), GFP_KERNEL);
 	if (abe == NULL)
-		printk(KERN_ERR "ABE Allocation ERROR "); 
+		printk(KERN_ERR "ABE Allocation ERROR ");
 
 	for (i = 0; i < 5; i++)
 		abe->io_base[i] = _io_base[i];
@@ -545,4 +545,3 @@ void omap_abe_reset_all_ports(struct omap_abe *abe)
 	omap_abe_write_gain(abe, GAINS_BTUL, GAIN_0dB,
 			    RAMP_100MS, GAIN_RIGHT_OFFSET);
 }
-

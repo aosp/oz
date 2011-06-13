@@ -572,4 +572,3 @@ abehal_status abe_plug_subroutine(u32 *id, abe_subroutine2 f, u32 n,
 	return 0;
 }
 EXPORT_SYMBOL(abe_plug_subroutine);
-

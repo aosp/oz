@@ -62,4 +62,3 @@
 void omap_abe_reset_all_sequence(struct omap_abe *abe);
 
 #endif /* _ABE_SEQ_H_ */
-

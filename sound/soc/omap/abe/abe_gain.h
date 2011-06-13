@@ -109,4 +109,3 @@ void omap_abe_reset_gain_mixer(struct omap_abe *abe, u32 id, u32 p);
 void abe_int_2_float16(u32 data, u32 *mantissa, u32 *exp);
 
 #endif /* _ABE_GAIN_H_ */
-

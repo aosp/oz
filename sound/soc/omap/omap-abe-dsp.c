@@ -17,11 +17,11 @@
  *
  * Copyright (C) 2010 Texas Instruments Inc.
  *
- * Author : Liam Girdwood <lrg@slimlogic.co.uk>
+ * Authors: Liam Girdwood <lrg@ti.com>
+ *          Misael Lopez Cruz <misael.lopez@ti.com>
+ *          Sebastien Guiriec <s-guiriec@ti.com>
  *
  */
-
-#define DEBUG
 
 #include <linux/module.h>
 #include <linux/moduleparam.h>
@@ -305,11 +305,18 @@ static DECLARE_TLV_DB_SCALE(vxrec_vx_ul_tlv, -12000, 100, 3000);
 /* DMIC volume control from -120 to 30 dB in 1 dB steps */
 static DECLARE_TLV_DB_SCALE(dmic_tlv, -12000, 100, 3000);
 
+/* BT UL volume control from -120 to 30 dB in 1 dB steps */
+static DECLARE_TLV_DB_SCALE(btul_tlv, -12000, 100, 3000);
+
+/* AMIC volume control from -120 to 30 dB in 1 dB steps */
+static DECLARE_TLV_DB_SCALE(amic_tlv, -12000, 100, 3000);
+
 //TODO: we have to use the shift value atm to represent register id due to current HAL
 static int dl1_put_mixer(struct snd_kcontrol *kcontrol,
 	struct snd_ctl_elem_value *ucontrol)
 {
-	struct snd_soc_dapm_widget *widget = snd_kcontrol_chip(kcontrol);
+	struct snd_soc_dapm_widget_list *wlist = snd_kcontrol_chip(kcontrol);
+	struct snd_soc_dapm_widget *widget = wlist->widgets[0];
 	struct soc_mixer_control *mc =
 		(struct soc_mixer_control *)kcontrol->private_value;
 
@@ -321,7 +328,7 @@ static int dl1_put_mixer(struct snd_kcontrol *kcontrol,
 		snd_soc_dapm_mixer_update_power(widget, kcontrol, 1);
 		abe_enable_gain(MIXDL1, mc->reg);
 	} else {
-		the_abe->widget_opp[mc->shift]= ucontrol->value.integer.value[0];
+		the_abe->widget_opp[mc->shift] = ucontrol->value.integer.value[0];
 		snd_soc_dapm_mixer_update_power(widget, kcontrol, 0);
 		abe_disable_gain(MIXDL1, mc->reg);
 	}
@@ -333,7 +340,8 @@ static int dl1_put_mixer(struct snd_kcontrol *kcontrol,
 static int dl2_put_mixer(struct snd_kcontrol *kcontrol,
 	struct snd_ctl_elem_value *ucontrol)
 {
-	struct snd_soc_dapm_widget *widget = snd_kcontrol_chip(kcontrol);
+	struct snd_soc_dapm_widget_list *wlist = snd_kcontrol_chip(kcontrol);
+	struct snd_soc_dapm_widget *widget = wlist->widgets[0];
 	struct soc_mixer_control *mc =
 		(struct soc_mixer_control *)kcontrol->private_value;
 
@@ -356,7 +364,8 @@ static int dl2_put_mixer(struct snd_kcontrol *kcontrol,
 static int audio_ul_put_mixer(struct snd_kcontrol *kcontrol,
 	struct snd_ctl_elem_value *ucontrol)
 {
-	struct snd_soc_dapm_widget *widget = snd_kcontrol_chip(kcontrol);
+	struct snd_soc_dapm_widget_list *wlist = snd_kcontrol_chip(kcontrol);
+	struct snd_soc_dapm_widget *widget = wlist->widgets[0];
 	struct soc_mixer_control *mc =
 		(struct soc_mixer_control *)kcontrol->private_value;
 
@@ -379,7 +388,8 @@ static int audio_ul_put_mixer(struct snd_kcontrol *kcontrol,
 static int vxrec_put_mixer(struct snd_kcontrol *kcontrol,
 	struct snd_ctl_elem_value *ucontrol)
 {
-	struct snd_soc_dapm_widget *widget = snd_kcontrol_chip(kcontrol);
+	struct snd_soc_dapm_widget_list *wlist = snd_kcontrol_chip(kcontrol);
+	struct snd_soc_dapm_widget *widget = wlist->widgets[0];
 	struct soc_mixer_control *mc =
 		(struct soc_mixer_control *)kcontrol->private_value;
 
@@ -402,7 +412,8 @@ static int vxrec_put_mixer(struct snd_kcontrol *kcontrol,
 static int sdt_put_mixer(struct snd_kcontrol *kcontrol,
 	struct snd_ctl_elem_value *ucontrol)
 {
-	struct snd_soc_dapm_widget *widget = snd_kcontrol_chip(kcontrol);
+	struct snd_soc_dapm_widget_list *wlist = snd_kcontrol_chip(kcontrol);
+	struct snd_soc_dapm_widget *widget = wlist->widgets[0];
 	struct soc_mixer_control *mc =
 		(struct soc_mixer_control *)kcontrol->private_value;
 
@@ -447,7 +458,8 @@ static const abe_router_t router[] = {
 static int ul_mux_put_route(struct snd_kcontrol *kcontrol,
 	struct snd_ctl_elem_value *ucontrol)
 {
-	struct snd_soc_dapm_widget *widget = snd_kcontrol_chip(kcontrol);
+	struct snd_soc_dapm_widget_list *wlist = snd_kcontrol_chip(kcontrol);
+	struct snd_soc_dapm_widget *widget = wlist->widgets[0];
 	struct soc_enum *e = (struct soc_enum *)kcontrol->private_value;
 	int mux = ucontrol->value.enumerated.item[0];
 	int reg = e->reg - ABE_MUX(0);
@@ -512,7 +524,8 @@ static int ul_mux_get_route(struct snd_kcontrol *kcontrol,
 static int abe_put_switch(struct snd_kcontrol *kcontrol,
 	struct snd_ctl_elem_value *ucontrol)
 {
-	struct snd_soc_dapm_widget *widget = snd_kcontrol_chip(kcontrol);
+	struct snd_soc_dapm_widget_list *wlist = snd_kcontrol_chip(kcontrol);
+	struct snd_soc_dapm_widget *widget = wlist->widgets[0];
 	struct soc_mixer_control *mc =
 		(struct soc_mixer_control *)kcontrol->private_value;
 
@@ -602,7 +615,7 @@ static int volume_put_dl2_mixer(struct snd_kcontrol *kcontrol,
 	return 1;
 }
 
-static int volume_put_dmic(struct snd_kcontrol *kcontrol,
+static int volume_put_gain(struct snd_kcontrol *kcontrol,
 	struct snd_ctl_elem_value *ucontrol)
 {
 	struct soc_mixer_control *mc =
@@ -695,7 +708,7 @@ static int volume_get_sdt_mixer(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
-static int volume_get_dmic(struct snd_kcontrol *kcontrol,
+static int volume_get_gain(struct snd_kcontrol *kcontrol,
 	struct snd_ctl_elem_value *ucontrol)
 {
 	struct soc_mixer_control *mc =
@@ -759,7 +772,7 @@ int snd_soc_info_enum_ext1(struct snd_kcontrol *kcontrol,
 	if (uinfo->value.enumerated.item > e->max - 1)
 		uinfo->value.enumerated.item = e->max - 1;
 	strcpy(uinfo->value.enumerated.name,
-		e->texts[uinfo->value.enumerated.item]);
+		snd_soc_get_enum_text(e, uinfo->value.enumerated.item));
 
 	return 0;
 }
@@ -971,15 +984,23 @@ static const struct snd_kcontrol_new abe_controls[] = {
 	/* DMIC gains */
 	SOC_DOUBLE_EXT_TLV("DMIC1 UL Volume",
 		GAINS_DMIC1, GAIN_LEFT_OFFSET, GAIN_RIGHT_OFFSET, 149, 0,
-		volume_get_dmic, volume_put_dmic, dmic_tlv),
+		volume_get_gain, volume_put_gain, dmic_tlv),
 
 	SOC_DOUBLE_EXT_TLV("DMIC2 UL Volume",
 		GAINS_DMIC2, GAIN_LEFT_OFFSET, GAIN_RIGHT_OFFSET, 149, 0,
-		volume_get_dmic, volume_put_dmic, dmic_tlv),
+		volume_get_gain, volume_put_gain, dmic_tlv),
 
 	SOC_DOUBLE_EXT_TLV("DMIC3 UL Volume",
 		GAINS_DMIC3, GAIN_LEFT_OFFSET, GAIN_RIGHT_OFFSET, 149, 0,
-		volume_get_dmic, volume_put_dmic, dmic_tlv),
+		volume_get_gain, volume_put_gain, dmic_tlv),
+
+	SOC_DOUBLE_EXT_TLV("AMIC UL Volume",
+		GAINS_AMIC, GAIN_LEFT_OFFSET, GAIN_RIGHT_OFFSET, 149, 0,
+		volume_get_gain, volume_put_gain, amic_tlv),
+
+	SOC_DOUBLE_EXT_TLV("BT UL Volume",
+		GAINS_BTUL, GAIN_LEFT_OFFSET, GAIN_RIGHT_OFFSET, 149, 0,
+		volume_get_gain, volume_put_gain, btul_tlv),
 };
 
 static const struct snd_soc_dapm_widget abe_dapm_widgets[] = {
@@ -1416,14 +1437,14 @@ static int abe_dbg_start_dma(struct abe_data *abe, int circular)
 {
 	struct omap_dma_channel_params dma_params;
 	int err;
-	
+
 	/* TODO: start the DMA in either :-
 	 *
 	 * 1) circular buffer mode where the DMA will restart when it get to
 	 *    the end of the buffer.
 	 * 2) default mode, where DMA stops at the end of the buffer.
 	 */
-	 
+
 	abe->dma_req = OMAP44XX_DMA_ABE_REQ_7;
 	err = omap_request_dma(abe->dma_req, "ABE debug",
 			       abe_dbg_dma_irq, abe, &abe->dma_ch);
@@ -1457,7 +1478,7 @@ static int abe_dbg_start_dma(struct abe_data *abe, int circular)
 	omap_set_dma_dest_burst_mode(abe->dma_ch, OMAP_DMA_DATA_BURST_16);
 
 	abe->dbg_reader_offset = 0;
-	
+
 	pm_runtime_get_sync(abe->dev);
 	omap_start_dma(abe->dma_ch);
 	return 0;
@@ -1519,7 +1540,7 @@ static ssize_t abe_copy_to_user(struct abe_data *abe, char __user *user_buf,
 	/* check for reader buffer wrap */
 	if (abe->dbg_reader_offset + count > abe->dbg_buffer_bytes) {
 		int size = abe->dbg_buffer_bytes - abe->dbg_reader_offset;
-		
+
 		/* wrap */
 		if (copy_to_user(user_buf,
 			abe->dbg_buffer + abe->dbg_reader_offset, size))
@@ -1844,7 +1865,7 @@ static int aess_hw_params(struct snd_pcm_substream *substream,
 				PING_PONG_WITH_MCU_IRQ);
 
 	/* Memory mapping for hw params */
-	runtime->dma_area  = abe->io_base[0] + ABE_DMEM_BASE_OFFSET_MPU + dst;
+	runtime->dma_area  = abe->io_base[0] + dst;
 	runtime->dma_addr  = 0;
 	runtime->dma_bytes = period_size * 2;
 
@@ -2054,6 +2075,7 @@ static int abe_add_widgets(struct snd_soc_platform *platform)
 	struct abe_data *abe = snd_soc_platform_get_drvdata(platform);
 	struct fw_header *hdr = &abe->hdr;
 	int i, j;
+
 #if defined(CONFIG_SND_OMAP_SOC_ABE_DSP_MODULE)
 	/* create equalizer controls */
 	for (i = 0; i < hdr->num_equ; i++) {
@@ -2064,7 +2086,7 @@ static int abe_add_widgets(struct snd_soc_platform *platform)
 		equalizer_enum->reg = i;
 		equalizer_enum->max = abe->equ_texts[i].count;
 		for (j = 0; j < abe->equ_texts[i].count; j++)
-			equalizer_enum->texts[j] = abe->equ_texts[i].texts[j];
+			equalizer_enum->dtexts[j] = abe->equ_texts[i].texts[j];
 
 		equalizer_control->name = abe->equ_texts[i].name;
 		equalizer_control->private_value = (unsigned long)equalizer_enum;
@@ -2072,15 +2094,18 @@ static int abe_add_widgets(struct snd_soc_platform *platform)
 		equalizer_control->put = abe_put_equalizer;
 		equalizer_control->info = snd_soc_info_enum_ext1;
 		equalizer_control->iface = SNDRV_CTL_ELEM_IFACE_MIXER;
+
 		dev_dbg(platform->dev, "added EQU mixer: %s profiles %d\n",
 				abe->equ_texts[i].name, abe->equ_texts[i].count);
+
 		for (j = 0; j < abe->equ_texts[i].count; j++)
-			dev_dbg(platform->dev, " %s\n", equalizer_enum->texts[j]);
+			dev_dbg(platform->dev, " %s\n", equalizer_enum->dtexts[j]);
 	}
 
 	snd_soc_add_platform_controls(platform, abe->equalizer_control,
 			hdr->num_equ);
 #endif
+
 	snd_soc_add_platform_controls(platform, abe_controls,
 			ARRAY_SIZE(abe_controls));
 
@@ -2169,9 +2194,9 @@ static int abe_probe(struct snd_soc_platform *platform)
 			ret = -EINVAL;
 			goto err_texts;
 		}
-		abe->equalizer_enum[i].texts =
+		abe->equalizer_enum[i].dtexts =
 				kzalloc(abe->equ_texts[i].count * sizeof(char *), GFP_KERNEL);
-		if (abe->equalizer_enum[i].texts == NULL) {
+		if (abe->equalizer_enum[i].dtexts == NULL) {
 			ret = -ENOMEM;
 			goto err_texts;
 		}
@@ -2210,6 +2235,9 @@ static int abe_probe(struct snd_soc_platform *platform)
 
 	/* "tick" of the audio engine */
 	abe_write_event_generator(EVENT_TIMER);
+	/* Stop the engine */
+	abe_stop_event_generator();
+	abe_disable_irq();
 
 	pm_runtime_put_sync(abe->dev);
 	abe_add_widgets(platform);
@@ -2253,10 +2281,10 @@ static int abe_remove(struct snd_soc_platform *platform)
 
 static struct snd_soc_platform_driver omap_aess_platform = {
 	.ops		= &omap_aess_pcm_ops,
-	.probe 		= abe_probe,
-	.remove 	= abe_remove,
-	.read 		= abe_dsp_read,
-	.write 		= abe_dsp_write,
+	.probe		= abe_probe,
+	.remove		= abe_remove,
+	.read		= abe_dsp_read,
+	.write		= abe_dsp_write,
 	.stream_event = aess_stream_event,
 };
 
@@ -2333,7 +2361,7 @@ static int __devexit abe_engine_remove(struct platform_device *pdev)
 
 static struct platform_driver omap_aess_driver = {
 	.driver = {
-		.name = "omap-aess-audio",
+		.name = "aess",
 		.owner = THIS_MODULE,
 		.pm = &aess_pm_ops,
 	},
@@ -2354,5 +2382,5 @@ static void __exit abe_engine_exit(void)
 module_exit(abe_engine_exit);
 
 MODULE_DESCRIPTION("ASoC OMAP4 ABE");
-MODULE_AUTHOR("Liam Girdwood <lrg@slimlogic.co.uk>");
+MODULE_AUTHOR("Liam Girdwood <lrg@ti.com>");
 MODULE_LICENSE("GPL");

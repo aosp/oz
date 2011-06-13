@@ -204,4 +204,3 @@ struct omap_abe_dma {
 int omap_abe_dbg_reset(struct omap_abe_dbg *dbg);
 
 #endif /* _ABE_DBG_H_ */
-

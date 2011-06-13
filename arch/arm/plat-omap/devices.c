@@ -143,7 +143,7 @@ static void omap_init_mcpdm(void)
 		return;
 	}
 
-	od = omap_device_build("omap-mcpdm-dai", -1, oh, pdata,
+	od = omap_device_build("omap-mcpdm", -1, oh, pdata,
 				sizeof(struct omap_mcpdm_platform_data),
 				omap_mcpdm_latency,
 				ARRAY_SIZE(omap_mcpdm_latency), 0);
@@ -152,55 +152,6 @@ static void omap_init_mcpdm(void)
 }
 #else
 static inline void omap_init_mcpdm(void) {}
-#endif
-
-/*-------------------------------------------------------------------------*/
-
-#if defined(CONFIG_SND_OMAP_SOC_ABE_DSP) || \
-	defined(CONFIG_SND_OMAP_SOC_ABE_DSP_MODULE)
-
-static struct omap_device_pm_latency omap_aess_latency[] = {
-	{
-		.deactivate_func = omap_device_idle_hwmods,
-		.activate_func = omap_device_enable_hwmods,
-		.flags = OMAP_DEVICE_LATENCY_AUTO_ADJUST,
-	},
-};
-
-static void omap_init_aess(void)
-{
-	struct omap_hwmod *oh;
-	struct omap_device *od;
-	struct omap4_abe_dsp_pdata *pdata;
-
-	printk(KERN_ERR "%s: looking up for aess\n", __func__);
-	oh = omap_hwmod_lookup("aess");
-	if (!oh) {
-		printk (KERN_ERR "Could not look up aess hw_mod\n");
-		return;
-	}
-
-	pdata = kzalloc(sizeof(struct omap4_abe_dsp_pdata), GFP_KERNEL);
-	if (!pdata) {
-		printk(KERN_ERR "Could not allocate platform data\n");
-		return;
-	}
-
-	/* FIXME: Add correct context loss counter */
-	//pdata->get_context_loss_count = omap_pm_get_dev_context_loss_count;
-
-	od = omap_device_build("omap-aess-audio", -1, oh, pdata,
-				sizeof(struct omap4_abe_dsp_pdata),
-				omap_aess_latency,
-				ARRAY_SIZE(omap_aess_latency), 0);
-
-	kfree(pdata);
-
-	if (IS_ERR(od))
-		printk(KERN_ERR "Could not build omap_device for omap-aess-audio\n");
-}
-#else
-static inline void omap_init_aess(void) {}
 #endif
 
 /*-------------------------------------------------------------------------*/
@@ -255,6 +206,55 @@ fail:
 
 /*-------------------------------------------------------------------------*/
 
+#if defined(CONFIG_SND_OMAP_SOC_ABE_DSP) || \
+	defined(CONFIG_SND_OMAP_SOC_ABE_DSP_MODULE)
+
+static struct omap_device_pm_latency omap_aess_latency[] = {
+	{
+		.deactivate_func = omap_device_idle_hwmods,
+		.activate_func = omap_device_enable_hwmods,
+		.flags = OMAP_DEVICE_LATENCY_AUTO_ADJUST,
+	},
+};
+
+static void omap_init_aess(void)
+{
+	struct omap_hwmod *oh;
+	struct omap_device *od;
+	struct omap4_abe_dsp_pdata *pdata;
+
+	oh = omap_hwmod_lookup("aess");
+	if (!oh) {
+		printk (KERN_ERR "Could not look up aess hw_mod\n");
+		return;
+	}
+
+	pdata = kzalloc(sizeof(struct omap4_abe_dsp_pdata), GFP_KERNEL);
+	if (!pdata) {
+		printk(KERN_ERR "Could not allocate platform data\n");
+		return;
+	}
+
+	/* FIXME: Add correct context loss counter */
+	//pdata->get_context_loss_count = omap_pm_get_dev_context_loss_count;
+
+	od = omap_device_build("aess", -1, oh, pdata,
+				sizeof(struct omap4_abe_dsp_pdata),
+				omap_aess_latency,
+				ARRAY_SIZE(omap_aess_latency), 0);
+
+	kfree(pdata);
+
+	if (IS_ERR(od))
+		printk(KERN_ERR "Could not build omap_device for omap-aess-audio\n");
+}
+#else
+static inline void omap_init_aess(void) {}
+#endif
+
+
+/*-------------------------------------------------------------------------*/
+
 #if defined(CONFIG_HW_RANDOM_OMAP) || defined(CONFIG_HW_RANDOM_OMAP_MODULE)
 
 #ifdef CONFIG_ARCH_OMAP2
@@ -285,8 +285,6 @@ static void omap_init_rng(void)
 #else
 static inline void omap_init_rng(void) {}
 #endif
-
-/*-------------------------------------------------------------------------*/
 
 /* Numbering for the SPI-capable controllers when used for SPI:
  * spi		= 1

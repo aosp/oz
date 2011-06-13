@@ -3,7 +3,9 @@
  *
  * Copyright (C) 2010 Texas Instruments
  *
- * Contact: Liam Girdwood <lrg@slimlogic.co.uk>
+ * Contact: Liam Girdwood <lrg@ti.com>
+ *          Misael Lopez Cruz <misael.lopez@ti.com>
+ *          Sebastien Guiriec <s-guiriec@ti.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -21,8 +23,6 @@
  *
  */
 
-//#define DEBUG
-
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/device.h>
@@ -37,7 +37,6 @@
 #include <sound/soc-dapm.h>
 #include <sound/soc-dsp.h>
 
-#include <plat/control.h>
 #include <plat/dma-44xx.h>
 #include <plat/dma.h>
 #include "omap-pcm.h"
@@ -149,11 +148,14 @@ static int modem_get_dai(struct snd_pcm_substream *substream,
 	abe_priv->modem_substream[substream->stream] =
 			snd_soc_get_dai_substream(rtd->card,
 					OMAP_ABE_BE_MM_EXT1, substream->stream);
+
 	if (abe_priv->modem_substream[substream->stream] == NULL)
 		return -ENODEV;
 
 	modem_rtd = abe_priv->modem_substream[substream->stream]->private_data;
+	abe_priv->modem_substream[substream->stream]->runtime = substream->runtime;
 	abe_priv->modem_dai = modem_rtd->cpu_dai;
+
 	return 0;
 }
 
@@ -482,10 +484,10 @@ static void mute_fe_port(struct snd_pcm_substream *substream,
 
 	switch(dai->id) {
 	case ABE_FRONTEND_DAI_MEDIA:
+	case ABE_FRONTEND_DAI_LP_MEDIA:
 		if (omap_abe_port_is_enabled(abe_priv->abe,
 						abe_priv->port[OMAP_ABE_BE_PORT_PDM_DL2]))
 			abe_mute_gain(MIXDL2, MIX_DL2_INPUT_MM_DL);
-	case ABE_FRONTEND_DAI_LP_MEDIA:
 		if (omap_abe_port_is_enabled(abe_priv->abe,
 						abe_priv->port[OMAP_ABE_BE_PORT_PDM_DL1]))
 			abe_mute_gain(MIXDL1, MIX_DL1_INPUT_MM_DL);
@@ -522,10 +524,10 @@ static void unmute_fe_port(struct snd_pcm_substream *substream,
 
 	switch(dai->id) {
 	case ABE_FRONTEND_DAI_MEDIA:
+	case ABE_FRONTEND_DAI_LP_MEDIA:
 		if (omap_abe_port_is_enabled(abe_priv->abe,
 						abe_priv->port[OMAP_ABE_BE_PORT_PDM_DL2]))
 			abe_unmute_gain(MIXDL2, MIX_DL2_INPUT_MM_DL);
-	case ABE_FRONTEND_DAI_LP_MEDIA:
 		if (omap_abe_port_is_enabled(abe_priv->abe,
 						abe_priv->port[OMAP_ABE_BE_PORT_PDM_DL1]))
 			abe_unmute_gain(MIXDL1, MIX_DL1_INPUT_MM_DL);
@@ -639,8 +641,9 @@ static void capture_trigger(struct snd_pcm_substream *substream,
 				continue;
 
 			/* only STOP BE in FREE state */
-			if (dsp_params->state != SND_SOC_DSP_LINK_STATE_FREE)
-				continue;
+			/* REVISIT: Investigate the appropriate state to check against */
+			//if (dsp_params->state != SND_SOC_DSP_LINK_STATE_FREE)
+			//	continue;
 
 			be_substream = snd_soc_dsp_get_substream(dsp_params->be, stream);
 
@@ -1235,6 +1238,6 @@ static void __exit omap_abe_exit(void)
 }
 module_exit(omap_abe_exit);
 
-MODULE_AUTHOR("Liam Girdwood <lrg@slimlogic.co.uk>");
+MODULE_AUTHOR("Liam Girdwood <lrg@ti.com>");
 MODULE_DESCRIPTION("OMAP ABE SoC Interface");
 MODULE_LICENSE("GPL");

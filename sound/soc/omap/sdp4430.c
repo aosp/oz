@@ -1,7 +1,8 @@
 /*
  * sdp4430.c  --  SoC audio for TI OMAP4430 SDP
  *
- * Author: Misael Lopez Cruz <x0052729@ti.com>
+ * Author: Misael Lopez Cruz <misael.lopez@ti.com>
+ *         Liam Girdwood <lrg@ti.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -40,10 +41,6 @@
 #include "omap-mcbsp.h"
 #include "omap-dmic.h"
 #include "../codecs/twl6040.h"
-
-#ifdef CONFIG_SND_OMAP_SOC_HDMI
-#include "omap-hdmi.h"
-#endif
 
 static int twl6040_power_mode;
 static int mcbsp_cfg;
@@ -284,6 +281,9 @@ static const struct snd_soc_dapm_widget sdp4430_twl6040_dapm_widgets[] = {
 	SND_SOC_DAPM_HP("Headset Stereophone", NULL),
 	SND_SOC_DAPM_SPK("Earphone Spk", NULL),
 	SND_SOC_DAPM_INPUT("Aux/FM Stereo In"),
+	SND_SOC_DAPM_MIC("Digital Mic 0", NULL),
+	SND_SOC_DAPM_MIC("Digital Mic 1", NULL),
+	SND_SOC_DAPM_MIC("Digital Mic 2", NULL),
 };
 
 static const struct snd_soc_dapm_route audio_map[] = {
@@ -310,6 +310,16 @@ static const struct snd_soc_dapm_route audio_map[] = {
 	/* Aux/FM Stereo In: AFML, AFMR */
 	{"AFML", NULL, "Aux/FM Stereo In"},
 	{"AFMR", NULL, "Aux/FM Stereo In"},
+
+	/* Digital Mics: DMic0, DMic1, DMic2 with bias */
+	{"DMIC0", NULL, "Digital Mic1 Bias"},
+	{"Digital Mic1 Bias", NULL, "Digital Mic 0"},
+
+	{"DMIC1", NULL, "Digital Mic1 Bias"},
+	{"Digital Mic1 Bias", NULL, "Digital Mic 1"},
+
+	{"DMIC2", NULL, "Digital Mic1 Bias"},
+	{"Digital Mic1 Bias", NULL, "Digital Mic 2"},
 };
 
 static int sdp4430_twl6040_init(struct snd_soc_pcm_runtime *rtd)
@@ -348,6 +358,9 @@ static int sdp4430_twl6040_init(struct snd_soc_pcm_runtime *rtd)
 	snd_soc_dapm_ignore_suspend(dapm, "AFMR");
 	snd_soc_dapm_ignore_suspend(dapm, "Headset Mic");
 	snd_soc_dapm_ignore_suspend(dapm, "Headset Stereophone");
+	snd_soc_dapm_ignore_suspend(dapm, "Digital Mic 0");
+	snd_soc_dapm_ignore_suspend(dapm, "Digital Mic 1");
+	snd_soc_dapm_ignore_suspend(dapm, "Digital Mic 2");
 
 	ret = snd_soc_dapm_sync(dapm);
 	if (ret)
@@ -366,6 +379,50 @@ static int sdp4430_twl6040_init(struct snd_soc_pcm_runtime *rtd)
 		twl6040_hs_jack_detect(codec, &hs_jack, SND_JACK_HEADSET);
 	else
 		snd_soc_jack_report(&hs_jack, SND_JACK_HEADSET, SND_JACK_HEADSET);
+
+	/* wait 500 ms before switching of HS power */
+	rtd->pmdown_time = 500;
+
+	return ret;
+}
+
+static int sdp4430_twl6040_dl2_init(struct snd_soc_pcm_runtime *rtd)
+{
+	/* wait 500 ms before switching of HF power */
+	rtd->pmdown_time = 500;
+
+	return 0;
+}
+
+/* SDP4430 digital microphones DAPM */
+static const struct snd_soc_dapm_widget sdp4430_dmic_dapm_widgets[] = {
+	SND_SOC_DAPM_MIC("Digital Mic Legacy", NULL),
+};
+
+static const struct snd_soc_dapm_route dmic_audio_map[] = {
+	{"DMic", NULL, "Digital Mic1 Bias"},
+	{"Digital Mic1 Bias", NULL, "Digital Mic Legacy"},
+};
+
+static int sdp4430_dmic_init(struct snd_soc_pcm_runtime *rtd)
+{
+	struct snd_soc_codec *codec = rtd->codec;
+	struct snd_soc_dapm_context *dapm = &codec->dapm;
+	int ret;
+
+	ret = snd_soc_dapm_new_controls(dapm, sdp4430_dmic_dapm_widgets,
+				ARRAY_SIZE(sdp4430_dmic_dapm_widgets));
+	if (ret)
+		return ret;
+
+	ret = snd_soc_dapm_add_routes(dapm, dmic_audio_map,
+				ARRAY_SIZE(dmic_audio_map));
+	if (ret)
+		return ret;
+
+	snd_soc_dapm_enable_pin(dapm, "Digital Mic Legacy");
+
+	ret = snd_soc_dapm_sync(dapm);
 
 	return ret;
 }
@@ -422,100 +479,40 @@ static struct snd_soc_dai_driver dai[] = {
 },
 };
 
-static const char *mm1_be[] = {
-		OMAP_ABE_BE_PDM_DL1,
-		OMAP_ABE_BE_PDM_UL1,
-		OMAP_ABE_BE_PDM_DL2,
-		OMAP_ABE_BE_BT_VX,
-		OMAP_ABE_BE_MM_EXT0,
-		OMAP_ABE_BE_DMIC0,
-		OMAP_ABE_BE_DMIC1,
-		OMAP_ABE_BE_DMIC2,
-};
-
 struct snd_soc_dsp_link fe_media = {
-	.supported_be	= mm1_be,
-	.num_be			= ARRAY_SIZE(mm1_be),
-	.fe_playback_channels	= 2,
-	.fe_capture_channels	= 8,
+	.playback	= true,
+	.capture	= true,
 	.trigger =
 		{SND_SOC_DSP_TRIGGER_BESPOKE, SND_SOC_DSP_TRIGGER_BESPOKE},
-};
-
-static const char *mm2_be[] = {
-		OMAP_ABE_BE_PDM_UL1,
-		OMAP_ABE_BE_BT_VX,
-		OMAP_ABE_BE_MM_EXT0,
-		OMAP_ABE_BE_DMIC0,
-		OMAP_ABE_BE_DMIC1,
-		OMAP_ABE_BE_DMIC2,
 };
 
 struct snd_soc_dsp_link fe_media_capture = {
-	.supported_be	= mm2_be,
-	.num_be			= ARRAY_SIZE(mm2_be),
-	.fe_capture_channels	= 8,
+	.capture	= true,
 	.trigger =
 		{SND_SOC_DSP_TRIGGER_BESPOKE, SND_SOC_DSP_TRIGGER_BESPOKE},
-};
-
-static const char *tones_be[] = {
-		OMAP_ABE_BE_PDM_DL1,
-		OMAP_ABE_BE_PDM_DL2,
-		OMAP_ABE_BE_BT_VX,
-		OMAP_ABE_BE_MM_EXT0,
 };
 
 struct snd_soc_dsp_link fe_tones = {
-	.supported_be	= tones_be,
-	.num_be			= ARRAY_SIZE(tones_be),
-	.fe_playback_channels	= 2,
+	.playback	= true,
 	.trigger =
 		{SND_SOC_DSP_TRIGGER_BESPOKE, SND_SOC_DSP_TRIGGER_BESPOKE},
-};
-
-static const char *vib_be[] = {
-		OMAP_ABE_BE_PDM_VIB,
 };
 
 struct snd_soc_dsp_link fe_vib = {
-	.supported_be	= vib_be,
-	.num_be			= ARRAY_SIZE(vib_be),
-	.fe_playback_channels	= 2,
+	.playback	= true,
 	.trigger =
 		{SND_SOC_DSP_TRIGGER_BESPOKE, SND_SOC_DSP_TRIGGER_BESPOKE},
-};
-
-static const char *modem_be[] = {
-		OMAP_ABE_BE_PDM_DL1,
-		OMAP_ABE_BE_PDM_UL1,
-		OMAP_ABE_BE_PDM_DL2,
-		OMAP_ABE_BE_BT_VX,
-		OMAP_ABE_BE_DMIC0,
-		OMAP_ABE_BE_DMIC1,
-		OMAP_ABE_BE_DMIC2,
 };
 
 struct snd_soc_dsp_link fe_modem = {
-	.supported_be	= modem_be,
-	.num_be			= ARRAY_SIZE(modem_be),
-	.fe_playback_channels	= 2,
-	.fe_capture_channels	= 2,
+	.playback	= true,
+	.capture	= true,
 	.trigger =
 		{SND_SOC_DSP_TRIGGER_BESPOKE, SND_SOC_DSP_TRIGGER_BESPOKE},
 };
 
-static const char *mm_lp_be[] = {
-		OMAP_ABE_BE_PDM_DL1,
-		OMAP_ABE_BE_PDM_DL2,
-		OMAP_ABE_BE_BT_VX,
-		OMAP_ABE_BE_MM_EXT0,
-};
-
 struct snd_soc_dsp_link fe_lp_media = {
-	.supported_be	= mm_lp_be,
-	.num_be			= ARRAY_SIZE(mm_lp_be),
-	.fe_playback_channels	= 2,
+	.playback	= true,
 	.trigger =
 		{SND_SOC_DSP_TRIGGER_BESPOKE, SND_SOC_DSP_TRIGGER_BESPOKE},
 };
@@ -588,7 +585,7 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 
 		/* ABE components - MODEM <-> McBSP2 */
 		.cpu_dai_name = "MODEM",
-		.platform_name = "omap-aess-audio",
+		.platform_name = "aess",
 
 		.dynamic = 1, /* BE is dynamic */
 		.dsp_link = &fe_modem,
@@ -601,25 +598,11 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 
 		/* ABE components - MM-DL (mmap) */
 		.cpu_dai_name = "MultiMedia1 LP",
-		.platform_name = "omap-aess-audio",
+		.platform_name = "aess",
 
 		.dynamic = 1, /* BE is dynamic */
 		.dsp_link = &fe_lp_media,
 	},
-#ifdef CONFIG_SND_OMAP_SOC_HDMI
-	{
-		.name = "hdmi",
-		.stream_name = "HDMI",
-
-		.cpu_dai_name = "hdmi-dai",
-		.platform_name = "omap-pcm-audio",
-
-		/* HDMI*/
-		.codec_dai_name = "HDMI",
-
-		.no_codec = 1,
-	},
-#endif
 	{
 		.name = "Legacy McBSP",
 		.stream_name = "Multimedia",
@@ -660,6 +643,7 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 		.codec_dai_name = "dmic-hifi",
 		.codec_name = "dmic-codec.0",
 
+		.init = sdp4430_dmic_init,
 		.ops = &sdp4430_dmic_ops,
 	},
 
@@ -674,7 +658,7 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 
 		/* ABE components - DL1 */
 		.cpu_dai_name = "mcpdm-dl1",
-		.platform_name = "omap-aess-audio",
+		.platform_name = "aess",
 
 		/* Phoenix - DL1 DAC */
 		.codec_dai_name =  "twl6040-dl1",
@@ -691,7 +675,7 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 
 		/* ABE components - UL1 */
 		.cpu_dai_name = "mcpdm-ul1",
-		.platform_name = "omap-aess-audio",
+		.platform_name = "aess",
 
 		/* Phoenix - UL ADC */
 		.codec_dai_name =  "twl6040-ul",
@@ -707,13 +691,14 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 
 		/* ABE components - DL2 */
 		.cpu_dai_name = "mcpdm-dl2",
-		.platform_name = "omap-aess-audio",
+		.platform_name = "aess",
 
 		/* Phoenix - DL2 DAC */
 		.codec_dai_name =  "twl6040-dl2",
 		.codec_name = "twl6040-codec",
 
 		.no_pcm = 1, /* don't create ALSA pcm for this */
+		.init = sdp4430_twl6040_dl2_init,
 		.ops = &sdp4430_mcpdm_ops,
 		.be_id = OMAP_ABE_DAI_PDM_DL2,
 	},
@@ -723,7 +708,7 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 
 		/* ABE components - VIB1 DL */
 		.cpu_dai_name = "mcpdm-vib",
-		.platform_name = "omap-aess-audio",
+		.platform_name = "aess",
 
 		/* Phoenix - PDM to PWM */
 		.codec_dai_name =  "twl6040-vib",
@@ -739,7 +724,7 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 
 		/* ABE components - MCBSP1 - BT-VX */
 		.cpu_dai_name = "omap-mcbsp-dai.0",
-		.platform_name = "omap-aess-audio",
+		.platform_name = "aess",
 
 		/* Bluetooth */
 		.codec_dai_name = "Bluetooth",
@@ -756,7 +741,7 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 
 		/* ABE components - MCBSP2 - MM-EXT */
 		.cpu_dai_name = "omap-mcbsp-dai.1",
-		.platform_name = "omap-aess-audio",
+		.platform_name = "aess",
 
 		/* FM */
 		.codec_dai_name = "FM Digital",
@@ -773,7 +758,7 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 
 		/* ABE components - MCBSP2 - MM-EXT */
 		.cpu_dai_name = "omap-mcbsp-dai.1",
-		.platform_name = "omap-aess-audio",
+		.platform_name = "aess",
 
 		/* MODEM */
 		.codec_dai_name = "MODEM",
@@ -787,11 +772,11 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 	},
 	{
 		.name = OMAP_ABE_BE_DMIC0,
-		.stream_name = "DMIC0",
+		.stream_name = "DMIC0 Capture",
 
 		/* ABE components - DMIC UL 1 */
 		.cpu_dai_name = "omap-dmic-abe-dai-0",
-		.platform_name = "omap-aess-audio",
+		.platform_name = "aess",
 
 		/* DMIC 0 */
 		.codec_dai_name = "dmic-hifi",
@@ -804,11 +789,11 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 	},
 	{
 		.name = OMAP_ABE_BE_DMIC1,
-		.stream_name = "DMIC1",
+		.stream_name = "DMIC1 Capture",
 
 		/* ABE components - DMIC UL 1 */
 		.cpu_dai_name = "omap-dmic-abe-dai-1",
-		.platform_name = "omap-aess-audio",
+		.platform_name = "aess",
 
 		/* DMIC 1 */
 		.codec_dai_name = "dmic-hifi",
@@ -821,11 +806,11 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 	},
 	{
 		.name = OMAP_ABE_BE_DMIC2,
-		.stream_name = "DMIC2",
+		.stream_name = "DMIC2 Capture",
 
 		/* ABE components - DMIC UL 2 */
 		.cpu_dai_name = "omap-dmic-abe-dai-2",
-		.platform_name = "omap-aess-audio",
+		.platform_name = "aess",
 
 		/* DMIC 2 */
 		.codec_dai_name = "dmic-hifi",

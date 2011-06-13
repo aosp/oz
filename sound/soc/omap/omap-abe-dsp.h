@@ -3,7 +3,7 @@
  *
  * Copyright (C) 2010 Texas Instruments
  *
- * Contact: Liam Girdwood <lrg@slimlogic.co.uk>
+ * Contact: Liam Girdwood <lrg@ti.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -138,7 +138,6 @@
 #define ABE_DBG_FLAG3_SIZE	0
 
 /* TODO: Pong start offset of DMEM */
-//#define ABE_DMEM_BASE_ADDRESS_MPU	0x40180000L
 /* Ping pong buffer DMEM offset */
 #define ABE_DMEM_BASE_OFFSET_PING_PONG	0x4000
 
