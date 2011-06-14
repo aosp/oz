@@ -95,14 +95,14 @@ int musb_notifier_call(struct notifier_block *nb,
 			hostmode = 1;
 			musb_enable_vbus(musb);
 		}
-
-		val = __raw_readl(phymux_base +
-				USBA0_OTG_CE_PAD1_USBA0_OTG_DP);
-
-		val |= DP_WAKEUPENABLE;
-		__raw_writel(val, phymux_base +
+		if (cpu_is_omap44xx()) {
+			val = __raw_readl(phymux_base +
 					USBA0_OTG_CE_PAD1_USBA0_OTG_DP);
 
+			val |= DP_WAKEUPENABLE;
+			__raw_writel(val, phymux_base +
+					USBA0_OTG_CE_PAD1_USBA0_OTG_DP);
+		}
 		break;
 
 	case USB_EVENT_VBUS:
@@ -154,12 +154,14 @@ int musb_notifier_call(struct notifier_block *nb,
 		val |= FORCEIDLE | FORCESTDBY;
 		musb_writel(musb->mregs, OTG_SYSCONFIG, val);
 
-		val = __raw_readl(phymux_base +
-				USBA0_OTG_CE_PAD1_USBA0_OTG_DP);
-
-		val &= ~DP_WAKEUPENABLE;
-		__raw_writel(val, phymux_base +
+		if (cpu_is_omap44xx()) {
+			val = __raw_readl(phymux_base +
 					USBA0_OTG_CE_PAD1_USBA0_OTG_DP);
+
+			val &= ~DP_WAKEUPENABLE;
+			__raw_writel(val, phymux_base +
+					USBA0_OTG_CE_PAD1_USBA0_OTG_DP);
+		}
 		break;
 	default:
 		DBG(1, "ID float\n");
@@ -350,6 +352,7 @@ int __init musb_platform_init(struct musb *musb)
 	struct omap_musb_board_data *data = plat->board_data;
 	int status;
 	u32 val;
+	u8 devctl;
 
 	/* We require some kind of external transceiver, hooked
 	 * up through ULPI.  TWL4030-family PMICs include one,
@@ -397,27 +400,55 @@ int __init musb_platform_init(struct musb *musb)
 	wake_lock_init(&plat->musb_lock, WAKE_LOCK_SUSPEND, "musb_wake_lock");
 	if (cpu_is_omap44xx()) {
 		phymux_base = ioremap(0x4A100000, SZ_1K);
-		ctrl_base = ioremap(0x4A002000, SZ_1K);
 
-		/* register for transciever notification*/
-		status = otg_register_notifier(musb->xceiv, &musb->nb);
-
-		if (status) {
-			DBG(1, "notification register failed\n");
+		if (!phymux_base) {
+			dev_err(dev, "ioremap failed\n");
 			wake_lock_destroy(&plat->musb_lock);
+			return -ENOMEM;
 		}
+
 		ctrl_base = ioremap(0x4A002000, SZ_1K);
 		if (!ctrl_base) {
 			dev_err(dev, "ioremap failed\n");
+			wake_lock_destroy(&plat->musb_lock);
 			return -ENOMEM;
 		}
 	}
-	/* configure in force idle/ standby */
-	musb_writel(musb->mregs, OTG_FORCESTDBY, 1);
-	val = musb_readl(musb->mregs, OTG_SYSCONFIG);
-	val &= ~(SMARTIDLEWKUP | NOSTDBY | ENABLEWAKEUP);
-	val |= FORCEIDLE | FORCESTDBY;
-	musb_writel(musb->mregs, OTG_SYSCONFIG,	val);
+
+	/* register for transciever notification */
+	status = otg_register_notifier(musb->xceiv, &musb->nb);
+	if (status) {
+		DBG(1, "notification register failed\n");
+		wake_lock_destroy(&plat->musb_lock);
+	}
+
+	/* Keep the old initalization code for revisions < 1.2
+	 * since the new code seem to crash the older boards
+	 * when coming out of power off mode
+	 */
+	if (omap_rev() < OMAP3630_REV_ES1_2) {
+		/* configure in force idle/ standby */
+		musb_writel(musb->mregs, OTG_FORCESTDBY, 1);
+		val = musb_readl(musb->mregs, OTG_SYSCONFIG);
+		val &= ~(SMARTIDLEWKUP | NOSTDBY | ENABLEWAKEUP);
+		val |= FORCEIDLE | FORCESTDBY;
+		musb_writel(musb->mregs, OTG_SYSCONFIG, val);
+	} else {
+		devctl = musb_readb(musb->mregs, MUSB_DEVCTL);
+		if ((devctl & MUSB_DEVCTL_VBUS) !=
+					(3 << MUSB_DEVCTL_VBUS_SHIFT)) {
+			/* configure in force idle/ standby */
+			musb_writel(musb->mregs, OTG_FORCESTDBY, 1);
+			val = FORCEIDLE | FORCESTDBY;
+			musb_writel(musb->mregs, OTG_SYSCONFIG, val);
+		} else {
+			/* configure smart idle when usb cable inserted at *
+			 * startup*/
+			val =  SMARTIDLE | SMARTSTDBY | ENABLEWAKEUP;
+			musb_writel(musb->mregs, OTG_SYSCONFIG, val);
+		}
+	}
+
 	return 0;
 }
 
@@ -429,6 +460,9 @@ void musb_platform_save_context(struct musb *musb,
 	musb_context->otg_sysconfig = musb_readl(musb->mregs, OTG_SYSCONFIG);
 	musb_context->otg_interfacesel = musb_readl(musb->mregs,
 							OTG_INTERFSEL);
+	musb_context->otg_forcestandby = musb_readl(musb->mregs,
+							OTG_FORCESTDBY);
+
 	if (cpu_is_omap44xx()) {
 		musb_context->ctl_dev_conf = __raw_readl(ctrl_base +
 							CONTROL_DEV_CONF);
@@ -442,6 +476,7 @@ void musb_platform_restore_context(struct musb *musb,
 		struct musb_context_registers *musb_context)
 {
 	void __iomem *musb_base = musb->mregs;
+	u32 forcestandby = musb_context->otg_forcestandby;
 	musb_writel(musb->mregs, OTG_SYSCONFIG, musb_context->otg_sysconfig);
 	if (cpu_is_omap44xx()) {
 		__raw_writel(musb_context->ctl_dev_conf, ctrl_base +
@@ -451,7 +486,9 @@ void musb_platform_restore_context(struct musb *musb,
 	}
 	musb_writel(musb->mregs, OTG_INTERFSEL,
 					musb_context->otg_interfacesel);
-	musb_writel(musb_base, OTG_FORCESTDBY, 0);
+	if (omap_rev() < OMAP3630_REV_ES1_2)
+		forcestandby = 0;
+	musb_writel(musb_base, OTG_FORCESTDBY, forcestandby);
 }
 #endif
 
@@ -507,10 +544,8 @@ int musb_platform_exit(struct musb *musb)
 	struct device *dev = musb->controller;
 	struct musb_hdrc_platform_data *plat = dev->platform_data;
 
-	if (cpu_is_omap44xx()) {
-		/* register for transciever notification*/
-		otg_unregister_notifier(musb->xceiv, &musb->nb);
-	}
+	/* unregister for transciever notification*/
+	otg_unregister_notifier(musb->xceiv, &musb->nb);
 	wake_lock_destroy(&plat->musb_lock);
 	musb_platform_suspend(musb);
 	if (cpu_is_omap44xx()) {

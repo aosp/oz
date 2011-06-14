@@ -27,6 +27,7 @@
 
 #include <linux/usb/musb.h>
 #include <linux/pm_runtime.h>
+#include <asm/sizes.h>
 
 #include <mach/hardware.h>
 #include <mach/irqs.h>
@@ -38,6 +39,11 @@
 
 #define CONTROL_DEV_CONF                0x300
 #define PHY_PD				(1 << 0)
+
+#define OTG_SYSCONFIG			0x404
+#define OTG_SYSC_SOFTRESET		BIT(1)
+
+#define OTG_FORCESTDBY			0x414
 
 #ifdef CONFIG_ARCH_OMAP4
 #define DIE_ID_REG_BASE         (L4_44XX_PHYS + 0x2000)
@@ -371,6 +377,7 @@ void __init usb_musb_init(struct omap_musb_board_data *board_data)
 	struct device	*dev;
 	int l, bus_id = -1;
 	struct musb_hdrc_platform_data *pdata;
+	void __iomem *otg_base;
 
 	if (!board_data) {
 		pr_err("Board data is required for hdrc device register\n");
@@ -429,7 +436,21 @@ void __init usb_musb_init(struct omap_musb_board_data *board_data)
 			put_device(dev);
 		}
 
-		/*powerdown the phy*/
+		if (omap_rev() > OMAP3630_REV_ES1_1) {
+			otg_base = ioremap(OMAP34XX_HSUSB_OTG_BASE, SZ_4K);
+
+			if (WARN_ON(!otg_base))
+				return;
+
+			/* Reset OTG controller.  After reset, it will be in
+			 * force-idle, force-standby mode. */
+			__raw_writel(OTG_SYSC_SOFTRESET, otg_base +
+								OTG_SYSCONFIG);
+
+			iounmap(otg_base);
+		}
+
+		/* powerdown the phy */
 		if (board_data->interface_type == MUSB_INTERFACE_UTMI)
 			omap_writel(PHY_PD, DIE_ID_REG_BASE + CONTROL_DEV_CONF);
 
@@ -505,7 +526,7 @@ void musb_context_save_restore(enum musb_state state)
 					clk_disable(clk48m);
 				}
 				/* Enable ENABLEFORCE bit*/
-				__raw_writel(0x1, base + 0x414);
+				__raw_writel(0x1, base + OTG_FORCESTDBY);
 				pdata->device_idle(pdev);
 				break;
 
@@ -534,7 +555,7 @@ void musb_context_save_restore(enum musb_state state)
 					clk_enable(clk48m);
 				}
 				/* Disable ENABLEFORCE bit*/
-				__raw_writel(0x1, base + 0x414);
+				__raw_writel(0x0, base + OTG_FORCESTDBY);
 
 				break;
 

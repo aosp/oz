@@ -465,15 +465,19 @@ void omap_sram_idle(void)
 						OMAP3_PRM_VOLTCTRL_OFFSET);
 			omap3_core_save_context();
 			omap3_prcm_save_context();
-			/* Save MUSB context */
-			musb_context_save_restore(save_context);
+
+			if (omap_rev() < OMAP3630_REV_ES1_2)
+				/* Save MUSB context */
+				musb_context_save_restore(save_context);
 			if (omap_type() != OMAP2_DEVICE_TYPE_GP)
 				omap3_save_secure_ram_context(mpu_next_state);
 		} else {
 			prm_set_mod_reg_bits(OMAP3430_AUTO_RET_MASK,
 						OMAP3430_GR_MOD,
 						OMAP3_PRM_VOLTCTRL_OFFSET);
-			musb_context_save_restore(disable_clk);
+
+			if (omap_rev() < OMAP3630_REV_ES1_2)
+				musb_context_save_restore(disable_clk);
 		}
 	}
 
@@ -516,10 +520,13 @@ void omap_sram_idle(void)
 			omap3_prcm_restore_context();
 			omap3_sram_restore_context();
 			omap2_sms_restore_context();
-			/* Restore MUSB context */
-			musb_context_save_restore(restore_context);
+
+			if (omap_rev() < OMAP3630_REV_ES1_2)
+				/* Restore MUSB context */
+				musb_context_save_restore(restore_context);
 		} else {
-			musb_context_save_restore(enable_clk);
+			if (omap_rev() < OMAP3630_REV_ES1_2)
+				musb_context_save_restore(enable_clk);
 		}
 		omap_uart_resume_idle(0);
 		omap_uart_resume_idle(1);
