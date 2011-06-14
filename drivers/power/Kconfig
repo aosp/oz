@@ -94,6 +94,12 @@ config TWL6030_BCI_BATTERY
 	help
 	  Say Y to enable support for OMAP TWL6030 BCI Battery driver.
 
+config CHARGER_BQ2415x
+	tristate "BQ2415x charger"
+	depends on TWL6030_BCI_BATTERY
+	help
+	  Say Y to enable support for BQ24156 battery charger.
+
 config BATTERY_TOSA
 	tristate "Sharp SL-6000 (tosa) battery"
 	depends on MACH_TOSA && MFD_TC6393XB && TOUCHSCREEN_WM97XX

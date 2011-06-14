@@ -87,7 +87,6 @@
 #define TWL6030_MODULE_ID0	0x0D
 #define TWL6030_MODULE_ID1	0x0E
 #define TWL6030_MODULE_ID2	0x0F
-#define TWL6030_MODULE_BQ	0x13
 
 #define GPIO_INTR_OFFSET	0
 #define KEYPAD_INTR_OFFSET	1
@@ -222,6 +221,11 @@ static inline int twl6030_mmc_card_detect(struct device *dev, int slot)
 #define TWL4030_SIH_CTRL_EXCLEN_MASK	BIT(0)
 #define TWL4030_SIH_CTRL_PENDDIS_MASK	BIT(1)
 #define TWL4030_SIH_CTRL_COR_MASK	BIT(2)
+
+int twl6030_register_notifier(struct notifier_block *nb,
+				unsigned int events);
+int twl6030_unregister_notifier(struct notifier_block *nb,
+				unsigned int events);
 
 /*----------------------------------------------------------------------*/
 

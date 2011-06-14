@@ -137,7 +137,7 @@
 /* Last - for index max*/
 #define TWL4030_MODULE_LAST		TWL4030_MODULE_SECURED_REG
 
-#define TWL_NUM_SLAVES		5
+#define TWL_NUM_SLAVES		4
 
 #if defined(CONFIG_INPUT_TWL4030_PWRBUTTON) \
 	|| defined(CONFIG_INPUT_TWL4030_PWRBUTTON_MODULE)
@@ -150,7 +150,6 @@
 #define SUB_CHIP_ID1 1
 #define SUB_CHIP_ID2 2
 #define SUB_CHIP_ID3 3
-#define SUB_CHIP_ID4 4
 
 #define TWL_MODULE_LAST TWL4030_MODULE_LAST
 
@@ -333,7 +332,7 @@ static struct twl_mapping twl6030_map[] = {
 	{ SUB_CHIP_ID2, TWL6030_BASEADD_ZERO },
 	{ SUB_CHIP_ID2, TWL6030_BASEADD_RSV },
 	{ SUB_CHIP_ID2, TWL6030_BASEADD_RSV },
-	{ SUB_CHIP_ID4, TWL6030_BASEADD_RSV },
+	{ SUB_CHIP_ID2, TWL6030_BASEADD_RSV },
 	{ SUB_CHIP_ID0, TWL6030_BASEADD_PM_MASTER },
 	{ SUB_CHIP_ID0, TWL6030_BASEADD_PM_SLAVE_MISC },
 
@@ -1062,8 +1061,6 @@ twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		struct twl_client	*twl = &twl_modules[i];
 
 		twl->address = client->addr + i;
-		if (i == 4)
-			twl->address = 0x6a;
 
 		if (i == 0)
 			twl->client = client;
