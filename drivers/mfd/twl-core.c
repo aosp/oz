@@ -126,12 +126,6 @@
 #define twl_has_codec()	false
 #endif
 
-#if defined(CONFIG_CHARGER_TWL4030) || defined(CONFIG_CHARGER_TWL4030_MODULE)
-#define twl_has_bci()	true
-#else
-#define twl_has_bci()	false
-#endif
-
 /* Triton Core internal information (BEGIN) */
 
 /* Last - for index max*/
