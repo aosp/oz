@@ -18,6 +18,7 @@
 #include <plat/mmc.h>
 #include <plat/omap-pm.h>
 #include <plat/omap_device.h>
+#include <asm/mach-types.h>
 
 #ifdef CONFIG_TIWLAN_SDIO
 #include <linux/mmc/sdio_ids.h>
@@ -312,11 +313,13 @@ void __init omap2_hsmmc_init(struct omap2_hsmmc_info *controllers)
 				"mmc%islot%i", c->mmc, 1);
 
 #ifdef CONFIG_TIWLAN_SDIO
-		if (c->mmc == CONFIG_TIWLAN_MMC_CONTROLLER) {
-			mmc->slots[0].embedded_sdio = &omap_wifi_emb_data;
-			mmc->slots[0].register_status_notify =
-				&omap_wifi_status_register;
-			mmc->slots[0].card_detect = &omap_wifi_status;
+		if (machine_is_omap_4430sdp()) {
+			if (c->mmc == CONFIG_TIWLAN_MMC_CONTROLLER) {
+				mmc->slots[0].embedded_sdio = &omap_wifi_emb_data;
+				mmc->slots[0].register_status_notify =
+					&omap_wifi_status_register;
+				mmc->slots[0].card_detect = &omap_wifi_status;
+			}
 		}
 #endif
 
@@ -430,7 +433,8 @@ void __init omap2_hsmmc_init(struct omap2_hsmmc_info *controllers)
 			mmc->slots[0].before_set_reg = NULL;
 			mmc->slots[0].after_set_reg = NULL;
 #ifdef CONFIG_TIWLAN_SDIO
-			mmc->slots[0].ocr_mask  = MMC_VDD_165_195;
+			if (machine_is_omap_4430sdp())
+				mmc->slots[0].ocr_mask  = MMC_VDD_165_195;
 #endif
 			break;
 		default:

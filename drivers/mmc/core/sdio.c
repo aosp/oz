@@ -16,6 +16,7 @@
 #include <linux/mmc/card.h>
 #include <linux/mmc/sdio.h>
 #include <linux/mmc/sdio_func.h>
+#include <asm/mach-types.h>
 
 #include "core.h"
 #include "bus.h"
@@ -299,7 +300,8 @@ static int mmc_sdio_init_card(struct mmc_host *host, u32 ocr,
 	}
 
 #ifdef CONFIG_TIWLAN_SDIO
-	card->quirks = host->embedded_sdio_data.quirks;
+	if (machine_is_omap_4430sdp())
+		card->quirks = host->embedded_sdio_data.quirks;
 #endif
 	card->type = MMC_TYPE_SDIO;
 
@@ -372,7 +374,8 @@ static int mmc_sdio_init_card(struct mmc_host *host, u32 ocr,
 		}
 		card = oldcard;
 #ifdef CONFIG_TIWLAN_SDIO
-		return 0;
+		if (machine_is_omap_4430sdp())
+			return 0;
 #endif
 	}
 
@@ -550,9 +553,10 @@ static int mmc_sdio_resume(struct mmc_host *host)
 		}
 	}
 
-#ifndef CONFIG_TIWLAN_SDIO
-	if (!err && host->sdio_irqs)
-		mmc_signal_sdio_irq(host);
+#ifdef CONFIG_TIWLAN_SDIO
+	if (machine_is_omap_tabletblaze())
+		if (!err && host->sdio_irqs)
+			mmc_signal_sdio_irq(host);
 #endif
 	mmc_release_host(host);
 

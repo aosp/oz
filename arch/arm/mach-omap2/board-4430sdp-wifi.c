@@ -26,6 +26,7 @@
 #include <asm/gpio.h>
 #include <asm/io.h>
 #include <linux/wifi_tiwlan.h>
+#include <asm/mach-types.h>
 
 #include "board-4430sdp-wifi.h"
 #include "mux.h"
@@ -125,28 +126,30 @@ static struct platform_device sdp4430_wifi_device = {
 
 static int __init sdp4430_wifi_init(void)
 {
-	int ret;
+	int ret = 0;
 
-	printk(KERN_WARNING"%s: start\n", __func__);
+	if (machine_is_omap_4430sdp()) {
+		printk(KERN_WARNING"%s: start\n", __func__);
 
-	ret = gpio_request(SDP4430_WIFI_PMENA_GPIO, "wifi_pmena");
-	if (ret < 0) {
-		pr_err("%s: can't reserve GPIO: %d\n", __func__,
-			SDP4430_WIFI_PMENA_GPIO);
-		goto out;
-	}
-	gpio_direction_output(SDP4430_WIFI_PMENA_GPIO, 0);
+		ret = gpio_request(SDP4430_WIFI_PMENA_GPIO, "wifi_pmena");
+		if (ret < 0) {
+			pr_err("%s: can't reserve GPIO: %d\n", __func__,
+				SDP4430_WIFI_PMENA_GPIO);
+			goto out;
+		}
+		gpio_direction_output(SDP4430_WIFI_PMENA_GPIO, 0);
 
-	ret = gpio_request(SDP4430_WIFI_IRQ_GPIO, "wifi_irq");
-	if (ret < 0) {
-		printk(KERN_ERR "%s: can't reserve GPIO: %d\n", __func__,
-			SDP4430_WIFI_IRQ_GPIO);
-		goto out;
-	}
-	gpio_direction_input(SDP4430_WIFI_IRQ_GPIO);
+		ret = gpio_request(SDP4430_WIFI_IRQ_GPIO, "wifi_irq");
+		if (ret < 0) {
+			printk(KERN_ERR "%s: can't reserve GPIO: %d\n", __func__,
+				SDP4430_WIFI_IRQ_GPIO);
+			goto out;
+		}
+		gpio_direction_input(SDP4430_WIFI_IRQ_GPIO);
 #ifdef CONFIG_WIFI_CONTROL_FUNC
-	ret = platform_device_register(&sdp4430_wifi_device);
+		ret = platform_device_register(&sdp4430_wifi_device);
 #endif
+	}
 out:
 	return ret;
 }

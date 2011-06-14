@@ -33,6 +33,7 @@
 #include <linux/gpio.h>
 #include <linux/regulator/consumer.h>
 #include <linux/pm_runtime.h>
+#include <asm/mach-types.h>
 #ifdef CONFIG_PM
 #include <plat/omap-pm.h>
 #endif
@@ -1624,50 +1625,52 @@ static void omap_hsmmc_request(struct mmc_host *mmc, struct mmc_request *req)
 	* the actual issue is root caused.
 	*/
 #ifdef CONFIG_TIWLAN_SDIO
-	if (host->id == CONFIG_TIWLAN_MMC_CONTROLLER-1) {
-		unsigned int irq_mask = 0, status = 0, loops = 0, i = 0;
+	if (machine_is_omap_4430sdp()) {
+		if (host->id == CONFIG_TIWLAN_MMC_CONTROLLER-1) {
+			unsigned int irq_mask = 0, status = 0, loops = 0, i = 0;
 
-		if (req->data != NULL && req->data->blocks == 1 && req->data->blksz < DMA_THRESHOLD) {
-			int dma_type;
-			unsigned char *nondma_data = sg_virt(req->data->sg);
+			if (req->data != NULL && req->data->blocks == 1 && req->data->blksz < DMA_THRESHOLD) {
+				int dma_type;
+				unsigned char *nondma_data = sg_virt(req->data->sg);
 
-			OMAP_HSMMC_WRITE(host, BLK, (req->data->blksz));
+				OMAP_HSMMC_WRITE(host, BLK, (req->data->blksz));
 
-			OMAP_HSMMC_WRITE(host, STAT, STAT_CLEAR);
-			irq_mask = INT_EN_MASK;
-			OMAP_HSMMC_WRITE(host, ISE, 0);
-			OMAP_HSMMC_WRITE(host, IE, irq_mask);
+				OMAP_HSMMC_WRITE(host, STAT, STAT_CLEAR);
+				irq_mask = INT_EN_MASK;
+				OMAP_HSMMC_WRITE(host, ISE, 0);
+				OMAP_HSMMC_WRITE(host, IE, irq_mask);
 
-			spin_lock(&host->irq_lock);
-			dma_type = host->dma_type;
-			host->dma_type = DMA_TYPE_NODMA;
-			host->polling_enabled = 1;
-			spin_unlock(&host->irq_lock);
-			omap_hsmmc_start_command(host, req->cmd, req->data);
+				spin_lock(&host->irq_lock);
+				dma_type = host->dma_type;
+				host->dma_type = DMA_TYPE_NODMA;
+				host->polling_enabled = 1;
+				spin_unlock(&host->irq_lock);
+				omap_hsmmc_start_command(host, req->cmd, req->data);
 
-			spin_lock(&host->irq_lock);
-			host->dma_type = dma_type;
-			host->polling_enabled = 0;
-			spin_unlock(&host->irq_lock);
+				spin_lock(&host->irq_lock);
+				host->dma_type = dma_type;
+				host->polling_enabled = 0;
+				spin_unlock(&host->irq_lock);
 
-			while (!(status & CC) && (loops++ <= POLLING_MAX_LOOPS))
-				status = OMAP_HSMMC_READ(host, STAT);
-			status = 0; loops = 0;
-
-			if ((req->data->flags & MMC_DATA_READ)) {
-				while (!(status & BRR_ENABLE) && (loops++ <= POLLING_MAX_LOOPS))
+				while (!(status & CC) && (loops++ <= POLLING_MAX_LOOPS))
 					status = OMAP_HSMMC_READ(host, STAT);
-				for (; i < req->data->blksz; i += sizeof(unsigned long))
-					*((unsigned long *)(nondma_data + i)) = OMAP_HSMMC_READ(host, DATA);
-			} else if ((req->data->flags & MMC_DATA_WRITE)) {
-			for (; i < req->data->blksz; i += sizeof(unsigned long))
-				OMAP_HSMMC_WRITE(host, DATA, *((unsigned long *)(nondma_data + i)));
+				status = 0; loops = 0;
+
+				if ((req->data->flags & MMC_DATA_READ)) {
+					while (!(status & BRR_ENABLE) && (loops++ <= POLLING_MAX_LOOPS))
+						status = OMAP_HSMMC_READ(host, STAT);
+					for (; i < req->data->blksz; i += sizeof(unsigned long))
+						*((unsigned long *)(nondma_data + i)) = OMAP_HSMMC_READ(host, DATA);
+				} else if ((req->data->flags & MMC_DATA_WRITE)) {
+					for (; i < req->data->blksz; i += sizeof(unsigned long))
+						OMAP_HSMMC_WRITE(host, DATA, *((unsigned long *)(nondma_data + i)));
+				}
+				status = 0; loops = 0;
+				while (!(status & TC) && (loops++ <= POLLING_MAX_LOOPS))
+					status = OMAP_HSMMC_READ(host, STAT);
+				omap_hsmmc_request_done(host, req);
+				return;
 			}
-			status = 0; loops = 0;
-			while (!(status & TC) && (loops++ <= POLLING_MAX_LOOPS))
-				status = OMAP_HSMMC_READ(host, STAT);
-			omap_hsmmc_request_done(host, req);
-			return;
 		}
 	}
 #endif
@@ -2398,13 +2401,15 @@ static int __init omap_hsmmc_probe(struct platform_device *pdev)
 		host->master_clock = OMAP_MMC_MASTER_CLOCK / 2;
 
 #ifdef CONFIG_TIWLAN_SDIO
-	if (pdev->id == CONFIG_TIWLAN_MMC_CONTROLLER-1) {
-		if (pdata->slots[0].embedded_sdio != NULL) {
-			mmc_set_embedded_sdio_data(mmc,
-			&pdata->slots[0].embedded_sdio->cis,
-			&pdata->slots[0].embedded_sdio->cccr,
-			pdata->slots[0].embedded_sdio->funcs,
-			pdata->slots[0].embedded_sdio->quirks);
+	if (machine_is_omap_4430sdp()) {
+		if (pdev->id == CONFIG_TIWLAN_MMC_CONTROLLER-1) {
+			if (pdata->slots[0].embedded_sdio != NULL) {
+				mmc_set_embedded_sdio_data(mmc,
+				&pdata->slots[0].embedded_sdio->cis,
+				&pdata->slots[0].embedded_sdio->cccr,
+				pdata->slots[0].embedded_sdio->funcs,
+				pdata->slots[0].embedded_sdio->quirks);
+			}
 		}
 	}
 #endif

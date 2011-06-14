@@ -794,7 +794,6 @@ static struct omap_musb_board_data musb_board_data = {
 	.power			= 100,
 };
 
-#ifndef CONFIG_TIWLAN_SDIO
 static int wifi_set_power(struct device *dev, int slot, int power_on, int vdd)
 {
 	static int power_state;
@@ -818,7 +817,6 @@ static int wifi_set_power(struct device *dev, int slot, int power_on, int vdd)
 
 	return 0;
 }
-#endif
 
 static struct twl4030_usb_data omap4_usbphy_data = {
 	.phy_init	= omap4430_phy_init,
@@ -849,15 +847,6 @@ static struct omap2_hsmmc_info mmc[] = {
 		.power_saving	= true,
 #endif
 	},
-#ifdef CONFIG_TIWLAN_SDIO
-	{
-		.mmc		= 5,
-		.caps		= MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA,
-		.gpio_cd	= -EINVAL,
-		.gpio_wp        = -EINVAL,
-		.ocr_mask	= MMC_VDD_165_195,
-	},
-#else
 	{
 		.mmc		= 5,
 		.caps		= MMC_CAP_4_BIT_DATA | MMC_CAP_POWER_OFF_CARD,
@@ -866,17 +855,14 @@ static struct omap2_hsmmc_info mmc[] = {
 		.ocr_mask	= MMC_VDD_165_195,
 		.nonremovable	= true,
 	},
-#endif
 	{}	/* Terminator */
 };
 
-#ifndef CONFIG_TIWLAN_SDIO
 static struct wl12xx_platform_data omap4_panda_wlan_data __initdata = {
 	.irq = OMAP_GPIO_IRQ(GPIO_WIFI_IRQ),
 	.board_ref_clock = WL12XX_REFCLOCK_26,
 	.board_tcxo_clock = 1,
 };
-#endif
 
 static struct regulator_consumer_supply sdp4430_vmmc_supply[] = {
 	{
@@ -907,11 +893,9 @@ static int omap4_twl6030_hsmmc_late_init(struct device *dev)
 		pdata->slots[0].card_detect = twl6030_mmc_card_detect;
 	}
 
-#ifndef CONFIG_TIWLAN_SDIO
 	/* Set the MMC5 (wlan) power function */
 	if (pdev->id == 4)
 		pdata->slots[0].set_power = wifi_set_power;
-#endif
 
 	return ret;
 }
@@ -1750,7 +1734,6 @@ static struct omap_uart_port_info omap_serial_platform_data[] = {
 
 #ifdef CONFIG_OMAP_MUX
 static struct omap_board_mux board_mux[] __initdata = {
-#ifndef CONFIG_TIWLAN_SDIO
 	/* WLAN IRQ - GPIO 53 */
 	OMAP4_MUX(GPMC_NCS3, OMAP_MUX_MODE3 | OMAP_PIN_INPUT |
 		  OMAP_PIN_OFF_WAKEUPENABLE),
@@ -1765,7 +1748,6 @@ static struct omap_board_mux board_mux[] __initdata = {
 	OMAP4_MUX(SDMMC5_DAT1, OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLUP),
 	OMAP4_MUX(SDMMC5_DAT2, OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLUP),
 	OMAP4_MUX(SDMMC5_DAT3, OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLUP),
-#endif
 	OMAP4_MUX(USBB1_ULPITLL_CLK, OMAP_MUX_MODE3 | OMAP_PIN_INPUT),
 	{ .reg_offset = OMAP_MUX_TERMINATOR },
 };
@@ -1785,7 +1767,6 @@ static void enable_rtc_gpio(void){
 	return;
 }
 
-#ifndef CONFIG_TIWLAN_SDIO
 static void omap4_4430sdp_wifi_init(void)
 {
 	if (gpio_request(GPIO_WIFI_PMENA, "wl12xx") ||
@@ -1794,7 +1775,6 @@ static void omap4_4430sdp_wifi_init(void)
 	if (wl12xx_set_platform_data(&omap4_panda_wlan_data))
 		pr_err("Error setting wl12xx data\n");
 }
-#endif
 
 static void __init tps62361_board_init(void)
 {
@@ -1869,11 +1849,7 @@ static void __init omap_44xxtablet_init(void)
 	omap_mpu3050_init();
 	blaze_tablet_tsl2771_init();
 
-#ifdef CONFIG_TIWLAN_SDIO
-	config_wlan_mux();
-#else
 	omap4_4430sdp_wifi_init();
-#endif
 
 	/* Power on the ULPI PHY */
 	if (gpio_is_valid(OMAP4SDP_MDM_PWR_EN_GPIO)) {
