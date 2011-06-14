@@ -81,7 +81,7 @@ int __init omap_display_init(struct omap_dss_board_info *board_data)
 	struct omap_device *od;
 	int i, oh_count;
 	struct omap_display_platform_data pdata;
-	const struct omap_dss_hwmod_data const *curr_dss_hwmod;
+	const struct omap_dss_hwmod_data *curr_dss_hwmod;
 
 	memset(&pdata, 0, sizeof(pdata));
 

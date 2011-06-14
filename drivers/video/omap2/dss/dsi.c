@@ -1603,6 +1603,7 @@ int dsi_pll_set_clock_div(struct platform_device *dsidev,
 	l = FLD_MOD(l, 1, 13, 13);		/* DSI_PLL_REFEN */
 	l = FLD_MOD(l, 0, 14, 14);		/* DSIPHY_CLKINEN */
 	l = FLD_MOD(l, 1, 20, 20);		/* DSI_HSDIVBYPASS */
+
 	if (cpu_is_omap44xx())
 		l = FLD_MOD(l, 3, 22, 21);	/* DSI_REF_SEL */
 	dsi_write_reg(dsidev, DSI_PLL_CONFIGURATION2, l);
@@ -2145,13 +2146,9 @@ static void dsi_set_lane_config(struct omap_dss_device *dssdev)
 	int clk_lane   = dssdev->phy.dsi.clk_lane;
 	int data1_lane = dssdev->phy.dsi.data1_lane;
 	int data2_lane = dssdev->phy.dsi.data2_lane;
-	int data3_lane = dssdev->phy.dsi.data3_lane;
-	int data4_lane = dssdev->phy.dsi.data4_lane;
 	int clk_pol    = dssdev->phy.dsi.clk_pol;
 	int data1_pol  = dssdev->phy.dsi.data1_pol;
 	int data2_pol  = dssdev->phy.dsi.data2_pol;
-	int data3_pol  = dssdev->phy.dsi.data3_pol;
-	int data4_pol  = dssdev->phy.dsi.data4_pol;
 
 	r = dsi_read_reg(dsidev, DSI_COMPLEXIO_CFG1);
 	r = FLD_MOD(r, clk_lane, 2, 0);
@@ -2780,7 +2777,6 @@ static void dsi_vc_initial_config(struct platform_device *dsidev, int channel)
 	r = FLD_MOD(r, 0, 9, 9); /* MODE_SPEED, high speed on/off */
 	if (dss_has_feature(FEAT_DSI_VC_OCP_WIDTH))
 		r = FLD_MOD(r, 3, 11, 10);	/* OCP_WIDTH = 32 bit */
-
 /* TODO: This breaks DSI on Blaze: figure out what is the righ fix */
 #if 0
 	if (channel == 0)
@@ -3523,7 +3519,8 @@ static void dsi_set_ta_timeout(struct platform_device *dsidev, unsigned ticks,
 }
 
 static void dsi_set_stop_state_counter(struct platform_device *dsidev,
-		unsigned ticks, bool x4, bool x16, bool stop_mode)
+				       unsigned ticks, bool x4, bool x16,
+				       bool stop_mode)
 {
 	unsigned long fck;
 	unsigned long total_ticks;
@@ -3651,14 +3648,12 @@ static int dsi_video_proto_config(struct omap_dss_device *dssdev)
 	int bytes_per_pixel;
 	int hbp, hfp, hsa, tl;
 
-	dsi_config_tx_fifo(dsidev,
-			DSI_FIFO_SIZE_32,
+	dsi_config_tx_fifo(dsidev, DSI_FIFO_SIZE_32,
 			DSI_FIFO_SIZE_32,
 			DSI_FIFO_SIZE_32,
 			DSI_FIFO_SIZE_32);
 
-	dsi_config_rx_fifo(dsidev,
-			DSI_FIFO_SIZE_32,
+	dsi_config_rx_fifo(dsidev, DSI_FIFO_SIZE_32,
 			DSI_FIFO_SIZE_32,
 			DSI_FIFO_SIZE_32,
 			DSI_FIFO_SIZE_32);
@@ -4245,7 +4240,8 @@ static int dsi_display_init_dispc(struct omap_dss_device *dssdev)
 
 	if (dssdev->phy.dsi.type == OMAP_DSS_DSI_TYPE_CMD_MODE) {
 		r = omap_dispc_register_isr(dsi_framedone_irq_callback, (void *) dssdev,
-					    irq);
+					    DISPC_IRQ_FRAMEDONE);
+
 		if (r) {
 			DSSERR("can't get FRAMEDONE irq\n");
 			return r;
@@ -4291,7 +4287,8 @@ static void dsi_display_uninit_dispc(struct omap_dss_device *dssdev)
 			DISPC_IRQ_FRAMEDONE : DISPC_IRQ_FRAMEDONE2;
 
 	if(dssdev->phy.dsi.type == OMAP_DSS_DSI_TYPE_CMD_MODE)
-		omap_dispc_unregister_isr(dsi_framedone_irq_callback, (void *) dssdev, irq);
+		omap_dispc_unregister_isr(dsi_framedone_irq_callback, (void *) dssdev,
+					  irq);
 }
 
 static int dsi_configure_dsi_clocks(struct omap_dss_device *dssdev)

@@ -6,7 +6,11 @@
  * published by the Free Software Foundation.
  */
 
+#include <asm/mach/mmc.h>
+
 struct mmc_card;
+
+typedef int (*mmc_card_detect_func)(struct device *dev, int slot);
 
 struct omap2_hsmmc_info {
 	u8	mmc;		/* controller 1/2/3 */
@@ -25,6 +29,7 @@ struct omap2_hsmmc_info {
 	char	*name;		/* or NULL for default */
 	struct device *dev;	/* returned: pointer to mmc adapter */
 	int	ocr_mask;	/* temporary HACK */
+	struct mmc_platform_data *mmc_data;
 	/* Remux (pad configuration) when powering on/off */
 	void (*remux)(struct device *dev, int slot, int power_on);
 	/* init some special card */
