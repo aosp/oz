@@ -432,6 +432,11 @@ static void twl6030_stop_usb_charger(struct twl6030_bci_device_info *di)
 
 static void twl6030_start_usb_charger(struct twl6030_bci_device_info *di)
 {
+	if (!is_battery_present()) {
+		dev_dbg(di->dev, "BATTERY NOT DETECTED!\n");
+		return;
+	}
+
 	if (di->charger_source == POWER_SUPPLY_TYPE_MAINS)
 		return;
 
@@ -457,10 +462,6 @@ static void twl6030_stop_ac_charger(struct twl6030_bci_device_info *di)
 {
 	long int events;
 
-	if (!is_battery_present()) {
-		dev_dbg(di->dev, "BATTERY NOT DETECTED!\n");
-		return;
-	}
 	di->charger_source = 0;
 	di->charge_status = POWER_SUPPLY_STATUS_DISCHARGING;
 	events = BQ2415x_STOP_CHARGING;
@@ -518,6 +519,11 @@ static irqreturn_t twl6030charger_ctrl_interrupt(int irq, void *_di)
 	u8 present_charge_state = 0;
 	u8 ac_or_vbus, no_ac_and_vbus = 0;
 	u8 hw_state = 0, temp = 0;
+
+	if (!is_battery_present()) {
+		dev_dbg(di->dev, "BATTERY NOT DETECTED!\n");
+		return IRQ_HANDLED;
+	}
 
 	/* read charger controller_stat1 */
 	ret = twl_i2c_read_u8(TWL6030_MODULE_CHARGER, &present_charge_state,
@@ -1722,6 +1728,7 @@ static int __devinit twl6030_bci_battery_probe(struct platform_device *pdev)
 	int irq;
 	int ret;
 	u8 controller_stat = 0;
+	u8 chargerusb_ctrl1 = 0;
 	u8 hw_state = 0;
 
 	di = kzalloc(sizeof(*di), GFP_KERNEL);
@@ -1883,21 +1890,31 @@ static int __devinit twl6030_bci_battery_probe(struct platform_device *pdev)
 
 	di->charger_incurrentmA = twl6030_get_usb_max_power(di->otg);
 
-	if (controller_stat & VAC_DET) {
-		di->ac_online = POWER_SUPPLY_TYPE_MAINS;
-		twl6030_start_ac_charger(di);
-	} else if (controller_stat & VBUS_DET) {
-		/*
-		 * In HOST mode (ID GROUND) with a device connected,
-		 * do no enable usb charging
-		 */
-		twl_i2c_read_u8(TWL6030_MODULE_ID0, &hw_state, STS_HW_CONDITIONS);
-		if (!(hw_state & STS_USB_ID)) {
-			di->usb_online = POWER_SUPPLY_TYPE_USB;
-			di->charger_source = POWER_SUPPLY_TYPE_USB;
-			di->charge_status = POWER_SUPPLY_STATUS_CHARGING;
-			di->event = USB_EVENT_VBUS;
-			schedule_work(&di->usb_work);
+	if (!is_battery_present()) {
+		dev_dbg(di->dev, "BATTERY NOT DETECTED! PUT in HZ mode\n");
+		twl_i2c_read_u8(TWL6030_MODULE_CHARGER, &chargerusb_ctrl1,
+						CHARGERUSB_CTRL1);
+		chargerusb_ctrl1 |= HZ_MODE;
+		twl_i2c_write_u8(TWL6030_MODULE_CHARGER, chargerusb_ctrl1,
+						CHARGERUSB_CTRL1);
+	} else {
+		if (controller_stat & VAC_DET) {
+			di->ac_online = POWER_SUPPLY_TYPE_MAINS;
+			twl6030_start_ac_charger(di);
+		} else if (controller_stat & VBUS_DET) {
+			/*
+			 * In HOST mode (ID GROUND) with a device connected,
+			 * do no enable usb charging
+			 */
+			twl_i2c_read_u8(TWL6030_MODULE_ID0, &hw_state,
+							STS_HW_CONDITIONS);
+			if (!(hw_state & STS_USB_ID)) {
+				di->usb_online = POWER_SUPPLY_TYPE_USB;
+				di->charger_source = POWER_SUPPLY_TYPE_USB;
+				di->charge_status = POWER_SUPPLY_STATUS_CHARGING;
+				di->event = USB_EVENT_VBUS;
+				schedule_work(&di->usb_work);
+			}
 		}
 	}
 
