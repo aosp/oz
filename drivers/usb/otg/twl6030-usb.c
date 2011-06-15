@@ -307,21 +307,19 @@ static irqreturn_t twl6030_usbotg_irq(int irq, void *_twl)
 		twl6030_usb_ldo_init(twl);
 		regulator_enable(twl->usb3v3);
 		twl->asleep = 1;
-		twl6030_writeb(twl, TWL_MODULE_USB, USB_ID_INT_EN_HI_CLR, 0x1);
-		twl6030_writeb(twl, TWL_MODULE_USB, USB_ID_INT_EN_HI_SET,
-								0x10);
+		twl6030_writeb(twl, TWL_MODULE_USB, 0x1, USB_ID_INT_EN_HI_CLR);
+		twl6030_writeb(twl, TWL_MODULE_USB, 0x10, USB_ID_INT_EN_HI_SET);
+
 		status = USB_EVENT_ID;
 		twl->otg.default_a = true;
 		twl->otg.state = OTG_STATE_A_IDLE;
 		blocking_notifier_call_chain(&twl->otg.notifier, status,
 							twl->otg.gadget);
 	} else  {
-		twl6030_writeb(twl, TWL_MODULE_USB, USB_ID_INT_EN_HI_CLR,
-								0x10);
-		twl6030_writeb(twl, TWL_MODULE_USB, USB_ID_INT_EN_HI_SET,
-								0x1);
+		twl6030_writeb(twl, TWL_MODULE_USB, 0x10, USB_ID_INT_EN_HI_CLR);
+		twl6030_writeb(twl, TWL_MODULE_USB, 0x1, USB_ID_INT_EN_HI_SET);
 	}
-	twl6030_writeb(twl, TWL_MODULE_USB, USB_ID_INT_LATCH_CLR, status);
+	twl6030_writeb(twl, TWL_MODULE_USB, status, USB_ID_INT_LATCH_CLR);
 	twl->linkstat = status;
 #endif
 
