@@ -307,7 +307,15 @@ static int pm_dbg_show_regs(struct seq_file *s, void *unused)
 	void *store = NULL;
 	int regs;
 	int linefeed;
+	unsigned cmbase, prmbase;
 
+	if (cpu_is_omap44xx()) {
+		cmbase = OMAP4430_CM_BASE;
+		prmbase = OMAP4430_PRM_BASE;
+	} else {
+		cmbase = OMAP3430_CM_BASE;
+		prmbase = OMAP3430_PRM_BASE;
+	}
 	if (reg_set == 0) {
 		store = kmalloc(pm_dbg_get_regset_size(), GFP_KERNEL);
 		if (!store) {
@@ -328,12 +336,12 @@ static int pm_dbg_show_regs(struct seq_file *s, void *unused)
 		if (pm_dbg_reg_modules[i].type == MOD_CM)
 			seq_printf(s, "MOD: CM_%s (%08x)\n",
 				pm_dbg_reg_modules[i].name,
-				(u32)(OMAP3430_CM_BASE +
+				(u32)(cmbase +
 				pm_dbg_reg_modules[i].offset));
 		else
 			seq_printf(s, "MOD: PRM_%s (%08x)\n",
 				pm_dbg_reg_modules[i].name,
-				(u32)(OMAP3430_PRM_BASE +
+				(u32)(prmbase +
 				pm_dbg_reg_modules[i].offset));
 
 		for (j = pm_dbg_reg_modules[i].low;
@@ -794,7 +802,7 @@ static int __init pm_dbg_init(void)
 	else if (cpu_is_omap44xx())
 		pm_dbg_reg_modules = omap4_pm_reg_modules;
 	else
-		printk(KERN_ERR "%s: only OMAP3 supported\n", __func__);
+		printk(KERN_ERR "%s: only OMAP3/4 supported\n", __func__);
 
 	d = debugfs_create_dir("pm_debug", NULL);
 	if (IS_ERR(d))
