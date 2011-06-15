@@ -1443,7 +1443,7 @@ static struct i2c_board_info __initdata sdp4430_i2c_4_boardinfo[] = {
 
 static struct usbhs_omap_platform_data usbhs_pdata __initconst = {
 	.port_mode[0] = OMAP_EHCI_PORT_MODE_PHY,
-	.port_mode[1] = OMAP_OHCI_PORT_MODE_PHY_6PIN_DATSE0,
+	.port_mode[1] = OMAP_USBHS_PORT_MODE_UNUSED,
 	.port_mode[2] = OMAP_USBHS_PORT_MODE_UNUSED,
 	.phy_reset  = false,
 	.reset_gpio_port[0]  = -EINVAL,
