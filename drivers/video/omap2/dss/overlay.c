@@ -420,6 +420,35 @@ static ssize_t overlay_zorder_store(struct omap_overlay *ovl,
 	return size;
 }
 
+static ssize_t overlay_color_mode_show(struct omap_overlay *ovl, char *buf)
+{
+	return snprintf(buf, PAGE_SIZE, "%d\n",
+			ovl->info.color_mode);
+}
+
+static ssize_t overlay_color_mode_store(struct omap_overlay *ovl,
+		const char *buf, size_t size)
+{
+	int r;
+	struct omap_overlay_info info;
+
+	ovl->get_overlay_info(ovl, &info);
+
+	info.color_mode = simple_strtoul(buf, NULL, 10);
+
+	r = ovl->set_overlay_info(ovl, &info);
+	if (r)
+		return r;
+
+	if (ovl->manager) {
+		r = ovl->manager->apply(ovl->manager);
+		if (r)
+			return r;
+	}
+
+	return size;
+}
+
 struct overlay_attribute {
 	struct attribute attr;
 	ssize_t (*show)(struct omap_overlay *, char *);
@@ -450,7 +479,8 @@ static OVERLAY_ATTR(y_decim, S_IRUGO|S_IWUSR,
 		overlay_y_decim_show, overlay_y_decim_store);
 static OVERLAY_ATTR(zorder, S_IRUGO|S_IWUSR,
 		overlay_zorder_show, overlay_zorder_store);
-
+static OVERLAY_ATTR(color_mode, S_IRUGO|S_IWUSR,
+		overlay_color_mode_show, overlay_color_mode_store);
 
 static struct attribute *overlay_sysfs_attrs[] = {
 	&overlay_attr_name.attr,
@@ -464,6 +494,7 @@ static struct attribute *overlay_sysfs_attrs[] = {
 	&overlay_attr_x_decim.attr,
 	&overlay_attr_y_decim.attr,
 	&overlay_attr_zorder.attr,
+	&overlay_attr_color_mode.attr,
 	NULL
 };
 
