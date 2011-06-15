@@ -49,6 +49,7 @@
 #define CHARGER_TYPE_HOST		0x5
 #define CHARGER_TYPE_PC			0x6
 #define USB2PHY_CHGDETECTED		BIT(13)
+#define USB2PHY_DISCHGDET		BIT(30)
 
 static struct clk *phyclk, *clk48m, *clk32k;
 static void __iomem *ctrl_base;
@@ -117,6 +118,9 @@ int omap4_charger_detect(void)
 	u32 chargertype = 0;
 
 	omap4430_phy_power(NULL, 0, 1);
+	usb2phycore = omap4_ctrl_pad_readl(CONTROL_USB2PHYCORE);
+	usb2phycore &= ~USB2PHY_DISCHGDET;
+	omap4_ctrl_pad_writel(usb2phycore, CONTROL_USB2PHYCORE);
 	timeout = jiffies + msecs_to_jiffies(500);
 	do {
 		usb2phycore = omap4_ctrl_pad_readl(CONTROL_USB2PHYCORE);
