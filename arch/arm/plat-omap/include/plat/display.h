@@ -1012,6 +1012,14 @@ int omapdss_default_get_recommended_bpp(struct omap_dss_device *dssdev);
 bool dispc_go_busy(enum omap_channel channel);
 void dispc_go(enum omap_channel channel);
 bool dispc_is_vsync_fake(void);
+int dispc_scaling_decision(u16 width, u16 height,
+		u16 out_width, u16 out_height,
+		enum omap_plane plane,
+		enum omap_color_mode color_mode,
+		enum omap_channel channel, u8 rotation,
+		u16 min_x_decim, u16 max_x_decim,
+		u16 min_y_decim, u16 max_y_decim,
+		u16 *x_decim, u16 *y_decim, bool *three_tap);
 void dispc_enable_channel(enum omap_channel channel, bool enable);
 typedef void (*omap_dispc_isr_t) (void *arg, u32 mask);
 int omap_dispc_register_isr(omap_dispc_isr_t isr, void *arg, u32 mask);
