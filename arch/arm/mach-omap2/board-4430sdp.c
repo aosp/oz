@@ -30,6 +30,7 @@
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
 #include <asm/mach/map.h>
+#include <linux/i2c/bq2415x.h>
 
 #include <plat/board.h>
 #include <plat/common.h>
@@ -658,6 +659,23 @@ static struct twl4030_codec_data twl6040_codec = {
 	.irq_base	= TWL6040_CODEC_IRQ_BASE,
 };
 
+static struct twl4030_bci_platform_data sdp4430_bci_data = {
+	.monitoring_interval		= 10,
+	.max_charger_currentmA		= 1500,
+	.max_charger_voltagemV		= 4560,
+	.max_bat_voltagemV		= 4200,
+	.low_bat_voltagemV		= 3300,
+};
+
+static struct bq2415x_platform_data sdp4430_bqdata = {
+	.max_charger_voltagemA = 4200,
+	.max_charger_currentmA = 1550,
+};
+
+static struct twl4030_madc_platform_data sdp4430_gpadc_data = {
+	.irq_line	= 1,
+};
+
 static struct twl4030_platform_data sdp4430_twldata = {
 	.irq_base	= TWL6030_IRQ_BASE,
 	.irq_end	= TWL6030_IRQ_END,
@@ -678,6 +696,8 @@ static struct twl4030_platform_data sdp4430_twldata = {
 
 	/* children */
 	.codec		= &twl6040_codec,
+	.bci            = &sdp4430_bci_data,
+	.madc           = &sdp4430_gpadc_data,
 };
 
 static struct i2c_board_info __initdata sdp4430_i2c_boardinfo[] = {
@@ -686,6 +706,10 @@ static struct i2c_board_info __initdata sdp4430_i2c_boardinfo[] = {
 		.flags = I2C_CLIENT_WAKE,
 		.irq = OMAP44XX_IRQ_SYS_1N,
 		.platform_data = &sdp4430_twldata,
+	},
+	{
+		I2C_BOARD_INFO("bq24156", 0x6a),
+		.platform_data = &sdp4430_bqdata,
 	},
 };
 
