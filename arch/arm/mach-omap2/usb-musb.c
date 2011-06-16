@@ -36,6 +36,12 @@
 #include <plat/omap_device.h>
 #include <plat/omap_hwmod.h>
 #include <plat/omap-pm.h>
+#ifdef CONFIG_ARCH_OMAP3
+#include "../../../drivers/usb/musb/musb_io.h"
+#include "../../../drivers/usb/musb/musb_regs.h"
+#include "../../../drivers/usb/musb/omap2430.h"
+int musb_module_reset(void);
+#endif /* CONFIG_ARCH_OMAP3 */
 
 #define CONTROL_DEV_CONF                0x300
 #define PHY_PD				(1 << 0)
@@ -373,7 +379,7 @@ void __init usb_musb_init(struct omap_musb_board_data *board_data)
 	char oh_name[MAX_OMAP_MUSB_HWMOD_NAME_LEN];
 	struct omap_hwmod *oh;
 	struct omap_device *od;
-	struct platform_device *pdev;
+	struct platform_device *pdev = NULL;
 	struct device	*dev;
 	int l, bus_id = -1;
 	struct musb_hdrc_platform_data *pdata;
@@ -455,8 +461,89 @@ void __init usb_musb_init(struct omap_musb_board_data *board_data)
 			omap_writel(PHY_PD, DIE_ID_REG_BASE + CONTROL_DEV_CONF);
 
 		usb_gadget_init();
+#ifdef CONFIG_ARCH_OMAP3
+		if(pdev){
+			musb_plat.device_enable(pdev);
+			musb_module_reset();
+			musb_plat.device_idle(pdev);
+		}else{
+			pr_err("Could not reset musb module.\n");
+		}
+#endif
 	}
 }
+
+#ifdef CONFIG_ARCH_OMAP3
+/*
+Errata ID: i445
+
+Instead of using the OTG_SYSCONFIG:SOFTRESET bit filed, the user can use the
+SOFTRESET register of the USB module at offset 0x7F, which will have the same effect
+and will allow the hsusb_stp	pin to go high and the reset command to be sent.
+As soon as this is done, LINK and PHY can start negotiating and function normally.
+ */
+int musb_module_reset(void)
+{
+	struct omap_hwmod *oh = oh_p;
+	struct platform_device *pdev;
+	struct resource	*iomem;
+	void __iomem	*base;
+	int ret = 0;
+	u32 val;
+
+	if(oh){
+		pdev = &oh->od->pdev;
+		iomem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+		if (!iomem){
+			pr_err("musb_module_reset: no mem resource\n");
+			return -EINVAL;
+		}
+	}else{
+		/* reset called at boot */
+		iomem = kmalloc(sizeof(struct resource), GFP_KERNEL);
+		if(!iomem){
+			pr_err("musb_module_reset: memory alloc failed\n");
+			return -ENOMEM;
+		}
+		iomem->start = OMAP34XX_HSUSB_OTG_BASE;
+		iomem->end = OMAP34XX_HSUSB_OTG_BASE + SZ_4K - 1;
+	}
+
+	base = ioremap(iomem->start, resource_size(iomem));
+	if (!base) {
+		pr_err("musb_module_reset: usb otg ioremap failed\n");
+		ret = -ENOMEM;
+		goto out;
+	}
+
+	/* recommended by TI HW team.
+	   step1. set USB OTG_SYSCONFIG:SOFTRESET
+	   step2. set SOFTRESET of the USB module(0x7F).
+	   step3. wait 3ms.
+	 */
+#if 0
+	/* If set the otg sysconfig.softreset here,
+	   usb adb does not connected, when the boot without usb cable.
+	   So, softreset do not use.
+	 */
+	/* softreset */
+	val = musb_readl(base, OTG_SYSCONFIG);
+	val |= SOFTRST;
+	musb_writel(base, OTG_SYSCONFIG, val);
+#endif
+	/* module reset */
+	musb_writeb(base, MUSB_SOFT_RST, 0x3);
+	mdelay(3); /* recommended by TI HW team */
+
+	iounmap(base);
+out:
+	if(!oh){
+		kfree(iomem);
+	}
+
+	return ret;
+}
+#endif /* CONFIG_ARCH_OMAP3 */
 
 void musb_context_save_restore(enum musb_state state)
 {
