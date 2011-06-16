@@ -675,17 +675,29 @@ EXPORT_SYMBOL(omap_mcbsp_get_dma_op_mode);
 
 static inline void omap34xx_mcbsp_request(struct omap_mcbsp *mcbsp)
 {
+	int idle_mode;
+
 	/*
 	 * Enable wakup behavior, smart idle and all wakeups
 	 * REVISIT: some wakeups may be unnecessary
 	 */
 	if (cpu_is_omap34xx() || cpu_is_omap44xx()) {
+		/*
+		 * OMAP3 Errata i649:  Do not allow McBSP2 when in slave mode
+		 * to idle to prevent frame corruption.
+		 */
+		if ((omap_rev() <= OMAP3630_REV_ES1_2) &&
+			(mcbsp->id == 2) &&
+			(mcbsp->interface_mode == OMAP_MCBSP_SLAVE))
+			idle_mode = HWMOD_IDLEMODE_NO;
+		else
+			idle_mode = HWMOD_IDLEMODE_SMART;
+
 
 		if (mcbsp->dma_op_mode == MCBSP_DMA_MODE_THRESHOLD) {
 			MCBSP_WRITE(mcbsp, WAKEUPEN, XRDYEN | RRDYEN);
 			omap_hwmod_enable_wakeup(mcbsp->oh[0]);
-			omap_hwmod_set_slave_idlemode(mcbsp->oh[0],
-						HWMOD_IDLEMODE_SMART);
+			omap_hwmod_set_slave_idlemode(mcbsp->oh[0], idle_mode);
 		} else {
 			omap_hwmod_disable_wakeup(mcbsp->oh[0]);
 			omap_hwmod_set_slave_idlemode(mcbsp->oh[0],
