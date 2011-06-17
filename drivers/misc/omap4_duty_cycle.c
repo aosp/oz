@@ -43,16 +43,16 @@ enum omap4_duty_state {
 };
 
 /* state struct */
-static unsigned int nitro_interval;
+static unsigned int nitro_interval = 20000;
 module_param(nitro_interval, int, 0);
 
-static unsigned int nitro_percentage;
+static unsigned int nitro_percentage = 25;
 module_param(nitro_percentage, int, 0);
 
-static unsigned int nitro_rate;
+static unsigned int nitro_rate = 1200000;
 module_param(nitro_rate, int, 0);
 
-static unsigned int cooling_rate;
+static unsigned int cooling_rate = 1008000;
 module_param(cooling_rate, int, 0);
 
 static int heating_budget;
