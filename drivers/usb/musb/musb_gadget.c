@@ -704,10 +704,12 @@ static void rxstate(struct musb *musb, struct musb_request *req)
 		/*
 		 * Enable Mode 1 for RX transfers only for mass-storage
 		 * use-case, based on short_not_ok flag which is set only
-		 * from file_storage and f_mass_storage drivers
+		 * from file_storage and f_mass_storage drivers.
+		 * We also don't use Mode 1 on OMAP3 since Mode 1 utilizes
+		 * AUTOCLEAR and that isn't allowed due to errata i426.
 		 */
-
-		if (request->short_not_ok && len == musb_ep->packet_sz)
+		if (request->short_not_ok && len == musb_ep->packet_sz
+						&& !cpu_is_omap34xx())
 			use_mode_1 = 1;
 		else
 			use_mode_1 = 0;
