@@ -87,9 +87,6 @@
 #define OMAP4_TSL2771_PWR_GPIO		188
 #define OMAP4SDP_MDM_PWR_EN_GPIO	157
 
-#define LED_SEC_DISP_GPIO 27
-#define DSI2_GPIO_59	59
-
 #define LED_PWM2ON		0x03
 #define LED_PWM2OFF		0x04
 #define LED_TOGGLE3		0x92
@@ -289,38 +286,11 @@ static void sdp4430_set_primary_brightness(u8 brightness)
 	}
 }
 
-static void sdp4430_set_secondary_brightness(u8 brightness)
-{
-	if (brightness > 0)
-		brightness = 1;
-
-	gpio_set_value(LED_SEC_DISP_GPIO, brightness);
-}
-
 static struct omap4430_sdp_disp_led_platform_data sdp4430_disp_led_data = {
 	.flags = LEDS_CTRL_AS_ONE_DISPLAY,
 	.display_led_init = sdp4430_init_display_led,
 	.primary_display_set = sdp4430_set_primary_brightness,
-	.secondary_display_set = sdp4430_set_secondary_brightness,
 };
-
-static void __init omap_disp_led_init(void)
-{
-	/* Seconday backlight control */
-	gpio_request(DSI2_GPIO_59, "dsi2_bl_gpio");
-	gpio_direction_output(DSI2_GPIO_59, 0);
-
-	if (sdp4430_disp_led_data.flags & LEDS_CTRL_AS_ONE_DISPLAY) {
-		pr_info("%s: Configuring as one display LED\n", __func__);
-		gpio_set_value(DSI2_GPIO_59, 1);
-	}
-
-	gpio_request(LED_SEC_DISP_GPIO, "dsi1_bl_gpio");
-	gpio_direction_output(LED_SEC_DISP_GPIO, 1);
-	mdelay(120);
-	gpio_set_value(LED_SEC_DISP_GPIO, 0);
-
-}
 
 static struct platform_device sdp4430_disp_led = {
 	.name	=	"display_led",
@@ -621,8 +591,6 @@ static int sdp4430_panel_enable_pico_DLP(struct omap_dss_device *dssdev)
 {
 	/* int i = 0; */
 
-	gpio_request(DLP_4430_GPIO_59, "DLP DISPLAY SEL");
-	gpio_direction_output(DLP_4430_GPIO_59, 0);
 	gpio_request(DLP_4430_GPIO_45, "DLP PARK");
 	gpio_direction_output(DLP_4430_GPIO_45, 0);
 	gpio_request(DLP_4430_GPIO_40, "DLP PHY RESET");
@@ -631,7 +599,6 @@ static int sdp4430_panel_enable_pico_DLP(struct omap_dss_device *dssdev)
 	gpio_direction_input(DLP_4430_GPIO_44); */
 	mdelay(500);
 
-	gpio_set_value(DLP_4430_GPIO_59, 1);
 	gpio_set_value(DLP_4430_GPIO_45, 1);
 	mdelay(1000);
 
@@ -653,7 +620,6 @@ static void sdp4430_panel_disable_pico_DLP(struct omap_dss_device *dssdev)
 {
 	gpio_set_value(DLP_4430_GPIO_40, 0);
 	gpio_set_value(DLP_4430_GPIO_45, 0);
-	gpio_set_value(DLP_4430_GPIO_59, 0);
 }
 
 static struct omap_dss_device sdp4430_picoDLP_device = {
@@ -1881,7 +1847,6 @@ static void __init omap_44xxtablet_init(void)
 
 	blaze_tablet_touch_init();
 	omap4_display_init();
-	omap_disp_led_init();
 
 	platform_add_devices(blazetablet_devices,
 		ARRAY_SIZE(blazetablet_devices));
