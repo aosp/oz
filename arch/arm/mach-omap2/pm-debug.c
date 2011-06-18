@@ -39,12 +39,14 @@
 #include "prm.h"
 #include "cm.h"
 #include "pm.h"
+#include "prm-regbits-34xx.h"
 
 int omap2_pm_debug;
 u32 enable_off_mode;
 u32 sleep_while_idle;
 u32 wakeup_timer_seconds;
 u32 wakeup_timer_milliseconds;
+u32 voltage_off_while_idle;
 u32 omap4_device_off_counter = 0;
 int pmd_clks_enable;
 int dpll_cascade_global_state;
@@ -650,6 +652,16 @@ static int option_set(void *data, u64 val)
 		else if (cpu_is_omap44xx())
 			omap4_pm_off_mode_enable(val);
 	}
+	if (option == &voltage_off_while_idle) {
+		if (voltage_off_while_idle)
+			prm_set_mod_reg_bits(OMAP3430_SEL_OFF_MASK,
+						OMAP3430_GR_MOD,
+						OMAP3_PRM_VOLTCTRL_OFFSET);
+		else
+			prm_clear_mod_reg_bits(OMAP3430_SEL_OFF_MASK,
+						OMAP3430_GR_MOD,
+						OMAP3_PRM_VOLTCTRL_OFFSET);
+	}
 	if (option == &enable_sr_vp_debug && val)
 		pr_notice("Beware that enabling this option will allow user "
 			"to override the system defined vp and sr parameters "
@@ -832,6 +844,14 @@ static int __init pm_dbg_init(void)
 			&pm_dbg_option_fops);
 	(void) debugfs_create_file("enable_sr_vp_debug",  S_IRUGO | S_IWUGO, d,
 				   &enable_sr_vp_debug, &pm_dbg_option_fops);
+
+	/* Only enable for >= 3430 ES2.1 . Going to 0V on anything under
+	 * ES2.1 will eventually cause a crash */
+	if (omap_rev() > OMAP3430_REV_ES2_0)
+		(void) debugfs_create_file("voltage_off_while_idle",
+					   S_IRUGO | S_IWUGO, d,
+					   &voltage_off_while_idle,
+					   &pm_dbg_option_fops);
 
 	if (cpu_is_omap44xx()) {
 		omap4_pmd_clks_init();

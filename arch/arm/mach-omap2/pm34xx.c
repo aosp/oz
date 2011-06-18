@@ -1086,6 +1086,16 @@ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
 	return set_pwrdm_state(pwrst->pwrdm, pwrst->next_state);
 }
 
+static int __init omap3_pm_early_init(void)
+{
+	/* set sys_off_mode active low */
+	prm_clear_mod_reg_bits(OMAP3430_OFFMODE_POL_MASK, OMAP3430_GR_MOD,
+				OMAP3_PRM_POLCTRL_OFFSET);
+	return 0;
+}
+
+arch_initcall(omap3_pm_early_init);
+
 /*
  * Enable hw supervised mode for all clockdomains if it's
  * supported. Initiate sleep transition for other clockdomains, if
