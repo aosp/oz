@@ -57,6 +57,8 @@
 #include "mux.h"
 #include "hsmmc.h"
 #include "smartreflex-class3.h"
+#include <linux/skbuff.h>
+#include <linux/ti_wilink_st.h>
 
 #define GPIO_HUB_POWER 1
 #define GPIO_HUB_NRESET_39 39
@@ -64,17 +66,29 @@
 #define GPIO_BOARD_ID0 182
 #define GPIO_BOARD_ID1 101
 #define GPIO_BOARD_ID2 171
+#define BLUETOOTH_UART_DEV_NAME "/dev/ttyO1"
 
 static int board_revision;
 
 /* wl127x BT, FM, GPS connectivity chip */
 static int gpios[] = {46, -1, -1};
+/* wl128x BT, FM, GPS connectivity chip */
+struct ti_st_plat_data wilink_pdata = {
+	.nshutdown_gpio = 46,
+	.dev_name = BLUETOOTH_UART_DEV_NAME,
+	.flow_cntrl = 1,
+	.baud_rate = 3000000,
+};
+
 static struct platform_device wl127x_device = {
        .name           = "kim",
        .id             = -1,
-       .dev.platform_data = &gpios,
+       .dev.platform_data = &wilink_pdata,
 };
-
+static struct platform_device btwilink_device = {
+	.name = "btwilink",
+	.id = -1,
+ };
 static struct gpio_led gpio_leds[] = {
 	{
 		.name			= "pandaboard::status1",
@@ -158,7 +172,8 @@ static struct omap_dss_board_info panda_dss_data = {
 static struct platform_device *panda_devices[] __initdata = {
 	&leds_gpio,
 	&sdp4430_hdmi_audio_device,
-	&wl127x_device
+	&wl127x_device,
+	&btwilink_device
 };
 
 static void __init omap4_display_init(void)
