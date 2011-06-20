@@ -371,7 +371,7 @@ sil9022_blockwrite_reg(struct i2c_client *client,
 		data[1] = val[i];
 		err = i2c_transfer(client->adapter, msg, 1);
 		udelay(50);
-		dev_err(&client->dev, "<%s> i2c Block write at 0x%x, "
+		dev_dbg(&client->dev, "<%s> i2c Block write at 0x%x, "
 				      "*val=%d flags=%d byte[%d] err=%d\n",
 			__func__, data[0], data[1], msg->flags, i, err);
 		if (err < 0)
@@ -1124,21 +1124,26 @@ static int hdmi_panel_enable(struct omap_dss_device *dssdev)
 						166 * 1000 * 4);
 	}
 #endif
+	r = omapdss_dpi_display_enable(dssdev);
+	if (r)
+		goto ERROR0;
 
 	if (dssdev->platform_enable)
 		r = dssdev->platform_enable(dssdev);
 
 	r = sil9022_set_cm_clkout_ctrl(sil9022_client);
 	if (r)
-		goto ERROR0;
+		goto ERROR1;
 
 	r = hdmi_enable(dssdev);
 	if (r)
-		goto ERROR0;
+		goto ERROR1;
 	/* wait couple of vsyncs until enabling the LCD */
 	msleep(50);
 
 	return 0;
+ERROR1:
+	omapdss_dpi_display_disable(dssdev);
 ERROR0:
 	return r;
 }
@@ -1164,6 +1169,8 @@ static void hdmi_panel_disable(struct omap_dss_device *dssdev)
 			pdata->set_max_mpu_wakeup_lat(&sil9022_client->dev, -1);
 	}
 #endif
+	msleep(50);
+	omapdss_dpi_display_disable(dssdev);
 }
 
 static int hdmi_panel_suspend(struct omap_dss_device *dssdev)

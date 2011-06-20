@@ -763,7 +763,7 @@ static int dss_resume_device(struct device *dev, void *data)
 			dssdev->driver->disable(dssdev);
 			return r;
 		}
-	} else {
+	} else if (dssdev->state != OMAP_DSS_DISPLAY_DISABLED) {
 		/* disabled may not be the same as suspended so call handler */
 		dssdev->driver->disable(dssdev);
 	}

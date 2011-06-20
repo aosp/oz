@@ -31,6 +31,7 @@
 #include <linux/regulator/consumer.h>
 
 #include <plat/display.h>
+#include <linux/io.h>
 #include <plat/cpu.h>
 
 #include "dss.h"
@@ -39,7 +40,6 @@ static struct {
 	struct regulator *vdds_dsi_reg;
 } dpi;
 
-#ifdef CONFIG_OMAP2_DSS_USE_DSI_PLL
 static int dpi_set_dsi_clk(enum omap_channel channel, bool is_tft,
 		unsigned long pck_req, unsigned long *pck)
 {
@@ -86,7 +86,6 @@ static int dpi_set_dsi_clk(enum omap_channel channel, bool is_tft,
 
 	return 0;
 }
-#else /* #ifdef CONFIG_OMAP2_DSS_USE_DSI_PLL */
 static int dpi_set_dispc_clk(enum omap_channel channel,
 		bool is_tft, unsigned long pck_req, unsigned long *pck)
 {
@@ -124,7 +123,6 @@ static int dpi_set_dispc_clk(enum omap_channel channel,
 
 	return 0;
 }
-#endif /* CONFIG_OMAP2_DSS_USE_DSI_PLL */
 
 static int dpi_set_mode(struct omap_dss_device *dssdev)
 {
@@ -132,7 +130,15 @@ static int dpi_set_mode(struct omap_dss_device *dssdev)
 	unsigned long pck = 0;
 	unsigned long cache_req_pck = 0;
 	bool is_tft;
-	int r = 0;
+	int r = 0, lcd_channel_ix = 0;
+	int use_dsi_for_hdmi = 0;
+
+	if (strncmp("hdmi", dssdev->name, 4) == 0)
+		use_dsi_for_hdmi = 1;
+	if (dssdev->channel == OMAP_DSS_CHANNEL_LCD2)
+		lcd_channel_ix = 1;
+
+	dss_clk_enable(DSS_CLK_ICK | DSS_CLK_FCK1);
 
 	dispc_set_pol_freq(dssdev->channel, dssdev->panel.config,
 				dssdev->panel.acbi, dssdev->panel.acb);
@@ -140,8 +146,18 @@ static int dpi_set_mode(struct omap_dss_device *dssdev)
 	is_tft = (dssdev->panel.config & OMAP_DSS_LCD_TFT) != 0;
 
 #ifdef CONFIG_OMAP2_DSS_USE_DSI_PLL
-	r = dpi_set_dsi_clk(dssdev->channel, is_tft,
+	if (use_dsi_for_hdmi)
+		r = dpi_set_dsi_clk(lcd_channel_ix, is_tft,
 			t->pixel_clock * 1000, &pck);
+	else {
+		cache_req_pck = dss_get_cache_req_pck();
+		if (cache_req_pck)
+			r = dpi_set_dispc_clk(dssdev->channel, is_tft,
+					cache_req_pck, &pck);
+		else
+			r = dpi_set_dispc_clk(dssdev->channel, is_tft,
+					t->pixel_clock * 1000, &pck);
+	}
 #else /* #ifdef CONFIG_OMAP2_DSS_USE_DSI_PLL */
 	cache_req_pck = dss_get_cache_req_pck();
 	if (cache_req_pck)
@@ -151,22 +167,23 @@ static int dpi_set_mode(struct omap_dss_device *dssdev)
 		r = dpi_set_dispc_clk(dssdev->channel, is_tft,
 				t->pixel_clock * 1000, &pck);
 #endif /* CONFIG_OMAP2_DSS_USE_DSI_PLL */
-	if (r)
-		return r;
 
-	pck /= 1000;
+	if (!r) {
+		pck /= 1000;
 
-	if (pck != t->pixel_clock) {
-		DSSWARN("Could not find exact pixel clock. "
+		if (pck != t->pixel_clock) {
+			DSSWARN("Could not find exact pixel clock. "
 				"Requested %d kHz, got %lu kHz\n",
 				t->pixel_clock, pck);
 
-		t->pixel_clock = pck;
+			t->pixel_clock = pck;
+		}
+
+		dispc_set_lcd_timings(dssdev->channel, t);
 	}
 
-	dispc_set_lcd_timings(dssdev->channel, t);
-
-	return 0;
+	dss_clk_disable(DSS_CLK_ICK | DSS_CLK_FCK1);
+	return r;
 }
 
 static void dpi_basic_init(struct omap_dss_device *dssdev)
@@ -201,11 +218,22 @@ static void dpi_start_auto_update(struct omap_dss_device *dssdev)
 int omapdss_dpi_display_enable(struct omap_dss_device *dssdev)
 {
 	int r;
+	int lcd_channel_ix = 1;
+	int use_dsi_for_hdmi = 0;
 
 	if (cpu_is_omap44xx() && dssdev->channel != OMAP_DSS_CHANNEL_LCD2) {
 		/* Only LCD2 channel is connected to DPI on OMAP4 */
 		return -EINVAL;
 	}
+
+	if (strncmp("hdmi", dssdev->name, 4) == 0)
+		use_dsi_for_hdmi = 1;
+
+	if (dssdev->channel == OMAP_DSS_CHANNEL_LCD2) {
+		DSSINFO("Lcd channel index 1");
+		lcd_channel_ix = 1;
+	} else
+		lcd_channel_ix = 0;
 
 	r = omap_dss_start_device(dssdev);
 	if (r) {
@@ -213,10 +241,20 @@ int omapdss_dpi_display_enable(struct omap_dss_device *dssdev)
 		return r;
 	}
 
-	if (cpu_is_omap34xx() && !cpu_is_omap3630()) {
+	if (use_dsi_for_hdmi && cpu_is_omap34xx()) {
+		if (dpi.vdds_dsi_reg == NULL) {
+			dpi.vdds_dsi_reg = dss_get_vdds_dsi();
+			if (dpi.vdds_dsi_reg == NULL)
+				DSSERR("%s %s (%d) dss_get_vdds_dsi() FAILED\n",
+						__func__, dssdev->name,
+						__LINE__);
+		}
 		r = regulator_enable(dpi.vdds_dsi_reg);
-		if (r)
+		if (r) {
+			DSSERR("%s %s (%d) regulator_enable() FAILED\n",
+					__func__, dssdev->name, __LINE__);
 			goto err0;
+		}
 	}
 
 	/* turn on clock(s) */
@@ -225,12 +263,25 @@ int omapdss_dpi_display_enable(struct omap_dss_device *dssdev)
 		dss_clk_enable(DSS_CLK_ICK | DSS_CLK_FCK1);
 	dss_mainclk_state_enable();
 
+	if (cpu_is_omap34xx()) {
+		if (dssdev->manager == NULL)
+			dss_recheck_connections(dssdev, true);
+	}
+
 	dpi_basic_init(dssdev);
 
 #ifdef CONFIG_OMAP2_DSS_USE_DSI_PLL
-	r = dsi_pll_init(dssdev, 0, 1);
-	if (r)
-		goto err1;
+	if (use_dsi_for_hdmi) {
+		dss_clk_enable(DSS_CLK_FCK2);
+
+
+		if (cpu_is_omap3630())
+			r = dsi_pll_init(dssdev, 1, 1);
+		else
+			r = dsi_pll_init(dssdev, 0, 1);
+		if (r)
+			goto err1;
+	}
 #endif /* CONFIG_OMAP2_DSS_USE_DSI_PLL */
 
 	r = dpi_set_mode(dssdev);
@@ -246,18 +297,29 @@ int omapdss_dpi_display_enable(struct omap_dss_device *dssdev)
 		dssdev->manager->enable(dssdev->manager);
 	}
 
+	/* This is done specifically for HDMI panel
+	 * Default HDMI panel timings may not work for all monitors
+	 * Reset HDMI panel timings after enabling HDMI.
+	 */
+	if (use_dsi_for_hdmi)
+		dpi_set_timings(dssdev, &dssdev->panel.timings);
+
 	return 0;
 
 err2:
 #ifdef CONFIG_OMAP2_DSS_USE_DSI_PLL
-	dsi_pll_uninit(dssdev->channel == OMAP_DSS_CHANNEL_LCD ? DSI1 : DSI2);
+	if (use_dsi_for_hdmi) {
+		dsi_pll_uninit((dssdev->channel == OMAP_DSS_CHANNEL_LCD) ?
+						DSI1 : DSI2);
+		dss_clk_disable(DSS_CLK_FCK2);
+	}
 err1:
 #endif
 	dssdev->state = OMAP_DSS_DISPLAY_DISABLED;
 	if (!cpu_is_omap44xx())
 		dss_clk_disable(DSS_CLK_ICK | DSS_CLK_FCK1);
 	dss_mainclk_state_disable(true);
-	if (cpu_is_omap34xx() && !cpu_is_omap3630())
+	if (use_dsi_for_hdmi && cpu_is_omap34xx())
 		regulator_disable(dpi.vdds_dsi_reg);
 err0:
 	omap_dss_stop_device(dssdev);
@@ -267,19 +329,31 @@ EXPORT_SYMBOL(omapdss_dpi_display_enable);
 
 void omapdss_dpi_display_disable(struct omap_dss_device *dssdev)
 {
+	int use_dsi_for_hdmi = 0;
+
 	if (dssdev->manager)
 		dssdev->manager->disable(dssdev->manager);
 
-#ifdef HWMOD
+	if (strncmp("hdmi", dssdev->name, 4) == 0)
+		use_dsi_for_hdmi = 1;
+
+	if (dssdev->state == OMAP_DSS_DISPLAY_DISABLED)
+		return;
+
 #ifdef CONFIG_OMAP2_DSS_USE_DSI_PLL
 	{
 		enum omap_dsi_index ix;
 
 		ix = (dssdev->channel == OMAP_DSS_CHANNEL_LCD) ? DSI1 : DSI2;
 		dss_select_dispc_clk_source(ix, DSS_SRC_DSS1_ALWON_FCLK);
-		dsi_pll_uninit(ix);
+		dispc_go(ix);
+		while (dispc_go_busy(ix))
+			;
+		if (use_dsi_for_hdmi) {
+			dsi_pll_uninit(ix);
+			dss_clk_disable(DSS_CLK_FCK2);
+		}
 	}
-#endif
 #endif
 
 	/* cut clock(s) */
@@ -288,7 +362,7 @@ void omapdss_dpi_display_disable(struct omap_dss_device *dssdev)
 		dss_clk_disable(DSS_CLK_ICK | DSS_CLK_FCK1);
 	dss_mainclk_state_disable(true);
 
-	if (cpu_is_omap34xx() && !cpu_is_omap3630())
+	if (use_dsi_for_hdmi && cpu_is_omap34xx())
 		regulator_disable(dpi.vdds_dsi_reg);
 
 	omap_dss_stop_device(dssdev);
