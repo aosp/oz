@@ -24,7 +24,8 @@ void config_wlan_mux(void)
 {
 	/* WLAN PW_EN and IRQ */
 	omap_mux_init_gpio(ZOOM2_WIFI_PMENA_GPIO, OMAP_PIN_OUTPUT);
-	omap_mux_init_gpio(ZOOM2_WIFI_IRQ_GPIO, OMAP_PIN_INPUT);
+	omap_mux_init_gpio(ZOOM2_WIFI_IRQ_GPIO, OMAP_PIN_INPUT |
+				OMAP_PIN_OFF_WAKEUPENABLE);
 
 	/* MMC3 */
 	omap_mux_init_signal("etk_clk.sdmmc3_clk", OMAP_PIN_INPUT_PULLUP);
