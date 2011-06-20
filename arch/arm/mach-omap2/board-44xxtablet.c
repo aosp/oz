@@ -270,17 +270,27 @@ static void __init sdp4430_init_display_led(void)
 	twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x30, TWL6030_TOGGLE3);
 }
 
+/*
+* Recalculation of brightness in new range using formula:
+* MIN_BRIGHT, MAX_BRIGHT - brightness range (changes form 0 to 127).
+*/
+
+#define MIN_BRIGHT	112
+#define MAX_BRIGHT	0
+
 static void sdp4430_set_primary_brightness(u8 brightness)
 {
 	if (brightness > 1) {
-		if (brightness == 255)
-			brightness = 0x7f;
-		else
-			brightness = (~(brightness/2)) & 0x7f;
+		s32 new_brightness = ((MAX_BRIGHT -
+					     MIN_BRIGHT) << 8) * brightness;
+		new_brightness += ((MIN_BRIGHT) << 16);
+		new_brightness >>= 16;
+
+		brightness = (u8)new_brightness;
 
 		twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x30, TWL6030_TOGGLE3);
 		twl_i2c_write_u8(TWL_MODULE_PWM, brightness, LED_PWM2ON);
-	} else if (brightness <= 1) {
+	} else {
 		twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x08, TWL6030_TOGGLE3);
 		twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x38, TWL6030_TOGGLE3);
 	}
