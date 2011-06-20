@@ -180,8 +180,8 @@ int cpuidle_enable_device(struct cpuidle_device *dev)
 	}
 	dev->last_residency = 0;
 	dev->last_state = NULL;
-	/* by default keep it disabled */
-	dev->enable_state = 0;
+	/* enable state by default */
+	dev->enable_state = 1;
 
 	smp_wmb();
 
