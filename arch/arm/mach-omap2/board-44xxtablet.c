@@ -791,7 +791,7 @@ static struct omap_musb_board_data musb_board_data = {
 #elif defined(CONFIG_USB_GADGET_MUSB_HDRC)
 	.mode			= MUSB_PERIPHERAL,
 #endif
-	.power			= 100,
+	.power			= 200,
 };
 
 static int wifi_set_power(struct device *dev, int slot, int power_on, int vdd)
