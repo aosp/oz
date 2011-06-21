@@ -1046,7 +1046,7 @@ static int __devexit twl_remove(struct i2c_client *client)
 static void _init_twl6030_settings(void)
 {
 	/* unmask PREQ transition */
-	twl_i2c_write_u8(TWL6030_MODULE_ID0, 0xE0, 0x20);
+	twl_i2c_write_u8(TWL6030_MODULE_ID0, 0xC0, 0x20);
 
 	/* USB_VBUS_CTRL_CLR */
 	twl_i2c_write_u8(TWL6030_MODULE_ID1, 0xFF, 0x05);
@@ -1077,12 +1077,18 @@ static void _init_twl6030_settings(void)
 	twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x21, 0xEA);
 
 	/* SYSEN_CFG_TRANS */
-	if (!cpu_is_omap446x()) {
-		twl_i2c_write_u8(TWL6030_MODULE_ID0, 0x01, 0xB3);
-		twl_i2c_write_u8(TWL6030_MODULE_ID0, 0x01, 0xB4);
+	twl_i2c_write_u8(TWL6030_MODULE_ID0, 0x01, 0xB3);
+	twl_i2c_write_u8(TWL6030_MODULE_ID0, 0x01, 0xB4);
+	if (!cpu_is_omap446x())
 		twl_i2c_write_u8(TWL6030_MODULE_ID0, 0x20, 0xB5);
+	/*
+	 * 4460: Disassociate VMEM and VCORE3 from all power group
+	 * (APP, CON,MOD). VMEM and VCORE3 not populated for 4460.
+	 */
+	if (cpu_is_omap446x()) {
+		twl_i2c_write_u8(TWL6030_MODULE_ID0, 0x00, 0x5E);
+		twl_i2c_write_u8(TWL6030_MODULE_ID0, 0x00, 0x64);
 	}
-
 	/* TMP */
 	twl_i2c_write_u8(TWL6030_MODULE_ID0, 0x01, 0xCE);
 	twl_i2c_write_u8(TWL6030_MODULE_ID0, 0x01, 0xCF);
