@@ -27,6 +27,7 @@
 #include <plat/prcm.h>
 #include <plat/irqs.h>
 #include <plat/control.h>
+#include <plat/sram.h>
 
 #include "clock.h"
 #include "clock2xxx.h"
@@ -534,6 +535,8 @@ void omap_prcm_arch_reset(char mode, const char *cmd)
 		 * cf. OMAP34xx TRM, Initialization / Software Booting
 		 * Configuration. */
 		omap_writel(l, OMAP343X_SCRATCHPAD + 4);
+
+		omap3_configure_core_dpll_warmreset();
 	} else if (cpu_is_omap44xx()) {
 		omap4_clk_prepare_for_reboot();
 		omap4_prm_global_sw_reset(cmd); /* never returns */
