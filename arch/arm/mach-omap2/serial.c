@@ -830,11 +830,19 @@ static void omap_uart_idle_init(struct omap_uart_state *uart)
 		switch (uart->num) {
 		case 0:
 			wk_mask = OMAP3430_ST_UART1_MASK;
+#if defined(CONFIG_MACH_OMAP_ZOOM3)
+			padconf = 0;  /*For ZOOM3 Modem unwanted RX_WAKEUP*/
+#else
 			padconf = 0x182;
+#endif
 			break;
 		case 1:
 			wk_mask = OMAP3430_ST_UART2_MASK;
+#if defined(CONFIG_MACH_OMAP_ZOOM3)
+			padconf = 0x174;  /*For ZOOM3 CTS_WAKEUP*/
+#else
 			padconf = 0x17a;
+#endif
 			break;
 		case 2:
 			wk_mask = OMAP3430_ST_UART3_MASK;
