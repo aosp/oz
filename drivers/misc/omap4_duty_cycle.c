@@ -199,7 +199,9 @@ static ssize_t show_nitro_interval(struct device *dev,
 {
 	int ret;
 
-	mutex_lock_interruptible(&mutex_duty);
+	ret = mutex_lock_interruptible(&mutex_duty);
+	if (ret)
+		return ret;
 	ret = sprintf(buf, "%u\n", nitro_interval);
 	mutex_unlock(&mutex_duty);
 
@@ -212,12 +214,17 @@ static ssize_t store_nitro_interval(struct device *dev,
 					size_t count)
 {
 	unsigned long val;
+	int ret;
 
-	strict_strtoul(buf, 0, &val);
+	ret = strict_strtoul(buf, 0, &val);
+	if (ret)
+		return ret;
 	if (val == 0)
 		return -EINVAL;
 
-	mutex_lock_interruptible(&mutex_duty);
+	ret = mutex_lock_interruptible(&mutex_duty);
+	if (ret)
+		return ret;
 	nitro_interval = val;
 	mutex_unlock(&mutex_duty);
 
@@ -231,7 +238,9 @@ static ssize_t show_nitro_percentage(struct device *dev,
 {
 	int ret;
 
-	mutex_lock_interruptible(&mutex_duty);
+	ret = mutex_lock_interruptible(&mutex_duty);
+	if (ret)
+		return ret;
 	ret = sprintf(buf, "%u\n", nitro_percentage);
 	mutex_unlock(&mutex_duty);
 
@@ -244,12 +253,17 @@ static ssize_t store_nitro_percentage(struct device *dev,
 					size_t count)
 {
 	unsigned long val;
+	int ret;
 
-	strict_strtoul(buf, 0, &val);
+	ret = strict_strtoul(buf, 0, &val);
+	if (ret)
+		return ret;
 	if (val == 0)
 		return -EINVAL;
 
-	mutex_lock_interruptible(&mutex_duty);
+	ret = mutex_lock_interruptible(&mutex_duty);
+	if (ret)
+		return ret;
 	nitro_percentage = val;
 	mutex_unlock(&mutex_duty);
 
@@ -263,7 +277,9 @@ static ssize_t show_nitro_rate(struct device *dev,
 {
 	int ret;
 
-	mutex_lock_interruptible(&mutex_duty);
+	ret = mutex_lock_interruptible(&mutex_duty);
+	if (ret)
+		return ret;
 	ret = sprintf(buf, "%u\n", nitro_rate);
 	mutex_unlock(&mutex_duty);
 
@@ -276,12 +292,17 @@ static ssize_t store_nitro_rate(struct device *dev,
 					size_t count)
 {
 	unsigned long val;
+	int ret;
 
-	strict_strtoul(buf, 0, &val);
+	ret = strict_strtoul(buf, 0, &val);
+	if (ret)
+		return ret;
 	if (val == 0)
 		return -EINVAL;
 
-	mutex_lock_interruptible(&mutex_duty);
+	ret = mutex_lock_interruptible(&mutex_duty);
+	if (ret)
+		return ret;
 	nitro_rate = val;
 	mutex_unlock(&mutex_duty);
 
@@ -295,7 +316,9 @@ static ssize_t show_cooling_rate(struct device *dev,
 {
 	int ret;
 
-	mutex_lock_interruptible(&mutex_duty);
+	ret = mutex_lock_interruptible(&mutex_duty);
+	if (ret)
+		return ret;
 	ret = sprintf(buf, "%u\n", cooling_rate);
 	mutex_unlock(&mutex_duty);
 
@@ -308,12 +331,17 @@ static ssize_t store_cooling_rate(struct device *dev,
 					size_t count)
 {
 	unsigned long val;
+	int ret;
 
-	strict_strtoul(buf, 0, &val);
+	ret = strict_strtoul(buf, 0, &val);
+	if (ret)
+		return ret;
 	if (val == 0)
 		return -EINVAL;
 
-	mutex_lock_interruptible(&mutex_duty);
+	ret = mutex_lock_interruptible(&mutex_duty);
+	if (ret)
+		return ret;
 	cooling_rate = val;
 	mutex_unlock(&mutex_duty);
 
