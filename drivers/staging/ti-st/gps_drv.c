@@ -380,12 +380,18 @@ int gpsdrv_release(struct inode *inod, struct file *file)
 	 */
 	tasklet_disable(&hgps->gpsdrv_tx_tsklet);
 	tasklet_kill(&hgps->gpsdrv_tx_tsklet);
-	/* Cleat registered bit if already registered */
+	/* Clear registered bit if already registered */
 	if (test_and_clear_bit(GPS_ST_REGISTERED, &hgps->state)) {
 		if (st_unregister(&gpsdrv_proto) < 0) {
 			GPSDRV_ERR(" st_unregister failed");
-			/* Re-Enable the task-let if un-register fails */
-			tasklet_enable(&hgps->gpsdrv_tx_tsklet);
+			/* Reset Tx count value and st_write function pointer */
+			hgps->tx_count = 0;
+			hgps->st_write = NULL;
+
+			skb_queue_purge(&hgps->rx_list);
+			skb_queue_purge(&hgps->tx_list);
+			kfree(hgps);
+			file->private_data = NULL;
 			return GPS_ERR_FAILURE;
 		}
 	}
