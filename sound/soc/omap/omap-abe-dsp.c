@@ -2223,6 +2223,14 @@ static int aess_resume(struct device *dev)
 
 static int omap_pm_abe_get_dev_context_loss_count(struct device *dev)
 {
+	/*
+	 * Workaround: It forced ABE to make updating Firmware all the time during "Open" operation.
+	 * It added, because in current implementation we can't get right value of
+	 * context/memory lost flag.
+	 */
+#ifdef CONFIG_PM_DEBUG
+	return (abe->loss_count + 1);
+#else
 	int ret;
 
 	ret = prm_read_mod_reg(abe_pwrdm->prcm_offs,
@@ -2239,6 +2247,7 @@ static int omap_pm_abe_get_dev_context_loss_count(struct device *dev)
 			abe_pwrdm->context_offset);
 
 	return ret;
+#endif
 }
 
 #else
