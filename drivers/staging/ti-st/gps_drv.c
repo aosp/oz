@@ -548,7 +548,7 @@ ssize_t gpsdrv_write(struct file *file, const char __user *data,
 	}
 
 
-	skb = alloc_skb(size + GPS_CH9_PKT_HDR_SIZE, GFP_ATOMIC);
+	skb = alloc_skb(size + GPS_CH9_PKT_HDR_SIZE, GFP_KERNEL);
 	/* Validate Created SKB */
 	if (NULL == skb) {
 		GPSDRV_ERR("Error aaloacting SKB");
