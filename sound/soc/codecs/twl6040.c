@@ -115,7 +115,7 @@ static const u8 twl6040_reg[TWL6040_CACHEREGNUM] = {
 	0x00, /* TWL6040_HSLCTL		0x10	*/
 	0x00, /* TWL6040_HSRCTL		0x11	*/
 	0xFF, /* TWL6040_HSGAIN		0x12	*/
-	0x1E, /* TWL6040_EARCTL		0x13	*/
+	0x3E, /* TWL6040_EARCTL		0x13	*/
 	0x00, /* TWL6040_HFLCTL		0x14	*/
 	0x1D, /* TWL6040_HFLGAIN	0x15	*/
 	0x00, /* TWL6040_HFRCTL		0x16	*/
@@ -1012,17 +1012,17 @@ static int twl6040_mute(struct snd_soc_dai *codec_dai, int mute)
 						TWL6040_REG_HSGAIN);
 			twl6040_write(codec, TWL6040_REG_HSGAIN, 0xFF);
 			/* earpiece */
-			priv->ear_gain = twl6040_read_reg_cache(codec,
-						TWL6040_REG_EARCTL) >> 1;
 			data = twl6040_read_reg_volatile(codec,
-						TWL6040_REG_EARCTL) & 0x01;
+						TWL6040_REG_EARCTL);
+			priv->ear_gain = (data >> 1) & 0x0F;
+			data &= 0x21;
 			twl6040_write(codec, TWL6040_REG_EARCTL, data | 0x1E);
 		} else {
 			/* headset */
 			twl6040_write(codec, TWL6040_REG_HSGAIN, priv->hs_gain);
 			/* earpiece */
 			data = twl6040_read_reg_volatile(codec,
-						TWL6040_REG_EARCTL) & 0x01;
+						TWL6040_REG_EARCTL) & 0x21;
 			twl6040_write(codec, TWL6040_REG_EARCTL,
 				      data | (priv->ear_gain << 1));
 		}
