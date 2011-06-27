@@ -482,7 +482,7 @@ void omap_sram_idle(void)
 						OMAP3430_GR_MOD,
 						OMAP3_PRM_VOLTCTRL_OFFSET);
 			omap3_core_save_context();
-			omap3_prcm_save_context();
+			omap3_cm_save_context();
 
 			if (omap_rev() < OMAP3630_REV_ES1_2)
 				/* Save MUSB context */
@@ -535,7 +535,7 @@ void omap_sram_idle(void)
 		core_prev_state = pwrdm_read_prev_pwrst(core_pwrdm);
 		if (core_prev_state == PWRDM_POWER_OFF) {
 			omap3_core_restore_context();
-			omap3_prcm_restore_context();
+			omap3_cm_restore_context();
 			omap3_sram_restore_context();
 			omap2_sms_restore_context();
 
