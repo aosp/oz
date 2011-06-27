@@ -96,6 +96,14 @@ config TIWLAN_SDIO
         help
            Say Y here if you want to be able to use TI's WLAN device using the
            SDIO interface. If unsure, say N.
+
+config TIWLAN_127x
+	bool "TI WLAN 127x chip select"
+	depends on WIFI_CONTROL_FUNC
+	default n
+	help
+	   Say Y here if you want to select TI's WLAN 127x device.If unsure, say N.
+
 config TIWLAN_MMC_CONTROLLER
         int "MMC Controller number that TI WLAN chip is connected to"
         range 1 5
