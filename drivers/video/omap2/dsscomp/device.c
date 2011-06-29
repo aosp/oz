@@ -81,6 +81,12 @@ static long setup_mgr(struct dsscomp_dev *cdev,
 	dev = cdev->displays[d->mgr.ix];
 	if (!dev)
 		return -EINVAL;
+
+	/* HACK: prevent executing IOCTL when driver in suspend mode to avoid
+		kernel crash */
+	if (dev->state != OMAP_DSS_DISPLAY_ACTIVE)
+		return -EINVAL;
+
 	mgr = dev->manager;
 	if (!mgr)
 		return -ENODEV;
@@ -184,6 +190,12 @@ static long check_ovl(struct dsscomp_dev *cdev,
 	dev = cdev->displays[chk->mgr.ix];
 	if (!dev)
 		return -EINVAL;
+
+	/* HACK: prevent executing IOCTL when driver in suspend mode to avoid
+		kernel crash */
+	if (dev->state != OMAP_DSS_DISPLAY_ACTIVE)
+		return -EINVAL;
+
 	mgr = dev->manager;
 
 	/* check manager setup - OMAP4 only for now */
