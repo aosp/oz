@@ -2667,7 +2667,7 @@ static int omap_hsmmc_remove(struct platform_device *pdev)
 				host->adma_table, host->phy_adma_table);
 
 		mmc_host_disable(host->mmc);
-		pm_runtime_disable(host->dev);
+		pm_runtime_suspend(host->dev);
 
 		clk_put(host->fclk);
 		clk_put(host->iclk);
@@ -2687,51 +2687,6 @@ static int omap_hsmmc_remove(struct platform_device *pdev)
 	platform_set_drvdata(pdev, NULL);
 
 	return 0;
-}
-
-
-static void omap_hsmmc_shutdown(struct platform_device *pdev)
-{
-	struct omap_hsmmc_host *host = platform_get_drvdata(pdev);
-	struct resource *res;
-
-	if (host) {
-		mmc_host_enable(host->mmc);
-
-		mmc_remove_host(host->mmc);
-		if (host->use_reg)
-			omap_hsmmc_reg_put(host);
-		if (host->pdata->cleanup)
-			host->pdata->cleanup(&pdev->dev);
-		free_irq(host->irq, host);
-		if (mmc_slot(host).card_detect_irq)
-			free_irq(mmc_slot(host).card_detect_irq, host);
-		flush_scheduled_work();
-
-		if (host->adma_table != NULL)
-			dma_free_coherent(NULL, ADMA_TABLE_SZ,
-				host->adma_table, host->phy_adma_table);
-
-		mmc_host_disable(host->mmc);
-		pm_runtime_disable(host->dev);
-
-		clk_put(host->fclk);
-		clk_put(host->iclk);
-		if (host->got_dbclk) {
-			clk_disable(host->dbclk);
-			clk_put(host->dbclk);
-		}
-
-		mmc_free_host(host->mmc);
-		iounmap(host->base);
-		omap_hsmmc_gpio_free(pdev->dev.platform_data);
-	}
-
-	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	if (res)
-		release_mem_region(res->start, res->end - res->start + 1);
-	platform_set_drvdata(pdev, NULL);
-
 }
 
 #ifdef CONFIG_PM
@@ -2875,7 +2830,6 @@ static struct dev_pm_ops omap_hsmmc_dev_pm_ops = {
 
 static struct platform_driver omap_hsmmc_driver = {
 	.remove		= omap_hsmmc_remove,
-	.shutdown	= omap_hsmmc_shutdown,
 	.driver		= {
 		.name = DRIVER_NAME,
 		.owner = THIS_MODULE,
