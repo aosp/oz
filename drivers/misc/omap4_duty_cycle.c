@@ -30,6 +30,8 @@
 #include <linux/mutex.h>
 #include <linux/platform_device.h>
 
+#include <plat/omap_device.h>
+
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Eduardo Valentin <eduardo.valentin@ti.com>");
 MODULE_DESCRIPTION("Module to control max opp duty cycle");
@@ -370,6 +372,9 @@ static struct notifier_block omap4_duty_nb = {
 static int __init omap4_duty_module_init(void)
 {
 	int err = 0;
+
+	if (!cpu_is_omap443x())
+		return 0;
 
 	if ((!nitro_interval) || (nitro_percentage > 100) ||
 		(nitro_percentage <= 0) || (nitro_rate <= 0) ||
