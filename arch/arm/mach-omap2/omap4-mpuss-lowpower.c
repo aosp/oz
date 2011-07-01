@@ -743,6 +743,8 @@ cpu_prepare:
 		 * Enable GIC distributor
 		 */
 		if (!wakeup_cpu) {
+			if (cpu_is_omap446x())
+				disable_gd = 1;
 			if (omap_type() != OMAP2_DEVICE_TYPE_GP) {
 				omap4_secure_dispatcher(0x21, 4, 0, 0, 0, 0, 0);
 				restore_ivahd_tesla_regs();

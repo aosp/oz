@@ -17,6 +17,7 @@ extern u32 enable_off_mode;
 extern u32 volt_off_mode;
 extern u32 sleep_while_idle;
 extern u32 omap4_device_off_counter;
+extern u32 disable_gd;
 
 extern void *omap3_secure_ram_storage;
 extern void omap3_pm_off_mode_enable(int);

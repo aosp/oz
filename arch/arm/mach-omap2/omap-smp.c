@@ -27,9 +27,12 @@
 #include <mach/omap4-common.h>
 #include <plat/clockdomain.h>
 
+/*
+ * GIC distibutor disable flag (omap4460)
+ */
+u32 disable_gd = 1;
 /* SCU base address */
 void __iomem *scu_base;
-
 /*
  * Use SCU config register to count number of cores
  */
@@ -112,7 +115,11 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
 		 * 2) CPU1 must re-enable the GIC distributor on
 		 * it's wakeup path.
 		 */
-		disable_gic_distributor();
+		if (cpu_is_omap446x()) {
+			disable_gic_distributor();
+			disable_gd = 0;
+		}
+
 		omap2_clkdm_wakeup(cpu1_clkdm);
 		smp_cross_call(cpumask_of(cpu));
 	} else {
