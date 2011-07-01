@@ -211,45 +211,34 @@ static struct tf_shmem_desc *tf_get_shmem_from_block_handle(
  */
 void tf_crypto_lock_hwa(u32 hwa_id, bool do_lock)
 {
-	int is_sem = 0;
 	struct semaphore *s = NULL;
-	struct mutex *m = NULL;
 	struct tf_device *dev = tf_get_device();
 
-	dprintk(KERN_INFO "tf_crypto_lock_hwa:hwa_id=0x%04X do_lock=%d\n",
-		hwa_id, do_lock);
+	dprintk(KERN_INFO "[pid=%d] %s: hwa_id=0x%04X do_lock=%d\n",
+		current->pid, __func__, hwa_id, do_lock);
 
 	switch (hwa_id) {
 	case RPC_AES1_CODE:
 		s = &dev->aes1_sema;
-		is_sem = 1;
 		break;
 	case RPC_DES_CODE:
-		m = &dev->des_mutex;
+		s = &dev->des_sema;
 		break;
 	default:
 	case RPC_SHA_CODE:
-		m = &dev->sha_mutex;
+		s = &dev->sha_sema;
 		break;
 	}
 
 	if (do_lock == LOCK_HWA) {
 		dprintk(KERN_INFO "tf_crypto_lock_hwa: "
 			"Wait for HWAID=0x%04X\n", hwa_id);
-		if (is_sem) {
-			while (down_trylock(s))
-				cpu_relax();
-		} else {
-			while (!mutex_trylock(m))
-				cpu_relax();
-		}
+		while (down_trylock(s))
+			cpu_relax();
 		dprintk(KERN_INFO "tf_crypto_lock_hwa: "
 			"Locked on HWAID=0x%04X\n", hwa_id);
 	} else {
-		if (is_sem)
-			up(s);
-		else
-			mutex_unlock(m);
+		up(s);
 		dprintk(KERN_INFO "tf_crypto_lock_hwa: "
 			"Released for HWAID=0x%04X\n", hwa_id);
 	}
@@ -293,8 +282,8 @@ u32 tf_crypto_init(void)
 
 	/*initialize the HWA semaphores */
 	sema_init(&dev->aes1_sema, 1);
-	mutex_init(&dev->des_mutex);
-	mutex_init(&dev->sha_mutex);
+	sema_init(&dev->des_sema, 1);
+	sema_init(&dev->sha_sema, 1);
 
 	/*initialize the current key handle loaded in the AESn/DES HWA */
 	dev->aes1_key_context = 0;

@@ -167,8 +167,7 @@ static struct aes_hwa_ctx *aes_ctx;
  *Forward declarations
  *------------------------------------------------------------------------- */
 
-static bool tf_aes_update_dma(u8 *src, u8 *dest,
-					u32 nb_blocks);
+static bool tf_aes_update_dma(u8 *src, u8 *dest, u32 nb_blocks, bool is_kernel);
 
 /*----------------------------------------------------------------------------
  *Save HWA registers into the specified operation state structure
@@ -176,8 +175,8 @@ static bool tf_aes_update_dma(u8 *src, u8 *dest,
 static void tf_aes_save_registers(
 	struct tf_crypto_aes_operation_state *aes_state)
 {
-	dprintk(KERN_INFO "tf_aes_save_registers: \
-		aes_state(%p) <- paes_reg(%p): CTRL=0x%08x\n",
+	dprintk(KERN_INFO "tf_aes_save_registers: "
+		"aes_state(%p) <- paes_reg(%p): CTRL=0x%08x\n",
 		aes_state, paes_reg, aes_state->CTRL);
 
 	/*Save the IV if we are in CBC or CTR mode (not required for ECB) */
@@ -197,8 +196,8 @@ static void tf_aes_restore_registers(
 {
 	struct tf_device *dev = tf_get_device();
 
-	dprintk(KERN_INFO "tf_aes_restore_registers: \
-		paes_reg(%p) <- aes_state(%p): CTRL=0x%08x\n",
+	dprintk(KERN_INFO "tf_aes_restore_registers: "
+		"paes_reg(%p) <- aes_state(%p): CTRL=0x%08x\n",
 		paes_reg, aes_state, aes_state->CTRL);
 
 	if (aes_state->key_is_public) {
@@ -271,6 +270,7 @@ bool tf_aes_update(struct tf_crypto_aes_operation_state *aes_state,
 	u8 *process_src;
 	u8 *process_dest;
 	u32 dma_use = PUBLIC_CRYPTO_DMA_USE_NONE;
+	bool is_kernel = false;
 
 	/*
 	 *Choice of the processing type
@@ -278,12 +278,15 @@ bool tf_aes_update(struct tf_crypto_aes_operation_state *aes_state,
 	if (nb_blocks * AES_BLOCK_SIZE >= DMA_TRIGGER_IRQ_AES)
 			dma_use = PUBLIC_CRYPTO_DMA_USE_IRQ;
 
-	dprintk(KERN_INFO "tf_aes_update: \
-		src=0x%08x, dest=0x%08x, nb_blocks=0x%08x, dma_use=0x%08x\n",
+	dprintk(KERN_INFO "tf_aes_update: "
+		"src=0x%08x, dest=0x%08x, nb_blocks=0x%08x, dma_use=0x%08x\n",
 		(unsigned int)src,
 		(unsigned int)dest,
 		(unsigned int)nb_blocks,
 		(unsigned int)dma_use);
+
+	if (aes_state->key_is_public)
+		is_kernel = true;
 
 	if (nb_blocks == 0) {
 		dprintk(KERN_INFO "tf_aes_update: Nothing to process\n");
@@ -302,18 +305,15 @@ bool tf_aes_update(struct tf_crypto_aes_operation_state *aes_state,
 
 	if (dma_use == PUBLIC_CRYPTO_DMA_USE_IRQ) {
 		/* Perform the update with DMA */
-		if (!tf_aes_update_dma(src, dest, nb_blocks))
+		if (!tf_aes_update_dma(src, dest, nb_blocks, is_kernel))
 			return false;
 	} else {
 		u8 buf[DMA_TRIGGER_IRQ_AES];
-		int is_kernel = 0;
 
 		/*
 		 * Synchronous Linux crypto API buffers are mapped in kernel
 		 * space
 		 */
-		if (aes_state->key_is_public)
-			is_kernel = 1;
 
 		if (is_kernel) {
 			process_src = src;
@@ -336,8 +336,8 @@ bool tf_aes_update(struct tf_crypto_aes_operation_state *aes_state,
 				(u32 *)&paes_reg->AES_CTRL,
 				AES_CTRL_INPUT_READY_BIT) !=
 					PUBLIC_CRYPTO_OPERATION_SUCCESS)
-					panic("Wait too long for AES hardware \
-					accelerator Input data to be ready\n");
+					panic("Wait too long for AES hardware "
+					"accelerator Input data to be ready\n");
 
 			/* We copy the 16 bytes of data src->reg */
 			temp = (u32) BYTES_TO_LONG(process_src);
@@ -398,7 +398,7 @@ bool tf_aes_update(struct tf_crypto_aes_operation_state *aes_state,
  *                     | PUBLIC_CRYPTO_DMA_USE_POLLING (poll the end of DMA)
  *output: dest : pointer of the output data (can be eq to src)
  */
-static bool tf_aes_update_dma(u8 *src, u8 *dest, u32 nb_blocks)
+static bool tf_aes_update_dma(u8 *src, u8 *dest, u32 nb_blocks, bool is_kernel)
 {
 	/*
 	 *Note: The DMA only sees physical addresses !
@@ -414,7 +414,8 @@ static bool tf_aes_update_dma(u8 *src, u8 *dest, u32 nb_blocks)
 	struct tf_device *dev = tf_get_device();
 
 	dprintk(KERN_INFO
-		"tf_aes_update_dma: In=0x%08x, Out=0x%08x, Len=%u\n",
+		"%s: In=0x%08x, Out=0x%08x, Len=%u\n",
+		__func__,
 		(unsigned int)src,
 		(unsigned int)dest,
 		(unsigned int)length);
@@ -460,11 +461,16 @@ static bool tf_aes_update_dma(u8 *src, u8 *dest, u32 nb_blocks)
 		 * buffer which has correct properties from efficient DMA
 		 * transfers.
 		 */
-		if (copy_from_user(dev->dma_buffer, src, length_loop)) {
-			omap_free_dma(dma_ch0);
-			omap_free_dma(dma_ch1);
-			mutex_unlock(&dev->sm.dma_mutex);
-			return false;
+		if (!is_kernel) {
+			if (copy_from_user(
+				 dev->dma_buffer, src, length_loop)) {
+				omap_free_dma(dma_ch0);
+				omap_free_dma(dma_ch1);
+				mutex_unlock(&dev->sm.dma_mutex);
+				return false;
+			}
+		} else {
+			memcpy(dev->dma_buffer, src, length_loop);
 		}
 
 		/*DMA1: Mem -> AES */
@@ -479,8 +485,7 @@ static bool tf_aes_update_dma(u8 *src, u8 *dest, u32 nb_blocks)
 		ch0_parameters.dst_amode = OMAP_DMA_AMODE_CONSTANT;
 		ch0_parameters.src_or_dst_synch = OMAP_DMA_DST_SYNC;
 
-		dprintk(KERN_INFO "tf_aes_update_dma: \
-				omap_set_dma_params(ch0)\n");
+		dprintk(KERN_INFO "%s: omap_set_dma_params(ch0)\n", __func__);
 		omap_set_dma_params(dma_ch0, &ch0_parameters);
 
 		omap_set_dma_src_burst_mode(dma_ch0, OMAP_DMA_DATA_BURST_8);
@@ -499,8 +504,7 @@ static bool tf_aes_update_dma(u8 *src, u8 *dest, u32 nb_blocks)
 		ch1_parameters.dst_amode = OMAP_DMA_AMODE_POST_INC;
 		ch1_parameters.src_or_dst_synch = OMAP_DMA_SRC_SYNC;
 
-		dprintk(KERN_INFO "tf_aes_update_dma: \
-			omap_set_dma_params(ch1)\n");
+		dprintk(KERN_INFO "%s: omap_set_dma_params(ch1)\n", __func__);
 		omap_set_dma_params(dma_ch1, &ch1_parameters);
 
 		omap_set_dma_src_burst_mode(dma_ch1, OMAP_DMA_DATA_BURST_8);
@@ -510,16 +514,16 @@ static bool tf_aes_update_dma(u8 *src, u8 *dest, u32 nb_blocks)
 		wmb();
 
 		dprintk(KERN_INFO
-			"tf_aes_update_dma: Start DMA channel %d\n",
-			(unsigned int)dma_ch1);
+			"%s: Start DMA channel %d\n",
+			__func__, (unsigned int)dma_ch1);
 		tf_dma_start(dma_ch1, OMAP_DMA_BLOCK_IRQ);
 		dprintk(KERN_INFO
-			"tf_aes_update_dma: Start DMA channel %d\n",
-			(unsigned int)dma_ch0);
+			"%s: Start DMA channel %d\n",
+			__func__, (unsigned int)dma_ch0);
 		tf_dma_start(dma_ch0, OMAP_DMA_BLOCK_IRQ);
 
 		dprintk(KERN_INFO
-			"tf_aes_update_dma: Waiting for IRQ\n");
+			"%s: Waiting for IRQ\n", __func__);
 		tf_dma_wait(2);
 
 		/*Unset DMA synchronisation requests */
@@ -537,11 +541,16 @@ static bool tf_aes_update_dma(u8 *src, u8 *dest, u32 nb_blocks)
 
 		/*The DMA output is in the preallocated aligned buffer
 		 *and needs to be copied to the output buffer.*/
-		if (copy_to_user(dest, dev->dma_buffer, length_loop)) {
-			omap_free_dma(dma_ch0);
-			omap_free_dma(dma_ch1);
-			mutex_unlock(&dev->sm.dma_mutex);
-			return false;
+		if (!is_kernel) {
+			if (copy_to_user(
+				dest, dev->dma_buffer, length_loop)) {
+				omap_free_dma(dma_ch0);
+				omap_free_dma(dma_ch1);
+				mutex_unlock(&dev->sm.dma_mutex);
+				return false;
+			}
+		} else {
+			memcpy(dest, dev->dma_buffer, length_loop);
 		}
 
 		src += length_loop;
@@ -558,7 +567,7 @@ static bool tf_aes_update_dma(u8 *src, u8 *dest, u32 nb_blocks)
 
 	mutex_unlock(&dev->sm.dma_mutex);
 
-	dprintk(KERN_INFO "tf_aes_update_dma: Success\n");
+	dprintk(KERN_INFO "%s: Success\n", __func__);
 
 	return true;
 }
@@ -1015,8 +1024,11 @@ static int aes_sync_operate(struct blkcipher_desc *desc,
 	}
 
 	while ((nbytes = walk.nbytes)) {
-		tf_aes_update(state, walk.src.virt.addr,
-			walk.dst.virt.addr, nbytes / AES_BLOCK_SIZE);
+		if (!tf_aes_update(state, walk.src.virt.addr,
+			walk.dst.virt.addr, nbytes / AES_BLOCK_SIZE)) {
+			err = -EINVAL;
+			break;
+		}
 
 		/* tf_aes_update processes all the data */
 		nbytes = 0;
@@ -1048,7 +1060,7 @@ static int aes_sync_encrypt(struct blkcipher_desc *desc,
 
 	state->CTRL |= AES_CTRL_DIRECTION_ENCRYPT;
 
-	dprintk(KERN_INFO "aes_sync_encrypt\n");
+	dprintk(KERN_INFO "aes_sync_encrypt nbytes=0x%x\n", nbytes);
 
 	return aes_sync_operate(desc, dst, src, nbytes);
 }

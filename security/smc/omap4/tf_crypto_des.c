@@ -109,8 +109,8 @@ static void tf_des_save_registers(u32 DES_CTRL,
 static void tf_des_restore_registers(u32 DES_CTRL,
 	struct tf_crypto_des_operation_state *des_state)
 {
-	dprintk(KERN_INFO "tf_des_restore_registers from \
-		des_state=%p CTRL=0x%08x\n",
+	dprintk(KERN_INFO "tf_des_restore_registers from "
+		"des_state=%p CTRL=0x%08x\n",
 		des_state, DES_CTRL);
 
 	/*Write the IV ctx->reg */
@@ -159,8 +159,8 @@ bool tf_des_update(u32 DES_CTRL,
 	if (nb_blocks * DES_BLOCK_SIZE >= DMA_TRIGGER_IRQ_DES)
 		dma_use = PUBLIC_CRYPTO_DMA_USE_IRQ;
 
-	dprintk(KERN_INFO "tf_des_update: \
-		src=0x%08x, dest=0x%08x, nb_blocks=0x%08x, dma_use=0x%08x\n",
+	dprintk(KERN_INFO "tf_des_update: "
+		"src=0x%08x, dest=0x%08x, nb_blocks=0x%08x, dma_use=0x%08x\n",
 		(unsigned int)src, (unsigned int)dest,
 		(unsigned int)nb_blocks, (unsigned int)dma_use);
 
@@ -203,8 +203,8 @@ bool tf_des_update(u32 DES_CTRL,
 				(u32 *)&des_reg->DES_CTRL,
 				DES_CTRL_INPUT_READY_BIT) !=
 					PUBLIC_CRYPTO_OPERATION_SUCCESS) {
-				panic("Wait too long for DES HW \
-					accelerator Input data to be ready\n");
+				panic("Wait too long for DES HW "
+					"accelerator Input data to be ready\n");
 			}
 
 			/*We copy the 8 bytes of data src->reg */
@@ -330,8 +330,7 @@ static bool tf_des_update_dma(u8 *src, u8 *dest, u32 nb_blocks)
 		ch0_parameters.src_or_dst_synch = OMAP_DMA_DST_SYNC;
 
 		dprintk(KERN_INFO
-			"tf_des_update_dma: \
-			omap_set_dma_params(ch0)\n");
+			"tf_des_update_dma: omap_set_dma_params(ch0)\n");
 		omap_set_dma_params(dma_ch0, &ch0_parameters);
 
 		/* DMA2: DES -> Mem */
@@ -346,8 +345,8 @@ static bool tf_des_update_dma(u8 *src, u8 *dest, u32 nb_blocks)
 		ch1_parameters.dst_amode = OMAP_DMA_AMODE_POST_INC;
 		ch1_parameters.src_or_dst_synch = OMAP_DMA_SRC_SYNC;
 
-		dprintk(KERN_INFO "tf_des_update_dma: \
-			omap_set_dma_params(ch1)\n");
+		dprintk(KERN_INFO "tf_des_update_dma: "
+			"omap_set_dma_params(ch1)\n");
 		omap_set_dma_params(dma_ch1, &ch1_parameters);
 
 		wmb();

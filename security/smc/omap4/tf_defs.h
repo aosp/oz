@@ -27,7 +27,6 @@
 #include <linux/completion.h>
 #include <linux/list.h>
 #include <linux/spinlock.h>
-#include <linux/sysdev.h>
 #include <linux/sysfs.h>
 #include <linux/sched.h>
 #include <linux/semaphore.h>
@@ -293,11 +292,6 @@ struct tf_device {
 	dev_t dev_number;
 
 	/*
-	 * Interfaces the system device with the kernel.
-	 */
-	struct sys_device sysdev;
-
-	/*
 	 * Interfaces the char device with the kernel.
 	 */
 	struct cdev cdev;
@@ -319,8 +313,8 @@ struct tf_device {
 
 	/* Object used to serialize HWA accesses */
 	struct semaphore aes1_sema;
-	struct mutex des_mutex;
-	struct mutex sha_mutex;
+	struct semaphore des_sema;
+	struct semaphore sha_sema;
 
 	/*
 	 * An aligned and correctly shaped pre-allocated buffer used for DMA
@@ -360,14 +354,6 @@ struct tf_device {
 
 	struct tf_device_stats stats;
 };
-
-/* the bits of the flags field of the tf_device structure */
-#define TF_DEVICE_FLAG_CDEV_INITIALIZED              (0)
-#define TF_DEVICE_FLAG_SYSDEV_CLASS_REGISTERED       (1)
-#define TF_DEVICE_FLAG_SYSDEV_REGISTERED             (2)
-#define TF_DEVICE_FLAG_CDEV_REGISTERED               (3)
-#define TF_DEVICE_FLAG_CDEV_ADDED                    (4)
-#define TF_DEVICE_SYSFS_REGISTERED                   (5)
 
 /*----------------------------------------------------------------------------*/
 /*

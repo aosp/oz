@@ -177,7 +177,7 @@ u32 omap4_secure_dispatcher(u32 app_id, u32 flags, u32 nargs,
 	pub2sec_args[4] = arg4;
 
 	/* Make sure parameters are visible to the secure world */
-	dmac_clean_range((void *)pub2sec_args,
+	dmac_flush_range((void *)pub2sec_args,
 		(void *)(((u32)(pub2sec_args)) + 5*sizeof(u32)));
 	outer_clean_range(__pa(pub2sec_args),
 		__pa(pub2sec_args) + 5*sizeof(u32));
@@ -244,7 +244,7 @@ int tf_schedule_secure_world(struct tf_comm *comm, bool prepare_exit)
 		dprintk(KERN_ERR "Service End ret=%X\n", ret);
 
 		if (ret == 0) {
-			dmac_inv_range((void *)comm->init_shared_buffer,
+			dmac_flush_range((void *)comm->init_shared_buffer,
 				(void *)(((u32)(comm->init_shared_buffer)) +
 					PAGE_SIZE));
 			outer_inv_range(__pa(comm->init_shared_buffer),
@@ -365,7 +365,7 @@ static u32 tf_rpc_init(struct tf_comm *comm)
 
 	spin_lock(&(comm->lock));
 
-	dmac_inv_range((void *)comm->init_shared_buffer,
+	dmac_flush_range((void *)comm->init_shared_buffer,
 		(void *)(((u32)(comm->init_shared_buffer)) + PAGE_SIZE));
 	outer_inv_range(__pa(comm->init_shared_buffer),
 		__pa(comm->init_shared_buffer) +  PAGE_SIZE);
@@ -444,7 +444,7 @@ int tf_rpc_execute(struct tf_comm *comm)
 
 		case RPC_CMD_TRACE:
 			rpc_error = RPC_NON_YIELD;
-			g_RPC_parameters[0] = tf_rpc_trace(comm);;
+			g_RPC_parameters[0] = tf_rpc_trace(comm);
 			break;
 
 		default:
@@ -845,17 +845,17 @@ int tf_start(struct tf_comm *comm,
 	/*
 	 * Make sure all data is visible to the secure world
 	 */
-	dmac_clean_range((void *)init_shared_buffer,
+	dmac_flush_range((void *)init_shared_buffer,
 		(void *)(((u32)init_shared_buffer) + PAGE_SIZE));
 	outer_clean_range(__pa(init_shared_buffer),
 		__pa(init_shared_buffer) + PAGE_SIZE);
 
-	dmac_clean_range((void *)pa_buffer,
+	dmac_flush_range((void *)pa_buffer,
 		(void *)(pa_buffer + pa_size));
 	outer_clean_range(__pa(pa_buffer),
 		__pa(pa_buffer) + pa_size);
 
-	dmac_clean_range((void *)&pa_info,
+	dmac_flush_range((void *)&pa_info,
 		(void *)(((u32)&pa_info) + sizeof(struct tf_ns_pa_info)));
 	outer_clean_range(__pa(&pa_info),
 		__pa(&pa_info) + sizeof(struct tf_ns_pa_info));
@@ -875,7 +875,8 @@ int tf_start(struct tf_comm *comm,
 	tf_set_current_time(comm);
 
 	/* Workaround for issue #6081 */
-	disable_nonboot_cpus();
+	if ((omap_rev() && 0xFFF000FF) == OMAP443X_CLASS)
+		disable_nonboot_cpus();
 
 	/*
 	 * Start the SMC PA
@@ -914,7 +915,7 @@ loop:
 			break;
 
 		case RPC_CMD_TRACE:
-			g_RPC_parameters[0] = tf_rpc_trace(comm);;
+			g_RPC_parameters[0] = tf_rpc_trace(comm);
 			break;
 
 		default:
@@ -951,13 +952,15 @@ loop:
 	#endif
 
 	/* Workaround for issue #6081 */
-	enable_nonboot_cpus();
+	if ((omap_rev() && 0xFFF000FF) == OMAP443X_CLASS)
+		enable_nonboot_cpus();
 
 	goto exit;
 
 error2:
 	/* Workaround for issue #6081 */
-	enable_nonboot_cpus();
+	if ((omap_rev() && 0xFFF000FF) == OMAP443X_CLASS)
+		enable_nonboot_cpus();
 
 	spin_lock(&(comm->lock));
 	l1_shared_buffer = comm->pBuffer;

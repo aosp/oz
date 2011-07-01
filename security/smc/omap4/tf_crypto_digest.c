@@ -362,8 +362,8 @@ bool tf_digest_update(struct tf_crypto_sha_operation_state *sha_state,
 			if (sha_state->chunk_length + data_length >
 					HASH_BLOCK_BYTES_LENGTH) {
 				/*Should never be in this case !!! */
-			panic("tf_digest_update: chunk_length + \
-				data_length > HASH_BLOCK_BYTES_LENGTH\n");
+			panic("tf_digest_update: chunk_length data_length > "
+				"HASH_BLOCK_BYTES_LENGTH\n");
 			}
 
 			/*So we fill the chunk buffer with the new data to

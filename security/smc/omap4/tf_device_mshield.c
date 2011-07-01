@@ -66,14 +66,13 @@ static int tf_ctrl_check_omap_type(void)
 	/* No need to do anything on a GP device */
 	switch (omap_type()) {
 	case OMAP2_DEVICE_TYPE_GP:
-		printk(KERN_INFO "SMC: Running on a GP device, SMC disabled\n");
+		dprintk(KERN_INFO "SMC: Running on a GP device\n");
 		return 0;
 
 	case OMAP2_DEVICE_TYPE_EMU:
 	case OMAP2_DEVICE_TYPE_SEC:
 	/*case OMAP2_DEVICE_TYPE_TEST:*/
-		printk(KERN_INFO "SMC: Secure device detected, enabling SMC"
-			" driver\n");
+		dprintk(KERN_INFO "SMC: Running on a EMU or HS device\n");
 		return 1;
 
 	default:
@@ -311,6 +310,7 @@ int __init tf_ctrl_device_register(void)
 }
 
 static int __initdata smc_mem;
+static int __initdata smc_address;
 
 void __init tf_allocate_workspace(void)
 {
@@ -319,26 +319,32 @@ void __init tf_allocate_workspace(void)
 	if (tf_ctrl_check_omap_type() <= 0)
 		return;
 
-#if 0
-	if (smc_mem < 3)
-		smc_mem = 3;
+	dev->workspace_size = smc_mem;
+	if (dev->workspace_size < 3*SZ_1M)
+		dev->workspace_size = 3*SZ_1M;
 
-	dev->workspace_size = SZ_1M * smc_mem;
-	dev->workspace_addr = (u32) __pa(__alloc_bootmem(
-		dev->workspace_size, SZ_1M, __pa(MAX_DMA_ADDRESS)));
+	if (smc_address == 0)
+#if 0
+		dev->workspace_addr = (u32) __pa(__alloc_bootmem(
+			dev->workspace_size, SZ_1M, __pa(MAX_DMA_ADDRESS)));
 #else
-	smc_mem = 3;
-	dev->workspace_size = SZ_1M * smc_mem;
-	dev->workspace_addr = (u32) 0x9C900000;
+		dev->workspace_addr = (u32) 0x9C900000;
 #endif
-	printk(KERN_INFO "SMC: Allocated workspace of %dM at (0x%x)\n",
-		smc_mem,
+	else
+		dev->workspace_addr = smc_address;
+
+	pr_info("SMC: Allocated workspace of %x Bytes at (0x%x)\n",
+		dev->workspace_size,
 		dev->workspace_addr);
 }
 
 static int __init tf_mem_setup(char *str)
 {
-	get_option(&str, &smc_mem);
+	smc_mem = memparse(str, &str);
+	if (*str == '@') {
+		str += 1;
+		get_option(&str, &smc_address);
+	}
 	return 0;
 }
 

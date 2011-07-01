@@ -133,6 +133,11 @@ MODULE_PARM_DESC(soft_interrupt,
 static struct class *tf_class;
 #endif
 
+/*
+ * Interfaces the system device with the kernel.
+ */
+struct sys_device g_tf_sysdev;
+
 /*----------------------------------------------------------------------------
  * Global Variables
  *----------------------------------------------------------------------------*/
@@ -226,8 +231,8 @@ static int __init tf_device_register(void)
 	cdev_init(&dev->cdev, &g_tf_device_file_ops);
 	dev->cdev.owner = THIS_MODULE;
 
-	dev->sysdev.id = 0;
-	dev->sysdev.cls = &g_tf_device_sys_class;
+	g_tf_sysdev.id = 0;
+	g_tf_sysdev.cls = &g_tf_device_sys_class;
 
 	INIT_LIST_HEAD(&dev->connection_list);
 	spin_lock_init(&dev->connection_list_lock);
@@ -242,9 +247,13 @@ static int __init tf_device_register(void)
 
 	dev_stats->kobj_type.default_attrs =
 		dev_stats->kobj_attribute_list,
-	kobject_init_and_add(&(dev_stats->kobj),
+	error = kobject_init_and_add(&(dev_stats->kobj),
 		 &(dev_stats->kobj_type), NULL, "%s",
 		 TF_DEVICE_BASE_NAME);
+	if (error) {
+		kobject_put(&dev_stats->kobj);
+		goto kobject_init_and_add_failed;
+	}
 
 	/*
 	 * Register the system device.
@@ -258,7 +267,7 @@ static int __init tf_device_register(void)
 		goto sysdev_class_register_failed;
 	}
 
-	error = sysdev_register(&dev->sysdev);
+	error = sysdev_register(&g_tf_sysdev);
 	if (error != 0) {
 		dprintk(KERN_ERR "tf_device_register(): "
 			"sysdev_register failed (error %d)!\n",
@@ -339,10 +348,11 @@ init_failed:
 cdev_add_failed:
 	unregister_chrdev_region(dev->dev_number, 1);
 register_chrdev_region_failed:
-	sysdev_unregister(&(dev->sysdev));
+	sysdev_unregister(&g_tf_sysdev);
 sysdev_register_failed:
 	sysdev_class_unregister(&g_tf_device_sys_class);
 sysdev_class_register_failed:
+kobject_init_and_add_failed:
 	kobject_del(&g_tf_dev.stats.kobj);
 
 	dprintk(KERN_INFO "tf_device_register(): Failure (error %d)\n",
