@@ -181,17 +181,13 @@ static dsscomp_t find_dsscomp_obj(OMAPLFB_DEVINFO *psDevInfo)
 		struct omap_overlay_manager *manager;
 		struct omap_overlay *overlay;
 		dsscomp_t comp;
-		u32 sync_id;
 		/* Always get the first overlay, we are not supposed
 			to add more with sysfs */
 		overlay = ofbi->overlays[0];
 		manager = overlay->manager;
 		if (!manager)
 			return NULL;
-		sync_id = dsscomp_first_sync_id(manager);
-		if (!sync_id)
-			return NULL;
-		comp = dsscomp_find(manager, sync_id);
+		comp = dsscomp_find(manager);
 		if (comp)
 			return comp;
 	}
@@ -209,18 +205,19 @@ static void OMAPLFBFlipDSSComp(OMAPLFB_SWAPCHAIN *psSwapChain,
 	struct fb_info * framebuffer = psDevInfo->psLINFBInfo;
 	struct omapfb_info *ofbi = FB2OFB(framebuffer);
 	unsigned long fb_offset;
+	int i;
+	int r;
+	struct omap_overlay *overlay;
+	struct dss2_ovl_info dss2_ovl;
 
 	fb_offset = aPhyAddr - psDevInfo->sSystemBuffer.sSysAddr.uiAddr;
 
 	/* Only one overlay for the moment*/
 	if (ofbi->num_overlays > 0) {
-		int r;
-		struct omap_overlay *overlay;
-		struct dss2_ovl_info dss2_ovl;
-
+		i = 0;
 		/* Always get the first overlay, we are not supposed
 			to add more with sysfs */
-		overlay = ofbi->overlays[0];
+		overlay = ofbi->overlays[i];
 
 		if (comp)
 			r = dsscomp_get_ovl(comp, overlay->id, &dss2_ovl);
@@ -229,6 +226,7 @@ static void OMAPLFBFlipDSSComp(OMAPLFB_SWAPCHAIN *psSwapChain,
 
 		if (r) {
 			struct omap_overlay_info overlay_info;
+			struct omap_overlay_manager *manager;
 			WARNING_PRINTK("Ovl%d not found, updating manually",
 				overlay->id);
 			overlay->get_overlay_info(overlay, &overlay_info);
@@ -237,9 +235,20 @@ static void OMAPLFBFlipDSSComp(OMAPLFB_SWAPCHAIN *psSwapChain,
 			overlay_info.vaddr = framebuffer->screen_base +
 				fb_offset;
 			overlay->set_overlay_info(overlay, &overlay_info);
+			manager = overlay->manager;
+			if (manager) {
+				/* No display attached to ovl, don't update */
+				if (manager->device)
+					manager->apply(manager);
+			}
 		} else {
 			dss2_ovl.ba = framebuffer->fix.smem_start + fb_offset;
+			dss2_ovl.uv = framebuffer->screen_base + fb_offset;
 			dsscomp_set_ovl(comp, &dss2_ovl);
+			r = dsscomp_apply(comp);
+			if (r)
+				WARNING_PRINTK("Ovl%d apply failed, novls %d",
+					overlay->id, ofbi->num_overlays);
 		}
 
 		r = dsscomp_apply(comp);
