@@ -184,6 +184,10 @@ static long check_ovl(struct dsscomp_dev *cdev,
 	bool checked_vid = false, scale_ok = false;
 	struct dss2_ovl_cfg *c = &chk->ovl.cfg;
 
+	/*Substitute width with height when screen is in portrait mode*/
+	if (c->rotation % 2)
+		swap(c->win.w, c->win.h);
+
 	/* get display */
 	if (chk->mgr.ix >= cdev->num_displays)
 		return -EINVAL;
