@@ -76,6 +76,18 @@ static int vdd1_locked = 0;
 static int vdd2_locked = 0;
 static struct device sysfs_cpufreq_dev;
 
+int omap_get_vdd1_lock(void)
+{
+	return vdd1_locked;
+}
+EXPORT_SYMBOL(omap_get_vdd1_lock);
+
+int omap_get_vdd2_lock(void)
+{
+	return vdd2_locked;
+}
+EXPORT_SYMBOL(omap_get_vdd2_lock);
+
 static ssize_t vdd_opp_show(struct kobject *kobj, struct kobj_attribute *attr,
 			 char *buf)
 {
@@ -97,7 +109,7 @@ static ssize_t vdd_opp_store(struct kobject *kobj, struct kobj_attribute *attr,
 			  const char *buf, size_t n)
 {
 	unsigned long value;
-
+	static unsigned long prev_mpu_freq = 0;
 	if (sscanf(buf, "%lu", &value) != 1)
 		return -EINVAL;
 
@@ -106,12 +118,9 @@ static ssize_t vdd_opp_store(struct kobject *kobj, struct kobj_attribute *attr,
 		if (vdd1_locked) {
 			/* vdd1 currently locked */
 			if (value == 0) {
-				if (omap_pm_set_min_mpu_freq(&sysfs_cpufreq_dev, -1)) {
-					printk(KERN_ERR "%s: Failed to remove vdd1_lock\n", __func__);
-				} else {
-					vdd1_locked = 0;
-					return n;
-				}
+				omap_pm_cpu_set_freq(prev_mpu_freq * 1000);
+				vdd1_locked = 0;
+				return n;
 			} else {
 				printk(KERN_ERR "%s: vdd1 already locked to %d\n", __func__, vdd1_locked);
 				return -EINVAL;
@@ -136,11 +145,10 @@ static ssize_t vdd_opp_store(struct kobject *kobj, struct kobj_attribute *attr,
 					printk(KERN_ERR "%s: Invalid value [0..%d]\n", __func__, i-1);
 					return -EINVAL;
 				}
-				if (omap_pm_set_min_mpu_freq(&sysfs_cpufreq_dev, freq * 1000)) {
-					printk(KERN_ERR "%s: Failed to add vdd1_lock\n", __func__);
-				} else {
-					vdd1_locked = value;
-				}
+				prev_mpu_freq = omap_pm_cpu_get_freq();
+				omap_pm_cpu_set_freq(freq * 1000);
+				vdd1_locked = value;
+
 			} else {
 				printk(KERN_ERR "%s: vdd1 already unlocked\n", __func__);
 				return -EINVAL;
@@ -150,10 +158,12 @@ static ssize_t vdd_opp_store(struct kobject *kobj, struct kobj_attribute *attr,
 		if (vdd2_locked) {
 			/* vdd2 currently locked */
 			if (value == 0) {
-				if (omap_pm_set_min_bus_tput(&sysfs_cpufreq_dev, OCP_INITIATOR_AGENT, 0)) {
+				int tmp_lock = vdd2_locked;
+				vdd2_locked = 0;
+				if (omap_pm_set_min_bus_tput(&sysfs_cpufreq_dev, OCP_INITIATOR_AGENT, -1)) {
 					printk(KERN_ERR "%s: Failed to remove vdd2_lock\n", __func__);
+					vdd2_locked = tmp_lock; /* restore previous lock */
 				} else {
-					vdd2_locked = 0;
 					return n;
 				}
 			} else {
