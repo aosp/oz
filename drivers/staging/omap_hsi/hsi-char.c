@@ -517,8 +517,10 @@ static int __init hsi_char_init(void)
 	/*printk(KERN_DEBUG "%s, devname = %s\n", __func__, devname); */
 
 	ret = if_hsi_init(port, channels_map, num_channels);
-	if (ret)
+	if (ret < 0) {
+		pr_err("HSI character device: Failed to init HSI driver\n");
 		return ret;
+	}
 
 	ret = alloc_chrdev_region(&hsi_char_dev, 0, HSI_MAX_CHAR_DEVS,
 				  HSI_CHAR_DEVICE_NAME);
@@ -530,6 +532,7 @@ static int __init hsi_char_init(void)
 	cdev_init(&hsi_char_cdev, &hsi_char_fops);
 	ret = cdev_add(&hsi_char_cdev, hsi_char_dev, HSI_MAX_CHAR_DEVS);
 	if (ret < 0) {
+		unregister_chrdev_region(hsi_char_dev, HSI_MAX_CHAR_DEVS);
 		pr_err("HSI character device: Failed to add char device\n");
 		return ret;
 	}
