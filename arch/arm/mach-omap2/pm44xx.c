@@ -384,8 +384,7 @@ static irqreturn_t prcm_interrupt_handler (int irq, void *dev_id)
 		omap_writel(0xD, 0x48020054);
 
 		/* Modem HSI wakeup */
-		if (omap_hsi_is_io_wakeup_from_hsi())
-			omap_hsi_wakeup(0);
+		omap_hsi_io_wakeup_check();
 
 		/* usbhs remote wakeup */
 		usbhs_wakeup();
@@ -776,7 +775,7 @@ static void __init prcm_clear_statdep_regs(void)
 	/*
 	 * REVISIT: Seen SGX issues with MPU -> EMIF. Keeping
 	 * it enabled.
-	 * REVISIT: Seen issue with MPU/DSP -> L3_2 and L4CFG. 
+	 * REVISIT: Seen issue with MPU/DSP -> L3_2 and L4CFG.
 	 * Keeping them enabled
 	 */
 	/* MPU towards EMIF clockdomains */

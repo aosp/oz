@@ -390,7 +390,7 @@ static void hsi_do_channel_rx(struct hsi_channel *ch)
 				"WARNING: RX FIFO %d empty before CPU copy\n",
 				fifo);
 
-			/* Do not disable interrupt becaue another interrupt */
+			/* Do not disable interrupt because another interrupt */
 			/* can still come, this time with a real frame. */
 			return;
 		}
@@ -689,7 +689,7 @@ static void do_hsi_tasklet(unsigned long hsi_port)
 
 static irqreturn_t hsi_mpu_handler(int irq, void *p)
 {
-	struct hsi_port *pport = p;
+	struct hsi_port *pport = (struct hsi_port *) p;
 
 	/* Check no other interrupt handler has already scheduled the tasklet */
 	if (test_and_set_bit(HSI_FLAGS_TASKLET_LOCK, &pport->flags))
