@@ -259,7 +259,7 @@ static long wait(struct dsscomp_dev *cdev, struct dsscomp_wait_data *wd)
 		return -ENODEV;
 
 	/* get composition */
-	comp = ERR_PTR(-EINVAL);
+	comp = dsscomp_find(mgr);
 	if (IS_ERR(comp))
 		return 0;
 
