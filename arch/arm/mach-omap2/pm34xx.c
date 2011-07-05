@@ -393,7 +393,8 @@ void omap_sram_idle(void)
 	int mpu_next_state = PWRDM_POWER_ON;
 	int per_next_state = PWRDM_POWER_ON;
 	int core_next_state = PWRDM_POWER_ON;
-	int core_prev_state, per_prev_state;
+	int core_prev_state = PWRDM_POWER_ON;
+	int per_prev_state = PWRDM_POWER_ON;
 	u32 sdrc_pwr = 0;
 	int per_state_modified = 0;
 	int per_context_saved = 0;
@@ -568,6 +569,25 @@ void omap_sram_idle(void)
 		omap_uart_resume_idle(2);
 		per_prev_state = pwrdm_read_prev_pwrst(per_pwrdm);
 		omap2_gpio_resume_after_idle(per_context_saved);
+
+		/* Errata i582 */
+		if ((omap_rev() <= OMAP3630_REV_ES1_1) &&
+			omap_uart_check_per_uarts_used() &&
+			(core_prev_state == PWRDM_POWER_ON) &&
+			(per_prev_state == PWRDM_POWER_OFF)) {
+			/*
+			 * We dont seem to have a real recovery other than reset
+			 * Errata i582:Alternative available here is to do a
+			 * reboot OR go to per off/core off, we will just print
+			 * and cause uart to be in an unstable state and
+			 * continue on till we hit the next off transition.
+			 * Reboot of the device due to this corner case is
+			 * undesirable.
+			 */
+			if (omap_uart_per_errata())
+				pr_err("%s: PER UART hit with Errata i582 "
+					"Corner case.\n", __func__);
+		}
 
 		if (per_state_modified)
 			pwrdm_set_next_pwrst(per_pwrdm, PWRDM_POWER_OFF);
@@ -1217,6 +1237,7 @@ static int __init omap3_pm_init(void)
 
 		clkdm_add_wkdep(per_clkdm, core_clkdm);
 
+		/* Also part of fix for errata i582. */
 		wkup_clkdm = clkdm_lookup("wkup_clkdm");
 		if (wkup_clkdm)
 			clkdm_add_wkdep(per_clkdm, wkup_clkdm);

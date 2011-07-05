@@ -104,6 +104,10 @@ extern void omap_uart_prepare_suspend(void);
 extern void omap_uart_prepare_idle(int num);
 extern void omap_uart_resume_idle(int num);
 extern void omap_uart_enable_irqs(int enable);
+#ifdef CONFIG_PM
+extern int omap_uart_per_errata(void);
+extern int omap_uart_check_per_uarts_used(void);
+#endif
 #endif
 
 #endif

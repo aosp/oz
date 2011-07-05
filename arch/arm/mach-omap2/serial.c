@@ -316,6 +316,88 @@ static void omap_uart_restore_context(struct omap_uart_state *uart)
 
 	serial_write_reg(uart, UART_OMAP_MDR1, 0x00); /* UART 16x mode */
 }
+
+static inline int _is_per_uart(struct omap_uart_state *uart)
+{
+	if ((omap_rev() <= OMAP3630_REV_ES1_1) &&
+		(uart->num == 2 || uart->num == 3))
+		return 1;
+
+	return 0;
+}
+
+int omap_uart_check_per_uarts_used(void)
+{
+	struct omap_uart_state *uart;
+
+	list_for_each_entry(uart, &uart_list, node) {
+		if (_is_per_uart(uart))
+			return 1;
+	}
+	return 0;
+}
+
+/*
+ * Errata i582 affects PER UARTS..Loop back test is done to
+ * check the UART state when the corner case is encountered
+ */
+static int omap_uart_loopback_test(struct omap_uart_state *uart)
+{
+	u8 loopbk_rhr = 0;
+
+	omap_uart_save_context(uart);
+	serial_write_reg(uart, UART_OMAP_MDR1, 0x7);
+	serial_write_reg(uart, UART_LCR, 0xBF); /* Config B mode */
+	serial_write_reg(uart, UART_DLL, uart->dll);
+	serial_write_reg(uart, UART_DLM, uart->dlh);
+	serial_write_reg(uart, UART_LCR, 0x0); /* Operational mode */
+	/* configure uart3 in UART mode */
+	serial_write_reg(uart, UART_OMAP_MDR1, 0x00); /* UART 16x mode */
+	serial_write_reg(uart, UART_LCR, 0x80);
+	/* Enable internal loop back mode by setting MCR_REG[4].LOOPBACK_EN */
+	serial_write_reg(uart, UART_MCR, 0x10);
+
+	/* write to THR,read RHR and compare */
+	/* Tx output is internally looped back to Rx input in loop back mode */
+	serial_write_reg(uart, UART_LCR_DLAB, 0x00);
+	/* Enables write to THR and read from RHR */
+	serial_write_reg(uart, UART_TX, 0xCC); /* writing data to THR */
+	/* reading data from RHR */
+	loopbk_rhr = (serial_read_reg(uart, UART_RX) & 0xFF);
+	if (loopbk_rhr == 0xCC) {
+		/* compare passes,try comparing with different data */
+		serial_write_reg(uart, UART_TX, 0x69);
+		loopbk_rhr = (serial_read_reg(uart, UART_RX) & 0xFF);
+		if (loopbk_rhr == 0x69) {
+			/* compare passes,reset UART3 and re-configure module */
+			omap_uart_reset(uart);
+			omap_uart_restore_context(uart);
+			return 0;
+		}
+	} else {	/* requires warm reset */
+		return -ENODEV;
+	}
+	return 0;
+}
+
+int omap_uart_per_errata(void)
+{
+	struct omap_uart_state *uart;
+
+	/* For all initialised UART modules that are in PER domain
+	 * do loopback test
+	 */
+	list_for_each_entry(uart, &uart_list, node) {
+		if (_is_per_uart(uart)) {
+			if (omap_uart_loopback_test(uart))
+				return -ENODEV;
+			else
+				return 0;
+		}
+	}
+	return 0;
+}
+
 #else
 static inline void omap_uart_save_context(struct omap_uart_state *uart) {}
 static inline void omap_uart_restore_context(struct omap_uart_state *uart) {}
