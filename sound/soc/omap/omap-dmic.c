@@ -582,6 +582,7 @@ static __devinit int asoc_dmic_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, dmic);
 	dmic->dev = &pdev->dev;
 	dmic->link = &omap_dmic_link;
+	dmic->sysclk = OMAP_DMIC_SYSCLK_INIT;
 
 	spin_lock_init(&dmic->lock);
 
