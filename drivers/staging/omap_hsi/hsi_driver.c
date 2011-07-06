@@ -657,9 +657,11 @@ void hsi_clocks_disable_channel(struct device *dev, u8 channel_number,
 	if (hsi_is_hst_controller_busy(hsi_ctrl))
 		dev_warn(dev, "Disabling clocks with HST FSM not IDLE !\n");
 
+#ifdef CONFIG_PM
 	/* Allow Fclk to change */
 	if (dpll_cascading_blocker_release(dev) < 0)
 		dev_warn(dev, "Error releasing DPLL cascading constraint\n");
+#endif /* CONFIG_PM */
 
 #ifndef USE_PM_RUNTIME_FOR_HSI
 	hsi_runtime_suspend(dev);
@@ -703,10 +705,11 @@ int hsi_clocks_enable_channel(struct device *dev, u8 channel_number,
 		dev_dbg(dev, "Clocks already enabled, skipping...\n");
 		return -EEXIST;
 	}
-
+#ifdef CONFIG_PM
 	/* Prevent Fclk change */
 	if (dpll_cascading_blocker_hold(dev) < 0)
 		dev_warn(dev, "Error holding DPLL cascading constraint\n");
+#endif /* CONFIG_PM */
 
 #ifndef USE_PM_RUNTIME_FOR_HSI
 	omap_device_enable(pd);
