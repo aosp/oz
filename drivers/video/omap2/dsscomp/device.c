@@ -38,6 +38,8 @@
 
 #define MODULE_NAME	"dsscomp"
 
+#include <linux/fb.h>
+
 #include <plat/display.h>
 #include <video/dsscomp.h>
 #include <plat/dsscomp.h>
@@ -108,6 +110,17 @@ static long setup_mgr(struct dsscomp_dev *cdev,
 		oi->ba = hwc_virt_to_phys(addr);
 
 		r = r ? : dsscomp_set_ovl(comp, oi);
+
+		if (oi->cfg.ix == 0) {
+			/*
+			 * setup gfx pipe
+			 */
+			struct fb_info *framebuffer = registered_fb[0];
+			int fb_offset = 0;
+			oi->ba = framebuffer->fix.smem_start + fb_offset;
+			r = r ? : dsscomp_set_ovl(comp, oi);
+			d->mode = DSSCOMP_SETUP_APPLY;
+		}
 	}
 
 	r = r ? : dsscomp_setup(comp, d->mode, d->win);
