@@ -891,7 +891,7 @@ static struct omap_musb_board_data musb_board_data = {
 #elif defined(CONFIG_USB_GADGET_MUSB_HDRC)
 	.mode			= MUSB_PERIPHERAL,
 #endif
-	.power			= 100,
+	.power			= 200,
 };
 
 #ifndef CONFIG_TIWLAN_SDIO
