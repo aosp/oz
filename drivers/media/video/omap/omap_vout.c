@@ -40,6 +40,7 @@
 #include <linux/videodev2.h>
 #include <linux/slab.h>
 #include <linux/wait.h>
+#include <linux/delay.h>
 
 #ifndef CONFIG_ARCH_OMAP4
 #include <media/videobuf-dma-sg.h>
@@ -115,6 +116,7 @@ enum dma_channel_state {
 (cpu_is_omap3630() ? 200000 : 166000) : 0)
 
 #ifdef CONFIG_OMAP3_ISP_RESIZER_ON_OVERLAY
+extern void tick_nohz_disable(int nohz);
 struct isp_node pipe;
 static int vrfb_configured;
 #endif
@@ -3145,6 +3147,12 @@ static int vidioc_streamon(struct file *file, void *fh, enum v4l2_buf_type i)
 			pdata->set_min_bus_tput(
 				((vout->vid_dev)->v4l2_dev).dev ,
 					OCP_INITIATOR_AGENT, 166 * 1000 * 4);
+        }
+
+		if(!cpu_is_omap44xx()) {
+			tick_nohz_disable(1);
+			/* Wait for 2 vsyncs before start processing buffers */
+			 mdelay(32);
 		}
 	}
 #endif
@@ -3240,6 +3248,8 @@ static int vidioc_streamoff(struct file *file, void *fh, enum v4l2_buf_type i)
 		pdata->set_min_bus_tput(
 			((vout->vid_dev)->v4l2_dev).dev,
 				OCP_INITIATOR_AGENT, 0);
+
+	tick_nohz_disable(0);
 #endif
 
 finish:

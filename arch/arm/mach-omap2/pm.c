@@ -71,10 +71,13 @@ static struct kobj_attribute vdd2_lock_attr =
 	__ATTR(vdd2_lock, 0644, vdd_opp_show, vdd_opp_store);
 static struct kobj_attribute dsp_freq_attr =
 	__ATTR(dsp_freq, 0644, vdd_opp_show, vdd_opp_store);
+static struct kobj_attribute tick_control_attr =
+	__ATTR(tick, 0644, vdd_opp_show, vdd_opp_store);
 
 static int vdd1_locked = 0;
 static int vdd2_locked = 0;
 static struct device sysfs_cpufreq_dev;
+extern void tick_nohz_disable(int nohz);
 
 int omap_get_vdd1_lock(void)
 {
@@ -113,6 +116,12 @@ static ssize_t vdd_opp_store(struct kobject *kobj, struct kobj_attribute *attr,
 	if (sscanf(buf, "%lu", &value) != 1)
 		return -EINVAL;
 
+	if (attr == &tick_control_attr) {
+		if (value == 1)
+			tick_nohz_disable(1);
+		else if (value == 0)
+			tick_nohz_disable(0);
+	}
 	/* Check locks */
 	if (attr == &vdd1_lock_attr) {
 		if (vdd1_locked) {
@@ -337,6 +346,11 @@ static int __init omap2_common_pm_init(void)
 			printk(KERN_ERR "%s: sysfs_create_file(vdd2_lock) failed %d\n", __func__, error);
 			return error;
 		}
+        error = sysfs_create_file(power_kobj, &tick_control_attr.attr);
+        if (error) {
+            printk(KERN_ERR "%s: sysfs_create_file(tick_control) failed: %d\n", __func__, error);
+            return error;
+        }
 	}
 #endif
 
