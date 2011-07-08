@@ -98,7 +98,6 @@ static ssize_t overlay_manager_store(struct omap_overlay *ovl, const char *buf,
 	}
 
 	old_mgr = ovl->manager;
-
 	/* detach old manager */
 	if (old_mgr) {
 		r = ovl->unset_manager(ovl);

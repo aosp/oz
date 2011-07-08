@@ -245,7 +245,7 @@ static struct omap_dss_device *zoom_dss_devices[] = {
 #ifdef CONFIG_PANEL_SIL9022
 	&zoom_hdmi_device,
 #endif
-
+	&zoom_tv_device,
 };
 
 static struct omap_dss_board_info zoom_dss_data = {

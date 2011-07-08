@@ -1403,7 +1403,10 @@ static int omap_dss_mgr_apply(struct omap_overlay_manager *mgr)
 		oc->replication =
 			dss_use_replication(dssdev, ovl->info.color_mode);
 
-		oc->ilace = ovl->info.field;
+		if(dssdev->type == OMAP_DISPLAY_TYPE_VENC)
+			oc->ilace = 1;
+		else
+			oc->ilace = ovl->info.field;
 
 		oc->channel = ovl->manager->id;
 

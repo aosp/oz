@@ -323,6 +323,7 @@ enum dss_clk_source dss_get_lcd_clk_source(enum omap_dsi_index ix);
 
 void dss_set_venc_output(enum omap_dss_venc_type type);
 void dss_set_dac_pwrdn_bgz(bool enable);
+void dss_configure_venc(bool enable);
 
 unsigned long dss_get_dpll4_rate(void);
 int dss_calc_clock_rates(struct dss_clock_info *cinfo);

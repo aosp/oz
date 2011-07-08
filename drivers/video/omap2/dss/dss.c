@@ -682,6 +682,13 @@ void dss_switch_tv_hdmi(int hdmi)
 
 extern int dss_base_count;
 
+void dss_configure_venc(bool enable)
+{
+	REG_FLD_MOD(DSS_CONTROL, enable, 4, 4);	/* venc dac demen */
+	REG_FLD_MOD(DSS_CONTROL, enable, 3, 3);	/* venc clock 4x enable */
+	REG_FLD_MOD(DSS_CONTROL, 0, 2, 2);	/* venc clock mode = normal */
+}
+
 int dss_init(struct platform_device *pdev)
 {
 	int r = 0, dss_irq;
