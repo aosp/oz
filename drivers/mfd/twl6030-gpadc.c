@@ -36,6 +36,7 @@
 #include <linux/platform_device.h>
 #include <linux/miscdevice.h>
 #include <linux/slab.h>
+#include <linux/hwmon.h>
 #include <linux/hwmon-sysfs.h>
 #include <linux/i2c/twl.h>
 #include <linux/i2c/twl6030-gpadc.h>
@@ -517,11 +518,32 @@ out:
 }
 EXPORT_SYMBOL(twl6030_gpadc_conversion);
 
+/*
+ * sysfs hook function
+ */
+static ssize_t gpadc_read(struct device *dev,
+			 struct device_attribute *devattr, char *buf)
+{
+	struct sensor_device_attribute *attr = to_sensor_dev_attr(devattr);
+	struct twl6030_gpadc_request req;
+	long val;
+
+	req.channels = (1 << attr->index);
+	req.method = TWL6030_GPADC_SW2;
+	req.func_cb = NULL;
+	val = twl6030_gpadc_conversion(&req);
+	if (val < 0)
+		return val;
+
+	return sprintf(buf, "%d\n", req.rbuf[attr->index]);
+}
+
 #define in_gain(index) \
 static SENSOR_DEVICE_ATTR(in##index##_gain, S_IRUGO|S_IWUSR, show_gain, \
 	set_gain, index); \
 static SENSOR_DEVICE_ATTR(in##index##_offset, S_IRUGO|S_IWUSR, show_offset, \
-	set_offset, index)
+	set_offset, index); \
+static SENSOR_DEVICE_ATTR(in##index##_input, S_IRUGO, gpadc_read, NULL, index);
 
 in_gain(0);
 in_gain(1);
@@ -543,7 +565,8 @@ in_gain(16);
 
 #define IN_ATTRS(X)\
 	&sensor_dev_attr_in##X##_gain.dev_attr.attr,	\
-	&sensor_dev_attr_in##X##_offset.dev_attr.attr	\
+	&sensor_dev_attr_in##X##_offset.dev_attr.attr,	\
+	&sensor_dev_attr_in##X##_input.dev_attr.attr	\
 
 static struct attribute *twl6030_gpadc_attributes[] = {
 	IN_ATTRS(0),
@@ -621,12 +644,6 @@ static const struct file_operations twl6030_gpadc_fileops = {
 	.unlocked_ioctl = twl6030_gpadc_ioctl
 };
 
-static struct miscdevice twl6030_gpadc_device = {
-	.minor = MISC_DYNAMIC_MINOR,
-	.name = "twl6030-gpadc",
-	.fops = &twl6030_gpadc_fileops
-};
-
 static int __devinit twl6030_gpadc_probe(struct platform_device *pdev)
 {
 	struct twl6030_gpadc_data *gpadc;
@@ -637,6 +654,7 @@ static int __devinit twl6030_gpadc_probe(struct platform_device *pdev)
 	s32 offset_error;
 	u8 index;
 	int ret;
+	struct device *hwmon;
 
 	gpadc = kzalloc(sizeof *gpadc, GFP_KERNEL);
 	if (!gpadc)
@@ -648,11 +666,11 @@ static int __devinit twl6030_gpadc_probe(struct platform_device *pdev)
 		goto err_pdata;
 	}
 	gpadc->dev = &pdev->dev;
-
-	ret = misc_register(&twl6030_gpadc_device);
-	if (ret) {
-		dev_dbg(&pdev->dev, "could not register misc_device\n");
-		goto err_misc;
+	hwmon = hwmon_device_register(&pdev->dev);
+	if (IS_ERR(hwmon)) {
+		dev_err(&pdev->dev, "hwmon_device_register failed.\n");
+		ret = PTR_ERR(hwmon);
+		goto err_reg;
 	}
 
 	ret = request_irq(platform_get_irq(pdev, 0), twl6030_gpadc_irq_handler,
@@ -700,9 +718,8 @@ static int __devinit twl6030_gpadc_probe(struct platform_device *pdev)
 	return 0;
 
 err_irq:
-	misc_deregister(&twl6030_gpadc_device);
-
-err_misc:
+	hwmon_device_unregister(&pdev->dev);
+err_reg:
 err_pdata:
 	kfree(gpadc);
 
@@ -718,7 +735,7 @@ static int __devexit twl6030_gpadc_remove(struct platform_device *pdev)
 	free_irq(platform_get_irq(pdev, 0), gpadc);
 	sysfs_remove_group(&pdev->dev.kobj, &twl6030_gpadc_group);
 	cancel_work_sync(&gpadc->ws);
-	misc_deregister(&twl6030_gpadc_device);
+	hwmon_device_unregister(&pdev->dev);
 
 	return 0;
 }
