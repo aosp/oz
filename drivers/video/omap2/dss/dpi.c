@@ -346,9 +346,6 @@ void omapdss_dpi_display_disable(struct omap_dss_device *dssdev)
 
 		ix = (dssdev->channel == OMAP_DSS_CHANNEL_LCD) ? DSI1 : DSI2;
 		dss_select_dispc_clk_source(ix, DSS_SRC_DSS1_ALWON_FCLK);
-		dispc_go(ix);
-		while (dispc_go_busy(ix))
-			;
 		if (use_dsi_for_hdmi) {
 			dsi_pll_uninit(ix);
 			dss_clk_disable(DSS_CLK_FCK2);
