@@ -26,6 +26,7 @@
 #include <plat/display.h>
 #include <video/dsscomp.h>
 #include <plat/dsscomp.h>
+#include <mach/tiler.h>
 
 #include "dsscomp.h"
 
@@ -575,6 +576,7 @@ static void dsscomp_mgr_callback(void *data, int id, int status)
 {
 	struct dsscomp_data *comp = data;
 	u32 ix;
+	struct dss2_overlay *o, *o2;
 
 	/* do any other callbacks */
 	if (comp->cb.fn)
@@ -618,6 +620,10 @@ static void dsscomp_mgr_callback(void *data, int id, int status)
 		wake_up_interruptible_sync(&mgrq[ix].wq);
 	} else if (status & DSS_COMPLETION_RELEASED) {
 		/* composition is no longer displayed */
+		list_for_each_entry_safe(o, o2, &comp->ois, q) {
+			if (o->ovl.cfg.enabled)
+				tiler_set_buf_state(o->ovl.ba, TILBUF_FREE);
+		}
 		dsscomp_drop(comp);
 		refresh_masks(ix);
 	}
@@ -719,11 +725,9 @@ int dsscomp_apply(dsscomp_t comp)
 		}
 
 		r = set_dss_ovl_info(oi);
-done_ovl:
-		/* we no longer have use for the overlay info structs */
-		list_move(&o->q, &free_ois);
 	}
 
+done_ovl:
 	/*
 	 * set manager's info - this also sets the completion callback,
 	 * so if it succeeds, we will use the callback to complete the

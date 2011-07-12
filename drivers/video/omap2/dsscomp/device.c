@@ -42,6 +42,7 @@
 #include <video/dsscomp.h>
 #include <plat/dsscomp.h>
 #include "dsscomp.h"
+#include <mach/tiler.h>
 
 static u32 hwc_virt_to_phys(u32 arg)
 {
@@ -91,6 +92,13 @@ static long setup_mgr(struct dsscomp_dev *cdev,
 	if (!mgr)
 		return -ENODEV;
 
+	for (i = 1; i < d->num_ovls; i++) {
+		struct dss2_ovl_info *oi = d->ovls + i;
+		u32 addr = (u32) oi->address;
+		if (oi->cfg.enabled)
+			tiler_set_buf_state(hwc_virt_to_phys(addr),
+						TILBUF_BUSY);
+	}
 	comp = dsscomp_new_sync_id(mgr, d->sync_id);
 	if (IS_ERR(comp))
 		return PTR_ERR(comp);
