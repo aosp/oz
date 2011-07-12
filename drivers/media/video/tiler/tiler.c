@@ -104,6 +104,7 @@ struct mem_info {
 
 	struct list_head by_area;	/* blocks in the same area / 1D */
 	void *parent;			/* area info for 2D, else group info */
+	u8 state; /*state of the buffer, whether busy with display or not*/
 };
 
 struct __buf_info {
@@ -124,6 +125,13 @@ static struct tcm *tcm[TILER_FORMATS];
 static struct tmm *tmm[TILER_FORMATS];
 static u32 *dmac_va;
 static dma_addr_t dmac_pa;
+
+/*couldn't make waitQ process specific,
+* as the queue wakeup has to happen from kernel module
+* Limitation# the wait ioctl is expected to be used from only
+* one process and only one outstanding wait call at any time
+*/
+static wait_queue_head_t wq;
 
 #define TCM(fmt)        tcm[(fmt) - TILFMT_8BIT]
 #define TCM_SS(ssptr)   TCM(TILER_GET_ACC_MODE(ssptr))
@@ -369,6 +377,8 @@ static struct process_info *__get_pi(pid_t pid, bool kernel)
 	INIT_LIST_HEAD(&pi->groups);
 	INIT_LIST_HEAD(&pi->bufs);
 	list_add(&pi->list, &procs);
+	init_waitqueue_head(&wq);
+
 done:
 	if (pi && !kernel)
 		pi->refs++;
@@ -1395,6 +1405,23 @@ static s32 alloc_block(enum tiler_fmt fmt, u32 width, u32 height,
 			u32 align, u32 offs, u32 gid, struct process_info *pi,
 			u32 *sys_addr);
 
+static s32 wait_for_buf(struct __buf_info *_b)
+{
+	u32 timeout = usecs_to_jiffies(33*1000); /*delay before timing out */
+	mutex_lock(&mtx);
+	/*assumption# mi[0] of each buffer always points to Y block */
+	if (_b->mi[0]->state) {
+		mutex_unlock(&mtx);
+		timeout = wait_event_interruptible_timeout(wq,
+					!_b->mi[0]->state, timeout);
+		if (timeout <= 0)
+			return timeout ? : -ETIME;
+		mutex_lock(&mtx);
+	}
+	mutex_unlock(&mtx);
+	return 0;
+}
+
 static s32 tiler_ioctl(struct inode *ip, struct file *filp, u32 cmd,
 			unsigned long arg)
 {
@@ -1543,6 +1570,23 @@ static s32 tiler_ioctl(struct inode *ip, struct file *filp, u32 cmd,
 		if (copy_to_user((void __user *)arg, &block_info,
 			sizeof(block_info)))
 			return -EFAULT;
+		break;
+
+	case TILIOC_WAIT:
+		if (copy_from_user(&buf_info, (void __user *)arg,
+					sizeof(buf_info)))
+			return -EFAULT;
+		mutex_lock(&mtx);
+		/* buffer status check */
+		list_for_each_entry(_b, &pi->bufs, by_pid) {
+			if (buf_info.offset == _b->buf_info.offset) {
+				mutex_unlock(&mtx);
+				wait_for_buf(_b);
+				return 0;
+			}
+		}
+		mutex_unlock(&mtx);
+		return -EFAULT;
 		break;
 	default:
 		return -EINVAL;
@@ -1696,6 +1740,31 @@ int tiler_unreg_notifier(struct notifier_block *nb)
 	return blocking_notifier_chain_unregister(&tiler_device->notifier, nb);
 }
 EXPORT_SYMBOL(tiler_unreg_notifier);
+
+s32 tiler_set_buf_state(u32 ssptr, enum buf_state state)
+{
+	struct mem_info *mi = NULL;
+	struct tcm_pt pt;
+	if (get_area(ssptr, &pt))
+		return -EFAULT;
+
+	mutex_lock(&mtx);
+	list_for_each_entry(mi, &blocks, global) {
+		if (tcm_is_in(pt, mi->area)) {
+			if (state == TILBUF_BUSY)
+				mi->state++;
+			else if (state == TILBUF_FREE)
+				mi->state--;
+
+			if (mi->state == 0)
+				wake_up_interruptible_sync(&wq);
+			break;
+		}
+	}
+	mutex_unlock(&mtx);
+	return 0;
+}
+EXPORT_SYMBOL(tiler_set_buf_state);
 
 static void __exit tiler_exit(void)
 {
