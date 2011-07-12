@@ -57,6 +57,7 @@ module_param(nitro_rate, int, 0);
 static unsigned int cooling_rate = 1008000;
 module_param(cooling_rate, int, 0);
 
+static bool enabled;
 static int heating_budget;
 static int t_next_heating_end;
 
@@ -193,6 +194,10 @@ static int omap4_duty_frequency_change(struct notifier_block *nb,
 done:
 	return 0;
 }
+
+static struct notifier_block omap4_duty_nb = {
+	.notifier_call	= omap4_duty_frequency_change,
+};
 
 static ssize_t show_nitro_interval(struct device *dev,
 			struct device_attribute *devattr, char *buf)
@@ -350,11 +355,71 @@ static ssize_t store_cooling_rate(struct device *dev,
 static DEVICE_ATTR(cooling_rate, S_IRUGO | S_IWUSR, show_cooling_rate,
 							store_cooling_rate);
 
+static ssize_t show_enabled(struct device *dev,
+			struct device_attribute *devattr, char *buf)
+{
+	int ret;
+
+	ret = mutex_lock_interruptible(&mutex_duty);
+	if (ret)
+		return ret;
+	ret = sprintf(buf, "%u\n", (unsigned int)enabled);
+	mutex_unlock(&mutex_duty);
+
+	return ret;
+}
+
+static ssize_t store_enabled(struct device *dev,
+					struct device_attribute *attr,
+					const char *buf,
+					size_t count)
+{
+	unsigned long val;
+	int ret;
+
+	ret = strict_strtoul(buf, 0, &val);
+	if (ret)
+		return ret;
+
+	ret = mutex_lock_interruptible(&mutex_duty);
+	if (ret)
+		return ret;
+
+	if (enabled != (!!val)) {
+		enabled = !!val;
+		if (enabled) {
+			/* Register the cpufreq notification */
+			if (cpufreq_register_notifier(&omap4_duty_nb,
+						CPUFREQ_TRANSITION_NOTIFIER)) {
+				pr_err("%s: failed to setup cpufreq_notifier\n",
+							__func__);
+				mutex_unlock(&mutex_duty);
+				return -EINVAL;
+			}
+		} else {
+			cpufreq_unregister_notifier(&omap4_duty_nb,
+					CPUFREQ_TRANSITION_NOTIFIER);
+			cancel_delayed_work_sync(&work_exit_cool);
+			cancel_delayed_work_sync(&work_exit_heat);
+			cancel_delayed_work_sync(&work_enter_heat);
+			cancel_work_sync(&work_enter_cool0);
+			cancel_work_sync(&work_enter_cool1);
+		}
+		omap4_duty_enter_normal();
+	}
+
+	mutex_unlock(&mutex_duty);
+
+	return count;
+}
+static DEVICE_ATTR(enabled, S_IRUGO | S_IWUSR, show_enabled, store_enabled);
+
 static struct attribute *attrs[] = {
 	&dev_attr_nitro_interval.attr,
 	&dev_attr_nitro_percentage.attr,
 	&dev_attr_nitro_rate.attr,
 	&dev_attr_cooling_rate.attr,
+	&dev_attr_enabled.attr,
 	NULL,
 };
 
@@ -392,10 +457,6 @@ static struct platform_driver omap4_duty_driver = {
 	.remove		= __exit_p(omap4_duty_remove),
 };
 
-static struct notifier_block omap4_duty_nb = {
-	.notifier_call	= omap4_duty_frequency_change,
-};
-
 /* Module Interface */
 static int __init omap4_duty_module_init(void)
 {
@@ -417,6 +478,7 @@ static int __init omap4_duty_module_init(void)
 	INIT_WORK(&work_enter_cool0, omap4_duty_enter_c0_wq);
 	INIT_WORK(&work_enter_cool1, omap4_duty_enter_c1_wq);
 	heating_budget = NITRO_P(nitro_percentage, nitro_interval);
+	enabled = true;
 
 	/* Register the cpufreq notification */
 	if (cpufreq_register_notifier(&omap4_duty_nb,
