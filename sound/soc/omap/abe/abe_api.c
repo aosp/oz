@@ -157,12 +157,12 @@ int abe_reload_fw(void)
 	abe->dbg_activity_log_write_pointer = 0;
 	abe->irq_dbg_read_ptr = 0;
 	/* Restore Gains not managed by the drivers */
-	abe_write_gain(GAINS_SPLIT, GAIN_0dB, RAMP_100MS, GAIN_LEFT_OFFSET);
-	abe_write_gain(GAINS_SPLIT, GAIN_0dB, RAMP_100MS, GAIN_RIGHT_OFFSET);
-	abe_write_gain(GAINS_DL1, GAIN_0dB, RAMP_100MS, GAIN_LEFT_OFFSET);
-	abe_write_gain(GAINS_DL1, GAIN_0dB, RAMP_100MS, GAIN_RIGHT_OFFSET);
-	abe_write_gain(GAINS_DL2, GAIN_0dB, RAMP_100MS, GAIN_LEFT_OFFSET);
-	abe_write_gain(GAINS_DL2, GAIN_0dB, RAMP_100MS, GAIN_RIGHT_OFFSET);
+	abe_write_gain(GAINS_SPLIT, GAIN_0dB, RAMP_5MS, GAIN_LEFT_OFFSET);
+	abe_write_gain(GAINS_SPLIT, GAIN_0dB, RAMP_5MS, GAIN_RIGHT_OFFSET);
+	abe_write_gain(GAINS_DL1, GAIN_0dB, RAMP_5MS, GAIN_LEFT_OFFSET);
+	abe_write_gain(GAINS_DL1, GAIN_0dB, RAMP_5MS, GAIN_RIGHT_OFFSET);
+	abe_write_gain(GAINS_DL2, GAIN_0dB, RAMP_5MS, GAIN_LEFT_OFFSET);
+	abe_write_gain(GAINS_DL2, GAIN_0dB, RAMP_5MS, GAIN_RIGHT_OFFSET);
 	return 0;
 }
 EXPORT_SYMBOL(abe_reload_fw);
@@ -1330,21 +1330,6 @@ int abe_write_equalizer(u32 id, abe_equ_t *param)
 		/* three DMIC are clear at the same time DMIC0 DMIC1 DMIC2 */
 		eq_mem_len *= 3;
 		break;
-	case APS1:
-		eq_offset = C_APS_DL1_coeffs1_ADDR;
-		eq_mem = S_APS_IIRmem1_ADDR;
-		eq_mem_len = S_APS_IIRmem1_sizeof;
-		break;
-	case APS2L:
-		eq_offset = C_APS_DL2_L_coeffs1_ADDR;
-		eq_mem = S_APS_M_IIRmem2_ADDR;
-		eq_mem_len = S_APS_M_IIRmem2_sizeof;
-		break;
-	case APS2R:
-		eq_offset = C_APS_DL2_R_coeffs1_ADDR;
-		eq_mem = S_APS_M_IIRmem2_ADDR;
-		eq_mem_len = S_APS_M_IIRmem2_sizeof;
-		break;
 	}
 	length = param->equ_length;
 	src = (u32 *) ((param->coef).type1);
@@ -1701,7 +1686,9 @@ int abe_write_gain(u32 id, s32 f_g, u32 ramp, u32 p)
 	}
 	ramp = maximum(minimum(RAMP_MAXLENGTH, ramp), RAMP_MINLENGTH);
 	/* ramp data should be interpolated in the table instead */
-	ramp_index = 8;
+	ramp_index = 3;
+	if ((RAMP_2MS <= ramp) && (ramp < RAMP_5MS))
+		ramp_index = 8;
 	if ((RAMP_5MS <= ramp) && (ramp < RAMP_50MS))
 		ramp_index = 24;
 	if ((RAMP_50MS <= ramp) && (ramp < RAMP_500MS))
@@ -1844,6 +1831,14 @@ int abe_mono_mixer(u32 id, u32 on_off)
 		else
 			abe->MultiFrame[TASK_DL2Mixer_SLT][TASK_DL2Mixer_IDX] =
 				ABE_TASK_ID(C_ABE_FW_TASK_DL2Mixer);
+		break;
+	case MIXAUDUL:
+		if (on_off)
+			abe->MultiFrame[12][4] =
+				ABE_TASK_ID(C_ABE_FW_TASK_ULMixer_dual_mono);
+		else
+			abe->MultiFrame[12][4] =
+				ABE_TASK_ID(C_ABE_FW_TASK_ULMixer);
 		break;
 	default:
 		break;
@@ -2014,12 +2009,6 @@ int abe_enable_test_pattern(u32 smem_id, u32 on_off)
 		task_patch = C_ABE_FW_TASK_MM_SPLIT;
 		idx_patch = 1;
 		break;
-	case DBG_PATCH_DL2_EQ:
-		dbg_on = DBG_48K_PATTERN_labelID;
-		dbg_off = DL2_EQ_labelID;
-		task_patch = C_ABE_FW_TASK_DL2_APS_SPLIT;
-		idx_patch = 1;
-		break;
 	case DBG_PATCH_VIBRA:
 		dbg_on = DBG_48K_PATTERN_labelID;
 		dbg_off = VIBRA_labelID;
@@ -2030,12 +2019,6 @@ int abe_enable_test_pattern(u32 smem_id, u32 on_off)
 		dbg_on = DBG_48K_PATTERN_labelID;
 		dbg_off = MM_EXT_IN_labelID;
 		task_patch = C_ABE_FW_TASK_MM_EXT_IN_SPLIT;
-		idx_patch = 1;
-		break;
-	case DBG_PATCH_MIC4:
-		dbg_on = DBG_48K_PATTERN_labelID;
-		dbg_off = MIC4_labelID;
-		task_patch = C_ABE_FW_TASK_MIC4_SPLIT;
 		idx_patch = 1;
 		break;
 	case DBG_PATCH_MM_DL_MIXDL1:
@@ -2126,3 +2109,34 @@ int abe_init_mem(void __iomem *_io_base)
 	return 0;
 }
 EXPORT_SYMBOL(abe_init_mem);
+
+/**
+ * abe_write_pdmdl_offset - write the desired offset on the DL1/DL2 paths
+ *
+ * Parameters:
+ *   path: 1 for the DL1 ABE path, 2 for the DL2 ABE path
+ *   offset_left: integer value that will be added on all PDM left samples
+ *   offset_right: integer value that will be added on all PDM right samples
+ *
+ */
+void abe_write_pdmdl_offset(u32 path, u32 offset_left, u32 offset_right)
+{
+	switch (path) {
+	case 1:
+		abe_block_copy(COPY_FROM_HOST_TO_ABE, ABE_SMEM,
+			4 + (S_DC_HS_ADDR << 3), &offset_left, sizeof(u32));
+			abe_block_copy(COPY_FROM_HOST_TO_ABE, ABE_SMEM,
+			(S_DC_HS_ADDR << 3), &offset_right, sizeof(u32));
+		break;
+	case 2:
+		abe_block_copy(COPY_FROM_HOST_TO_ABE, ABE_SMEM,
+			4 + (S_DC_HF_ADDR << 3), &offset_left, sizeof(u32));
+			abe_block_copy(COPY_FROM_HOST_TO_ABE, ABE_SMEM,
+			(S_DC_HF_ADDR << 3), &offset_right, sizeof(u32));
+		break;
+	default:
+		break;
+	}
+}
+EXPORT_SYMBOL(abe_write_pdmdl_offset);
+
