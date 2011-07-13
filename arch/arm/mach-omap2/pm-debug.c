@@ -648,7 +648,8 @@ static int option_set(void *data, u64 val)
 	if (option == &wakeup_timer_milliseconds && val >= 1000)
 		return -EINVAL;
 
-	if (cpu_is_omap443x() && (omap_type() == OMAP2_DEVICE_TYPE_GP))
+	if (cpu_is_omap443x() && (omap_type() == OMAP2_DEVICE_TYPE_GP) &&
+		omap_rev() < OMAP4430_REV_ES2_3)
 		*option = 0;
 	else
 		*option = val;
