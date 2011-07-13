@@ -73,6 +73,17 @@
 #include "omaplfb.h"
 #include "pvrmodule.h"
 
+/* Workqueues for virtual display (primary, seconday)*/
+struct omap_display_sync_item {
+	struct work_struct work;
+	dsscomp_t comp;
+};
+
+static struct workqueue_struct *vdisp_wq_primary;
+static struct workqueue_struct *vdisp_wq_secondary;
+static struct omap_display_sync_item vdisp_sync_primary;
+static struct omap_display_sync_item vdisp_sync_secondary;
+
 MODULE_SUPPORTED_DEVICE(DEVNAME);
 
 #if defined(CONFIG_OUTER_CACHE)  /* Kernel config option */
@@ -173,29 +184,26 @@ static void OMAPLFBFlipNoLock(OMAPLFB_SWAPCHAIN *psSwapChain,
 #elif defined(FLIP_TECHNIQUE_OVERLAY)
 
 /* Must be called within framebuffer lock to prevent race conditions */
-static dsscomp_t find_dsscomp_obj(OMAPLFB_DEVINFO *psDevInfo)
+static dsscomp_t find_dsscomp_obj(struct omap_overlay_manager *manager)
 {
-	struct fb_info *framebuffer = psDevInfo->psLINFBInfo;
-	struct omapfb_info *ofbi = FB2OFB(framebuffer);
-	if (ofbi->num_overlays > 0) {
-		struct omap_overlay_manager *manager;
-		struct omap_overlay *overlay;
-		dsscomp_t comp;
-		u32 sync_id;
-		/* Always get the first overlay, we are not supposed
-			to add more with sysfs */
-		overlay = ofbi->overlays[0];
-		manager = overlay->manager;
-		if (!manager)
-			return NULL;
-		sync_id = dsscomp_first_sync_id(manager);
-		if (!sync_id)
-			return NULL;
-		comp = dsscomp_find(manager, sync_id);
-		if (comp)
-			return comp;
-	}
-	return NULL;
+	dsscomp_t comp = NULL;
+	u32 sync_id;
+	if (!manager)
+		return NULL;
+	sync_id = dsscomp_first_sync_id(manager);
+	if (!sync_id)
+		return NULL;
+	comp = dsscomp_find(manager, sync_id);
+	return comp;
+}
+
+static void vdisp_sync_handler(struct work_struct *work)
+{
+	struct omap_display_sync_item *sync_item =
+		(struct omap_display_sync_item *) work;
+	int r = dsscomp_apply(sync_item->comp);
+	if (r)
+		DEBUG_PRINTK("DSSComp apply failed %p", sync_item->comp);
 }
 
 /*
@@ -209,43 +217,85 @@ static void OMAPLFBFlipDSSComp(OMAPLFB_SWAPCHAIN *psSwapChain,
 	struct fb_info * framebuffer = psDevInfo->psLINFBInfo;
 	struct omapfb_info *ofbi = FB2OFB(framebuffer);
 	unsigned long fb_offset;
+	struct omap_overlay *overlay;
+	struct dss2_ovl_info dss2_ovl;
+	int r = 0;
+	/* Arbitrarily look in the TV manager if there is a
+	 * composition available, if it is, then UI cloning is requested
+	 */
+	dsscomp_t tv_comp = find_dsscomp_obj(
+		omap_dss_get_overlay_manager(OMAP_DSS_OVL_MGR_TV));
 
 	fb_offset = aPhyAddr - psDevInfo->sSystemBuffer.sSysAddr.uiAddr;
 
-	/* Only one overlay for the moment*/
-	if (ofbi->num_overlays > 0) {
-		int r;
-		struct omap_overlay *overlay;
-		struct dss2_ovl_info dss2_ovl;
+	/* Always get the first overlay from fb */
+	overlay = ofbi->overlays[0];
 
-		/* Always get the first overlay, we are not supposed
-			to add more with sysfs */
-		overlay = ofbi->overlays[0];
+	/* Handle LCD composition*/
+	r = dsscomp_get_ovl(comp, overlay->id, &dss2_ovl);
 
-		if (comp)
-			r = dsscomp_get_ovl(comp, overlay->id, &dss2_ovl);
-		else
-			r = 1;
+	if (r) {
+		struct omap_overlay_info overlay_info;
+		DEBUG_PRINTK("Overlay %d not found in comp %p,"
+			"updating manually", overlay->id, comp);
+		overlay->get_overlay_info(overlay, &overlay_info);
+		overlay_info.paddr =
+			framebuffer->fix.smem_start + fb_offset;
+		overlay_info.vaddr =
+			framebuffer->screen_base + fb_offset;
+		overlay->set_overlay_info(overlay, &overlay_info);
+	} else {
+		dss2_ovl.ba = framebuffer->fix.smem_start + fb_offset;
+		dsscomp_set_ovl(comp, &dss2_ovl);
 
-		if (r) {
-			struct omap_overlay_info overlay_info;
-			WARNING_PRINTK("Ovl%d not found, updating manually",
-				overlay->id);
-			overlay->get_overlay_info(overlay, &overlay_info);
-			overlay_info.paddr = framebuffer->fix.smem_start +
-				fb_offset;
-			overlay_info.vaddr = framebuffer->screen_base +
-				fb_offset;
-			overlay->set_overlay_info(overlay, &overlay_info);
-		} else {
-			dss2_ovl.ba = framebuffer->fix.smem_start + fb_offset;
-			dsscomp_set_ovl(comp, &dss2_ovl);
+		/* If there is no comp for the TV no need to use the wq */
+		if (!tv_comp) {
+			if (dsscomp_apply(comp))
+				DEBUG_PRINTK("DSSComp apply failed %p", comp);
+			goto done;
 		}
-
-		r = dsscomp_apply(comp);
-		if (r)
-			WARNING_PRINTK("Overlay %d apply failed %lx", overlay->id, framebuffer->fix.smem_start + fb_offset);
+		vdisp_sync_primary.comp = comp;
+		INIT_WORK((struct work_struct *)&vdisp_sync_primary,
+			vdisp_sync_handler);
+		queue_work(vdisp_wq_primary,
+			(struct work_struct *)&vdisp_sync_primary);
 	}
+
+	/* TODO: Find a proper way to look in the composition object
+	 * the pipe used for UI cloning, use vid2 for now
+	 */
+	overlay = omap_dss_get_overlay(OMAP_DSS_VIDEO2);
+	if (tv_comp)
+		r = dsscomp_get_ovl(tv_comp, overlay->id, &dss2_ovl);
+	else
+		goto tv_comp_invalid;
+
+	/* Handle TV cloning composition */
+	if (r) {
+		struct omap_overlay_info overlay_info;
+		DEBUG_PRINTK("Overlay %d not found in TV comp %p,"
+			"updating manually", overlay->id, tv_comp);
+		overlay->get_overlay_info(overlay, &overlay_info);
+		overlay_info.paddr =
+			framebuffer->fix.smem_start + fb_offset;
+		overlay_info.vaddr =
+			framebuffer->screen_base + fb_offset;
+		overlay->set_overlay_info(overlay, &overlay_info);
+	} else {
+		dss2_ovl.ba = framebuffer->fix.smem_start + fb_offset;
+		dsscomp_set_ovl(tv_comp, &dss2_ovl);
+		vdisp_sync_secondary.comp = tv_comp;
+		INIT_WORK((struct work_struct *)&vdisp_sync_secondary,
+			vdisp_sync_handler);
+		queue_work(vdisp_wq_secondary,
+			(struct work_struct *)&vdisp_sync_secondary);
+		flush_work((struct work_struct *)&vdisp_sync_secondary);
+	}
+
+tv_comp_invalid:
+	flush_work((struct work_struct *)&vdisp_sync_primary);
+done:
+	return;
 }
 
 /*
@@ -289,14 +339,10 @@ static void OMAPLFBFlipDSS(OMAPLFB_SWAPCHAIN *psSwapChain,
 		}
 
 		if (dss_ovl_manually_updated(overlay)) {
-			if (driver->sched_update)
-				driver->sched_update(display, 0, 0,
-							overlay_info.width,
-							overlay_info.height);
-			else if (driver->update)
+			if (driver->update)
 				driver->update(display, 0, 0,
-							overlay_info.width,
-							overlay_info.height);
+					overlay_info.width,
+					overlay_info.height);
 
 		}
 
@@ -314,11 +360,18 @@ void OMAPLFBFlip(OMAPLFB_SWAPCHAIN *psSwapChain, unsigned long aPhyAddr)
 	struct fb_info *framebuffer = psDevInfo->psLINFBInfo;
 	struct omapfb_info *ofbi = FB2OFB(framebuffer);
 	struct omapfb2_device *fbdev = ofbi->fbdev;
-	dsscomp_t comp;
-
-	comp = find_dsscomp_obj(psDevInfo);
+	struct omap_overlay_manager *manager;
+	dsscomp_t comp = NULL;
 
 	omapfb_lock(fbdev);
+
+	/* Always get the first overlay for main LCD */
+	if (ofbi->num_overlays > 0) {
+		struct omap_overlay *overlay;
+		overlay = ofbi->overlays[0];
+		manager = overlay->manager;
+		comp = find_dsscomp_obj(manager);
+	}
 
 	if (comp)
 		OMAPLFBFlipDSSComp(psSwapChain, aPhyAddr, comp);
@@ -340,19 +393,25 @@ void OMAPLFBPresentSync(OMAPLFB_DEVINFO *psDevInfo,
 	struct fb_info *framebuffer = psDevInfo->psLINFBInfo;
 	struct omapfb_info *ofbi = FB2OFB(framebuffer);
 	struct omapfb2_device *fbdev = ofbi->fbdev;
-	dsscomp_t comp;
+	struct omap_overlay_manager *manager;
+	dsscomp_t comp = NULL;
 	unsigned long aPhyAddr = (unsigned long)psFlipItem->sSysAddr->uiAddr;
 
 	omapfb_lock(fbdev);
 
-	comp = find_dsscomp_obj(psDevInfo);
+	/* Always get the first overlay for main LCD */
+	if (ofbi->num_overlays > 0) {
+		struct omap_overlay *overlay;
+		overlay = ofbi->overlays[0];
+		manager = overlay->manager;
+		comp = find_dsscomp_obj(manager);
+	}
 
 	if (comp)
 		OMAPLFBFlipDSSComp(psDevInfo->psSwapChain, aPhyAddr, comp);
 	else {
 		struct omap_dss_device *display;
 		struct omap_dss_driver *driver;
-		struct omap_overlay_manager *manager;
 		int err = 1;
 
 		display = fb2display(framebuffer);
@@ -581,7 +640,10 @@ static int __init OMAPLFB_Init(void)
 	register_early_suspend(&omaplfb_early_suspend);
 	DEBUG_PRINTK("Registered early suspend support");
 #endif
-
+	vdisp_wq_primary =
+		__create_workqueue("pvr_aux_sync_wq1", 1, 1, 1);
+	vdisp_wq_secondary =
+		__create_workqueue("pvr_aux_sync_wq2", 1, 1, 1);
 #endif
 	return 0;
 }
