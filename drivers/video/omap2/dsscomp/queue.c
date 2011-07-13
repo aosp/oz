@@ -770,17 +770,13 @@ done_ovl:
 		r = drv->sync(dssdev) ? : mgr->apply(mgr);
 
 		if (!r && (d->mode & DSSCOMP_SETUP_MODE_DISPLAY)) {
-			/* schedule update if supported */
-			if (drv->sched_update)
-				r = drv->sched_update(dssdev, d->win.x,
-					d->win.y, d->win.w, d->win.h);
-			else if (drv->update)
+			if (drv->update)
 				r = drv->update(dssdev, d->win.x,
 					d->win.y, d->win.w, d->win.h);
 		}
 	} else {
 		/* wait for sync to avoid tear */
-		r = mgr->wait_for_vsync(mgr) ? : mgr->apply(mgr);
+		r = mgr->apply(mgr) ? : mgr->wait_for_vsync(mgr);
 	}
 done:
 	if (change)
