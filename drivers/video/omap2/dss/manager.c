@@ -1342,9 +1342,9 @@ static void dss_completion_irq_handler(void *data, u32 mask)
 	const int num_mgrs = MAX_DSS_MANAGERS;
 	const u32 masks[] = {
 		DISPC_IRQ_FRAMEDONE | DISPC_IRQ_VSYNC,
+		DISPC_IRQ_FRAMEDONE2 | DISPC_IRQ_VSYNC2,
 		DISPC_IRQ_FRAMEDONE_DIG | DISPC_IRQ_EVSYNC_EVEN |
-		DISPC_IRQ_EVSYNC_ODD,
-		DISPC_IRQ_FRAMEDONE2 | DISPC_IRQ_VSYNC2
+		DISPC_IRQ_EVSYNC_ODD
 	};
 	int i;
 	bool notify = false;

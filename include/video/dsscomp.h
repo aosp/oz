@@ -447,6 +447,8 @@ enum dsscomp_setup_mode {
 };
 
 struct dsscomp_setup_mgr_data {
+	__u32 sync_id;		/* synchronization ID */
+
 	struct dss2_rect_t win; /* update region, set w/h to 0 for fullscreen */
 	enum dsscomp_setup_mode mode;
 	__u16 num_ovls;		/* # of overlays used in the composition */

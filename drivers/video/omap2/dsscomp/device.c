@@ -91,7 +91,7 @@ static long setup_mgr(struct dsscomp_dev *cdev,
 	if (!mgr)
 		return -ENODEV;
 
-	comp = dsscomp_new(mgr);
+	comp = dsscomp_new_sync_id(mgr, d->sync_id);
 	if (IS_ERR(comp))
 		return PTR_ERR(comp);
 
@@ -259,7 +259,7 @@ static long wait(struct dsscomp_dev *cdev, struct dsscomp_wait_data *wd)
 		return -ENODEV;
 
 	/* get composition */
-	comp = ERR_PTR(-EINVAL);
+	comp = dsscomp_find(mgr, wd->sync_id);
 	if (IS_ERR(comp))
 		return 0;
 
