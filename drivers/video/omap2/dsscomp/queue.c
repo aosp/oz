@@ -739,7 +739,8 @@ done_ovl:
 	 */
 	r = r ? : set_dss_mgr_info(&d->mgr);
 	if (r) {
-		dev_err(DEV(cdev), "[%08x] set failed %d\n", d->sync_id, r);
+		dev_err(DEV(cdev), "[%08x] [%d] set failed %d\n",
+					d->sync_id, mgr->id, r);
 		dsscomp_drop(comp);
 		change = true;
 		goto done;
@@ -831,7 +832,14 @@ int dsscomp_wait(dsscomp_t comp, enum dsscomp_wait_phase phase, int timeout)
 
 	if (!IS_ERR(comp) && !is_wait_over(comp, phase)) {
 		u32 ix = comp->frm.mgr.ix;
+		if (ix >= cdev->num_displays ||
+			!cdev->displays[ix] ||
+			!cdev->displays[ix]->manager)
+			return -1;
 
+		ix = cdev->displays[ix]->manager->id;
+		if (ix >= cdev->num_mgrs)
+			return -1;
 		mutex_unlock(&mtx);
 
 		/*
