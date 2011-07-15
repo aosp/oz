@@ -851,7 +851,15 @@ static bool is_bt_active(void)
 	struct kim_data_s       *kim_gdata;
 
 	pdev = &wl128x_device;
+
+	if (pdev == NULL)
+		return false;
+
 	kim_gdata = dev_get_drvdata(&pdev->dev);
+
+	if (kim_gdata == NULL)
+		return false;
+
 	if (st_ll_getstate(kim_gdata->core_data) != ST_LL_ASLEEP &&
 			st_ll_getstate(kim_gdata->core_data) != ST_LL_INVALID)
 		return true;
