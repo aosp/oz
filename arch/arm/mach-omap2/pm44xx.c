@@ -114,8 +114,6 @@ u32 omap4_device_off_read_next_state(void)
 
 int omap4_can_sleep(void)
 {
-	if (!omap_uart_can_sleep())
-		return 0;
 	return 1;
 }
 
@@ -236,11 +234,6 @@ void omap4_enter_sleep(unsigned int cpu, unsigned int power_state)
 		if (cpu_is_omap446x())
 			omap_temp_sensor_prepare_idle();
 
-		omap_uart_prepare_idle(0);
-		omap_uart_prepare_idle(1);
-		omap_uart_prepare_idle(2);
-		omap_uart_prepare_idle(3);
-
 		if (omap4_device_off_read_next_state()) {
 			omap2_gpio_prepare_for_idle(1);
 			/* Extend Non-EMIF I/O isolation */
@@ -350,11 +343,6 @@ restore_state:
 				OMAP4430_PRM_DEVICE_MOD,
 				OMAP4_PRM_IO_PMCTRL_OFFSET);
 
-		omap_uart_resume_idle(0);
-		omap_uart_resume_idle(1);
-		omap_uart_resume_idle(2);
-		omap_uart_resume_idle(3);
-
 		if (cpu_is_omap446x())
 			omap_temp_sensor_resume_idle();
 
@@ -378,6 +366,7 @@ restore_state:
 		omap_smartreflex_enable(vdd_core);
 	}
 
+	omap_uart_resume_idle();
 
 	if (mpu_next_state < PWRDM_POWER_INACTIVE) {
 		if (!omap4_device_off_read_next_state())
