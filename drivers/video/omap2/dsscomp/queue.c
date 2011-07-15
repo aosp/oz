@@ -575,6 +575,11 @@ void dsscomp_drop(dsscomp_t c)
 	if (debug & DEBUG_COMPOSITIONS)
 		dev_info(DEV(cdev), "[%08x] released\n", c->frm.sync_id);
 
+	list_for_each_entry_safe(o, o2, &c->ois, q) {
+		if (o->ovl.cfg.enabled)
+			tiler_set_buf_state(o->ovl.ba, TILBUF_FREE);
+	}
+
 	list_for_each_entry_safe(o, o2, &c->ois, q)
 		list_move(&o->q, &free_ois);
 	list_move(&c->q, &mgrq[c->ix].free_cis);
@@ -628,10 +633,6 @@ static void dsscomp_mgr_callback(void *data, int id, int status)
 		wake_up_interruptible_sync(&mgrq[ix].wq);
 	} else if (status & DSS_COMPLETION_RELEASED) {
 		/* composition is no longer displayed */
-		list_for_each_entry_safe(o, o2, &comp->ois, q) {
-			if (o->ovl.cfg.enabled)
-				tiler_set_buf_state(o->ovl.ba, TILBUF_FREE);
-		}
 		dsscomp_drop(comp);
 		refresh_masks(ix);
 	}
