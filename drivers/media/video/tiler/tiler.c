@@ -1407,7 +1407,7 @@ static s32 alloc_block(enum tiler_fmt fmt, u32 width, u32 height,
 
 static s32 wait_for_buf(struct __buf_info *_b)
 {
-	u32 timeout = usecs_to_jiffies(33*1000); /*delay before timing out */
+	u32 timeout = usecs_to_jiffies(66*1000); /*delay before timing out */
 	mutex_lock(&mtx);
 	/*assumption# mi[0] of each buffer always points to Y block */
 	if (_b->mi[0]->state) {
