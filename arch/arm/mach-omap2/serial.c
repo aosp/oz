@@ -60,7 +60,6 @@
 
 struct omap_uart_state {
 	int num;
-	int can_sleep;
 	struct timer_list timer;
 	u32 timeout;
 
@@ -106,14 +105,14 @@ struct omap_uart_state {
 	u16 lcr;
 	u16 dpll_ier_state;
 	u16 dpll_lcr_state;
-
-
 #endif
+	unsigned int port_timer_active;
 };
 
 static LIST_HEAD(uart_list);
 static u8 num_uarts;
 
+static bool plat_check_bt_active(struct omap_uart_state *uart);
 void __init omap2_set_globals_uart(struct omap_globals *omap2_globals)
 {
 }
@@ -161,8 +160,18 @@ static inline unsigned int __serial_read_reg(struct uart_port *up,
 static inline unsigned int serial_read_reg(struct omap_uart_state *uart,
 					   int offset)
 {
+	unsigned int val;
+	struct uart_omap_port *up = platform_get_drvdata(uart->pdev);
+
+	if (up)
+		up->port_reg_access_active = 1;
+	omap_uart_enable_clock_from_ext(uart->num);
+
 	offset <<= uart->regshift;
-	return (unsigned int)__raw_readb(uart->membase + offset);
+	val = (unsigned int)__raw_readb(uart->membase + offset);
+	if (up)
+		up->port_reg_access_active = 0;
+	return val;
 }
 
 static inline void __serial_write_reg(struct uart_port *up, int offset,
@@ -175,8 +184,17 @@ static inline void __serial_write_reg(struct uart_port *up, int offset,
 static inline void serial_write_reg(struct omap_uart_state *uart, int offset,
 				    int value)
 {
+	struct uart_omap_port *up = platform_get_drvdata(uart->pdev);
+
+	if (up)
+		up->port_reg_access_active = 1;
+	omap_uart_enable_clock_from_ext(uart->num);
+
 	offset <<= uart->regshift;
 	__raw_writeb(value, uart->membase + offset);
+
+	if (up)
+		up->port_reg_access_active = 0;
 }
 
 /*
@@ -336,7 +354,6 @@ static inline void omap_uart_enable_clocks(struct omap_uart_state *uart)
 }
 
 #ifdef CONFIG_PM
-
 static inline void omap_uart_disable_clocks(struct omap_uart_state *uart)
 {
 	if (!uart->clocked)
@@ -409,19 +426,14 @@ static void omap_uart_smart_idle_enable(struct omap_uart_state *uart,
 {
 	u8 idlemode;
 
-	if (enable) {
-		/**
-		 * Errata 2.15: [UART]:Cannot Acknowledge Idle Requests
-		 * in Smartidle Mode When Configured for DMA Operations.
-		 */
-		if (uart->dma_enabled)
-			idlemode = HWMOD_IDLEMODE_FORCE;
-		else {
-			idlemode = HWMOD_IDLEMODE_SMART;
-		}
-	} else {
-		idlemode = HWMOD_IDLEMODE_NO;
-	}
+	/**
+	 * Errata 2.15: [UART]:Cannot Acknowledge Idle Requests
+	 * in Smartidle Mode When Configured for DMA Operations.
+	 */
+	if (uart->dma_enabled)
+		idlemode = HWMOD_IDLEMODE_FORCE;
+	else
+		idlemode = HWMOD_IDLEMODE_SMART_WKUP;
 
 	omap_hwmod_set_slave_idlemode(uart->oh, idlemode);
 }
@@ -431,11 +443,6 @@ static void omap_uart_block_sleep(struct omap_uart_state *uart)
 	omap_uart_enable_clocks(uart);
 
 	omap_uart_smart_idle_enable(uart, 0);
-	uart->can_sleep = 0;
-	if (uart->timeout)
-		mod_timer(&uart->timer, jiffies + uart->timeout);
-	else
-		del_timer(&uart->timer);
 }
 
 static void omap_uart_allow_sleep(struct omap_uart_state *uart)
@@ -445,17 +452,40 @@ static void omap_uart_allow_sleep(struct omap_uart_state *uart)
 	else
 		omap_uart_disable_wakeup(uart);
 
-	if (!uart->clocked)
-		return;
-
 	omap_uart_smart_idle_enable(uart, 1);
-	uart->can_sleep = 1;
 	del_timer(&uart->timer);
+	uart->port_timer_active = 0;
+	omap_uart_disable_clocks(uart);
 }
 
 static void omap_uart_idle_timer(unsigned long data)
 {
 	struct omap_uart_state *uart = (struct omap_uart_state *)data;
+	struct uart_omap_port *up = platform_get_drvdata(uart->pdev);
+	/* As the CAllback is done, now timer can be Mdofiied */
+	uart->port_timer_active = 0;
+
+	/* Check if BT Use case is active */
+	if (plat_check_bt_active(uart)) {
+		omap_uart_block_sleep(uart);
+		omap_uart_smart_idle_enable(uart, 1);
+		omap_uart_start_inactivity_timer(uart->num);
+		return;
+	}
+
+	if ((up == NULL) && (uart->timeout)) {
+		omap_uart_start_inactivity_timer(uart->num);
+		return;
+	}
+
+	if ((up->port_tx_active == 0) && (up->port_rx_active == 0) &&
+		(up->port_reg_access_active == 0)) {
+		omap_uart_allow_sleep(uart);
+		return;
+	} else {
+		omap_uart_block_sleep(uart);
+		omap_uart_start_inactivity_timer(uart->num);
+	}
 
 #ifdef CONFIG_SERIAL_OMAP
 	/* check if the uart port is active
@@ -464,23 +494,10 @@ static void omap_uart_idle_timer(unsigned long data)
 	 */
 	if (omap_uart_active(uart->num, uart->timeout)) {
 		omap_uart_block_sleep(uart);
+		omap_uart_start_inactivity_timer(uart->num);
 		return;
 	}
 #endif
-	omap_uart_allow_sleep(uart);
-}
-
-void omap_uart_prepare_idle(int num)
-{
-	struct omap_uart_state *uart;
-
-	list_for_each_entry(uart, &uart_list, node) {
-		if (num == uart->num && uart->can_sleep) {
-			omap_uart_enable_rtspullup(uart);
-			omap_uart_disable_clocks(uart);
-			return;
-		}
-	}
 }
 
 static bool omap_uart_is_wakeup_src(struct omap_uart_state *uart)
@@ -507,45 +524,83 @@ static bool omap_uart_is_wakeup_src(struct omap_uart_state *uart)
 	return false;
 }
 
-void omap_uart_resume_idle(int num)
+void omap_uart_resume_idle(void)
 {
 	struct omap_uart_state *uart;
 	struct omap_uart_port_info *pdata;
 
 	list_for_each_entry(uart, &uart_list, node) {
-		if (num == uart->num) {
-			pdata = uart->pdev->dev.platform_data;
-			omap_uart_enable_clocks(uart);
+		pdata = uart->pdev->dev.platform_data;
+
+		/* Check for IO pad wakeup */
+		if (omap_uart_is_wakeup_src(uart)) {
 			omap_uart_disable_rtspullup(uart);
 
-			/* Check for IO pad wakeup */
-			if (omap_uart_is_wakeup_src(uart)) {
-				omap_uart_block_sleep(uart);
+			if (pdata && pdata->plat_hold_wakelock)
+				pdata->uart_wakeup_event = 1;
 
-				if (pdata && pdata->plat_hold_wakelock)
-					pdata->uart_wakeup_event = 1;
+			if (cpu_is_omap44xx())
+				omap_uart_update_jiffies(uart->num);
 
-				if (cpu_is_omap44xx())
-					omap_uart_update_jiffies(uart->num);
-			}
-
-			/* Check for normal UART wakeup */
-			if (uart->wk_st && uart->wk_mask)
-				if (__raw_readl(uart->wk_st) & uart->wk_mask)
-					omap_uart_block_sleep(uart);
-			return;
+			omap_uart_block_sleep(uart);
+			omap_uart_start_inactivity_timer(uart->num);
 		}
+
+		/* Check for normal UART wakeup */
+		if (uart->wk_st && uart->wk_mask)
+			if (__raw_readl(uart->wk_st) & uart->wk_mask) {
+				omap_uart_disable_rtspullup(uart);
+				omap_uart_block_sleep(uart);
+				omap_uart_start_inactivity_timer(uart->num);
+			}
 	}
 }
 
-void omap_uart_prepare_suspend(void)
+int omap_uart_is_enabled(int uart_num)
 {
 	struct omap_uart_state *uart;
 
 	list_for_each_entry(uart, &uart_list, node) {
+		if (uart_num == uart->num)
+			return uart->clocked;
+	}
+
+	return -EINVAL;
+}
+EXPORT_SYMBOL(omap_uart_is_enabled);
+
+void omap_uart_prepare_suspend(void)
+{
+	struct uart_omap_port *up;
+	struct omap_uart_state *uart;
+
+	list_for_each_entry(uart, &uart_list, node) {
+		omap_uart_block_sleep(uart);
+		up = platform_get_drvdata(uart->pdev);
+		if (device_may_wakeup(&uart->pdev->dev))
+			omap_uart_enable_wakeup(uart);
+		else
+			omap_uart_disable_wakeup(uart);
+
+		omap_uart_enable_rtspullup(uart);
 		omap_uart_allow_sleep(uart);
 	}
 }
+
+void omap_uart_resume(int uart_num)
+{
+	struct omap_uart_state *uart;
+
+	list_for_each_entry(uart, &uart_list, node) {
+		if (uart_num == uart->num) {
+			omap_uart_disable_rtspullup(uart);
+			omap_uart_block_sleep(uart);
+			omap_uart_start_inactivity_timer(uart->num);
+			break;
+		}
+	}
+}
+EXPORT_SYMBOL(omap_uart_resume);
 
 static bool plat_check_bt_active(struct omap_uart_state *uart)
 {
@@ -561,33 +616,30 @@ static bool plat_check_bt_active(struct omap_uart_state *uart)
 int omap_uart_can_sleep(void)
 {
 	struct omap_uart_state *uart;
-	int can_sleep = 1;
 
 	list_for_each_entry(uart, &uart_list, node) {
-		if (!uart->clocked)
-			continue;
-
-		if (!uart->can_sleep) {
-			can_sleep = 0;
-			continue;
-		}
-
-		/* Check if BT Use case is active */
-		if (plat_check_bt_active(uart)) {
-			can_sleep = 0;
-			continue;
-		}
-
-		if (omap_uart_active(uart->num, uart->timeout)) {
-			can_sleep = 0;
-			continue;
-		}
-
-		/* This UART can now safely sleep. */
-		omap_uart_allow_sleep(uart);
+		if (uart->clocked)
+			return 0;
 	}
 
-	return can_sleep;
+	return 1;
+}
+
+void omap_uart_start_inactivity_timer(unsigned int uart_num)
+{
+	struct omap_uart_state *uart;
+
+	list_for_each_entry(uart, &uart_list, node) {
+		if (uart_num == uart->num) {
+			if ((uart->timeout) && (uart->port_timer_active == 0)) {
+				mod_timer(&uart->timer,
+					jiffies + uart->timeout);
+				uart->port_timer_active = 1;
+			}
+			break;
+		}
+	}
+	return;
 }
 
 /**
@@ -614,21 +666,38 @@ static irqreturn_t omap_uart_interrupt(int irq, void *dev_id)
  * hence call be called by other module to enable the UART
  * clocks.
  */
-void omap_uart_enable_clock_from_irq(int uart_num)
+void omap_uart_enable_clock_from_ext(int uart_num)
 {
 	struct omap_uart_state *uart;
 
 	list_for_each_entry(uart, &uart_list, node) {
 		if (uart_num == uart->num) {
-			if (uart->clocked)
-				break;
 			omap_uart_block_sleep(uart);
 			break;
 		}
 	}
 	return;
 }
-EXPORT_SYMBOL(omap_uart_enable_clock_from_irq);
+EXPORT_SYMBOL(omap_uart_enable_clock_from_ext);
+
+/*
+ * This function disable clock. This is exported function
+ * hence call be called by other module to enable the UART
+ * clocks.
+ */
+void omap_uart_disable_clock_from_ext(int uart_num)
+{
+	struct omap_uart_state *uart;
+
+	list_for_each_entry(uart, &uart_list, node) {
+		if (uart_num == uart->num) {
+			omap_uart_allow_sleep(uart);
+			break;
+		}
+	}
+	return;
+}
+EXPORT_SYMBOL(omap_uart_disable_clock_from_ext);
 
 static int omap_uart_recalibrate_baud_cb(struct notifier_block *nb,
 			unsigned long status, void *data)
@@ -696,6 +765,13 @@ static int omap_uart_recalibrate_baud_cb(struct notifier_block *nb,
 	/* These would take care of the POst Rate Change requirements */
 	list_for_each_entry(uart, &uart_list, node) {
 		up = platform_get_drvdata(uart->pdev);
+
+		if (up == NULL)
+			continue;
+
+		omap_uart_enable_clock_from_ext(uart->num);
+
+		up->port_reg_access_active = 1;
 		lcr = serial_read_reg(uart, UART_LCR);
 		/* these are hard coded here since the clock
 		 * framework is not return the correct value.
@@ -752,6 +828,8 @@ static int omap_uart_recalibrate_baud_cb(struct notifier_block *nb,
 
 			omap_uart_disable_rtspullup(uart);
 		}
+		up->port_reg_access_active = 0;
+		omap_uart_start_inactivity_timer(uart->num);
 	}
 	return 0;
 }
@@ -759,14 +837,6 @@ static int omap_uart_recalibrate_baud_cb(struct notifier_block *nb,
 static void omap_uart_idle_init(struct omap_uart_state *uart)
 {
 	int ret;
-
-	uart->can_sleep = 0;
-	uart->timeout = msecs_to_jiffies(DEFAULT_IDLE_TIMEOUT);
-	setup_timer(&uart->timer, omap_uart_idle_timer,
-		    (unsigned long) uart);
-	if (uart->timeout)
-		mod_timer(&uart->timer, jiffies + uart->timeout);
-	omap_uart_smart_idle_enable(uart, 0);
 
 	if (cpu_is_omap34xx()) {
 		u32 mod = (uart->num == 2) ? OMAP3430_PER_MOD : CORE_MOD;
@@ -870,9 +940,11 @@ static ssize_t sleep_timeout_store(struct device *dev,
 	uart->timeout = msecs_to_jiffies(value);
 	if (uart->timeout)
 		mod_timer(&uart->timer, jiffies + uart->timeout);
-	else
+	else {
 		/* A zero value means disable timeout feature */
 		omap_uart_block_sleep(uart);
+		omap_uart_start_inactivity_timer(uart->num);
+	}
 
 	return n;
 }
@@ -1108,6 +1180,8 @@ void __init omap_serial_init_port(int port,
 #endif
 
 	omap_uart_enable_clocks(uart);
+	setup_timer(&uart->timer, omap_uart_idle_timer,
+		(unsigned long) uart);
 	omap_uart_idle_init(uart);
 	omap_uart_reset(uart);
 	omap_uart_disable_clocks(uart);
@@ -1118,9 +1192,9 @@ void __init omap_serial_init_port(int port,
 	 * so device needs to be kept enabled while polling driver
 	 * is in use.
 	 */
-	uart->timeout = (30 * HZ);
-	omap_uart_block_sleep(uart);
 	uart->timeout = msecs_to_jiffies(platform_data->idle_timeout);
+	uart->port_timer_active = 0;
+	omap_uart_disable_clocks(uart);
 
 	if (((cpu_is_omap34xx() || cpu_is_omap44xx())
 		 && uart->padconf) ||
