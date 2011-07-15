@@ -69,7 +69,8 @@
 /* L2 controller AUXCTRL value */
 #define OMAP443X_L2X0_AUXCTL_VALUE_ES1			0x0e050000
 #define OMAP443X_L2X0_AUXCTL_VALUE			0x1e470000
-#define OMAP446X_L2X0_AUXCTL_VALUE			0x4e470000
+#define OMAP446X_L2X0_AUXCTL_VALUE			0x5e470000
+#define OMAP446X_L2X0_AUXCTL_VALUE_ES1			0x4e470000
 
 /* POR register settings */
 #define OMAP443X_PL310_POR				5
@@ -77,7 +78,8 @@
  *  FIXME : The L2 prefetch hints seems to break MPU OSWR. Remove them
  * for time being.
  */
-#define OMAP446x_PL310_POR				0x42000009
+#define OMAP446X_PL310_POR_ES1				0x42000007
+#define OMAP446X_PL310_POR				0x52000007
 
 #define A9_ES1_REV					0x410FC091
 

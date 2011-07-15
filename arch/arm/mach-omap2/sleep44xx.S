@@ -34,10 +34,17 @@
 /*
  * Macro to check cpu omap
  */
-.macro IS_CPU_OMAP4460
+.macro CPU_REV_CMP a
 	mrc	p15, 0, r0, c0, c0, 0
 	and	r0, #0xf
-	cmp	r0, #0xa
+	cmp	r0, \a
+.endm
+
+.macro CPU_MINOR_REV_CMP a
+	ldr	r1, =OMAP443X_SCM_BASE
+	ldr	r0, [r1, #0x204]
+	lsr	r0, #28
+	cmp	r0, \a
 .endm
 
 /*
@@ -69,10 +76,13 @@ zero_params:
 .word 0
 
 POR_params:
-.word 1, 5
+.word 1, OMAP443X_PL310_POR
+
+POR_4460es10_params:
+.word 1, OMAP446X_PL310_POR_ES1
 
 POR_4460_params:
-.word 1, 0x42000009
+.word 1, OMAP446X_PL310_POR
 
 /*
  * CPUx Wakeup Non-Secure Physical Address for
@@ -169,17 +179,27 @@ check_por:
 	ldr	r1, [r0, #OMAP_TYPE_OFFSET]
 	cmp	r1, #0x1                   @ Check for HS device
 	bne	skip_por
-	ldr	r0, =PPA_SERVICE_PL310_POR @ Setup PPA HAL call
-	IS_CPU_OMAP4460
+	CPU_REV_CMP #0xa	@Check for 4460 family
+	itt	lt
+	adrlt	r3, POR_params	@Check for ES1.0
+	blt	por_setup
+	CPU_MINOR_REV_CMP #0x0
 	ite	eq
-	adreq	r3, POR_4460_params
-	adrne	r3, POR_params
+	adreq	r3, POR_4460es10_params
+	adrgt	r3, POR_4460_params
+por_setup:
+	ldr	r0, =PPA_SERVICE_PL310_POR @ Setup PPA HAL call
 	LM_CALL_PPA_SERVICE_PA
 skip_por:
-	IS_CPU_OMAP4460
+	CPU_REV_CMP #0xa	@Check for 4460 family
+	itt	lt
+	ldrlt	r0, =OMAP443X_L2X0_AUXCTL_VALUE
+	blt	auxctl_setup
+	CPU_MINOR_REV_CMP #0x0	@Check for ES1.0
 	ite	eq
-	ldreq	r0, =OMAP446X_L2X0_AUXCTL_VALUE
-	ldrne	r0, =OMAP443X_L2X0_AUXCTL_VALUE
+	ldreq	r0, =OMAP446X_L2X0_AUXCTL_VALUE_ES1
+	ldrgt	r0, =OMAP446X_L2X0_AUXCTL_VALUE
+auxctl_setup:
 	ldr     r12, =0x109		@ Setup L2 AUXCTL value
 	dsb
 	smc     #0

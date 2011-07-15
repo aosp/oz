@@ -229,9 +229,15 @@ static int __init omap_l2_cache_init(void)
 	}
 
 	if (cpu_is_omap446x()) {
-		l2x0_auxctrl = OMAP446X_L2X0_AUXCTL_VALUE;
-		l2x0_por = OMAP446x_PL310_POR;
-		l2x0_lockdown = 0xa5a5;
+		if (omap_rev() == OMAP4460_REV_ES1_0) {
+			l2x0_auxctrl = OMAP446X_L2X0_AUXCTL_VALUE_ES1;
+			l2x0_por = OMAP446X_PL310_POR_ES1;
+			l2x0_lockdown = 0xa5a5;
+		} else {
+			l2x0_auxctrl = OMAP446X_L2X0_AUXCTL_VALUE;
+			l2x0_por = OMAP446X_PL310_POR;
+			l2x0_lockdown = 0;
+		}
 	} else {
 		l2x0_auxctrl = OMAP443X_L2X0_AUXCTL_VALUE;
 		l2x0_por = OMAP443X_PL310_POR;
