@@ -57,6 +57,10 @@
 #define OMAP343X_TABLE_VALUE_OFFSET	   0xC0
 #define OMAP343X_CONTROL_REG_VALUE_OFFSET  0xC8
 
+#define RTA_ERRATA_i608         (1 << 1)
+static u16 pm34xx_errata;
+#define IS_PM34XX_ERRATA(id) (pm34xx_errata & (id))
+
 /* Secure ram save size - store the defaults */
 static struct omap3_secure_copy_data secure_copy_data = {
 	.size = 0xF040,
@@ -1255,6 +1259,17 @@ static int __init omap3_pm_init(void)
 			printk(KERN_ERR "%s: failed to look up wkup clock "
 				"domain\n", __func__);
 	}
+
+	if (cpu_is_omap3630())
+		pm34xx_errata |= RTA_ERRATA_i608;
+	/*
+	 * RTA is disabled during initialization as per errata i608
+	 * it is safer to disable rta by the bootloader, but we would like
+	 * to be doubly sure here and prevent any mishaps.
+	 */
+	if (IS_PM34XX_ERRATA(RTA_ERRATA_i608))
+		omap_ctrl_writel(OMAP36XX_RTA_DISABLE,
+				OMAP36XX_CONTROL_MEM_RTA_CTRL);
 
 	omap3_save_scratchpad_contents();
 err1:
