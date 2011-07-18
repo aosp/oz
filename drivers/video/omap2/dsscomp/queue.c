@@ -30,16 +30,10 @@
 
 #include "dsscomp.h"
 
-/* queue state */
-static DEFINE_MUTEX(mtx);
-
 /* free overlay structs */
 static LIST_HEAD(free_ois);
 
 #define QUEUE_SIZE	3
-
-#define MUTEXED(exp) ({ typeof(exp) __r;\
-	mutex_lock(&mtx); __r = (exp); mutex_unlock(&mtx); __r; })
 
 #undef STRICT_CHECK
 
@@ -84,9 +78,15 @@ static struct {
 
 	u32 ovl_mask;		/* overlays used on this display */
 	u32 ovl_qmask;		/* overlays queued to this display */
+	struct mutex mtx;
 } mgrq[MAX_MANAGERS];
 
 static struct dsscomp_dev *cdev;
+
+
+#define MUTEXED(exp, ix) ({ typeof(exp) __r;\
+	mutex_lock(&mgrq[ix].mtx); __r = (exp); \
+	mutex_unlock(&mgrq[ix].mtx); __r; })
 
 /*
  * ===========================================================================
@@ -133,6 +133,7 @@ int dsscomp_queue_init(struct dsscomp_dev *cdev_)
 				    cdev->ovls[j]->manager == mgr)
 					mgrq[i].ovl_mask |= 1 << j;
 			}
+			mutex_init(&mgrq[i].mtx);
 		}
 		return 0;
 	} else {
@@ -231,7 +232,8 @@ dsscomp_t dsscomp_new_sync_id(struct omap_overlay_manager *mgr, u32 sync_id)
 		return ERR_PTR(-EINVAL);
 
 	/* see if sync_id exists */
-	mutex_lock(&mtx);
+	mutex_lock(&mgrq[ix].mtx);
+
 	if (dsscomp_get(mgr, sync_id)) {
 		r = -EEXIST;
 		goto done;
@@ -268,7 +270,7 @@ dsscomp_t dsscomp_new_sync_id(struct omap_overlay_manager *mgr, u32 sync_id)
 	comp->magic = MAGIC_ACTIVE;
 	r = 0;
  done:
-	mutex_unlock(&mtx);
+	mutex_unlock(&mgrq[ix].mtx);
 	return r ? ERR_PTR(r) : comp;
 }
 EXPORT_SYMBOL(dsscomp_new_sync_id);
@@ -282,11 +284,11 @@ dsscomp_t dsscomp_find(struct omap_overlay_manager *mgr, u32 sync_id)
 		return ERR_PTR(-EINVAL);
 
 	/* see if sync_id exists */
-	mutex_lock(&mtx);
+	mutex_lock(&mgrq[mgr->id].mtx);
 	comp = dsscomp_get(mgr, sync_id);
 	if (IS_ERR(comp))
 		comp = NULL;
-	mutex_unlock(&mtx);
+	mutex_unlock(&mgrq[mgr->id].mtx);
 	return comp;
 }
 EXPORT_SYMBOL(dsscomp_find);
@@ -303,7 +305,7 @@ u32 dsscomp_first_sync_id(struct omap_overlay_manager *mgr)
 		return 0;
 
 	/* find first unapplied composition */
-	mutex_lock(&mtx);
+	mutex_lock(&mgrq[ix].mtx);
 	list_for_each_entry(comp, &mgrq[ix].q_ci, q) {
 		if (comp->magic == MAGIC_ACTIVE &&
 		    (DSSCOMP_SETUP_MODE_APPLY & ~comp->frm.mode)) {
@@ -311,7 +313,7 @@ u32 dsscomp_first_sync_id(struct omap_overlay_manager *mgr)
 			break;
 		}
 	}
-	mutex_unlock(&mtx);
+	mutex_unlock(&mgrq[ix].mtx);
 
 	return sync_id;
 }
@@ -320,7 +322,10 @@ EXPORT_SYMBOL(dsscomp_first_sync_id);
 /* returns overlays used in a composition */
 u32 dsscomp_get_ovls(dsscomp_t comp)
 {
-	BUG_ON(MUTEXED(IS_ERR(validate(comp))));
+	if (!comp)
+		return 0;
+
+	BUG_ON(MUTEXED(IS_ERR(validate(comp)), comp->ix));
 
 	return comp->ovl_mask;
 }
@@ -346,7 +351,7 @@ int dsscomp_set_ovl(dsscomp_t comp, struct dss2_ovl_info *ovl)
 		if (ix >= cdev->num_mgrs)
 			return -ENODEV;
 
-		mutex_lock(&mtx);
+		mutex_lock(&mgrq[ix].mtx);
 
 		/* check if composition is active */
 		chkcomp = validate(comp);
@@ -407,7 +412,7 @@ int dsscomp_set_ovl(dsscomp_t comp, struct dss2_ovl_info *ovl)
 		oi->ovl = *ovl;
 		r = 0;
  done:
-		mutex_unlock(&mtx);
+		mutex_unlock(&mgrq[ix].mtx);
 	}
 
 	return r;
@@ -422,7 +427,7 @@ int dsscomp_get_ovl(dsscomp_t comp, u32 ix, struct dss2_ovl_info *ovl)
 
 	if (comp && ovl) {
 		dsscomp_t chkcomp;
-		mutex_lock(&mtx);
+		mutex_lock(&mgrq[comp->ix].mtx);
 
 		/* check if composition is active */
 		chkcomp = validate(comp);
@@ -448,7 +453,7 @@ int dsscomp_get_ovl(dsscomp_t comp, u32 ix, struct dss2_ovl_info *ovl)
 			}
 		}
 
-		mutex_unlock(&mtx);
+		mutex_unlock(&mgrq[comp->ix].mtx);
 	}
 
 	return r;
@@ -462,7 +467,7 @@ int dsscomp_set_mgr(dsscomp_t comp, struct dss2_mgr_info *mgr)
 
 	if (comp && mgr) {
 		dsscomp_t chkcomp;
-		mutex_lock(&mtx);
+		mutex_lock(&mgrq[comp->ix].mtx);
 
 		/* check if composition is active */
 		chkcomp = validate(comp);
@@ -481,7 +486,7 @@ int dsscomp_set_mgr(dsscomp_t comp, struct dss2_mgr_info *mgr)
 		comp->frm.mgr = *mgr;
 		r = 0;
  done:
-		mutex_unlock(&mtx);
+		mutex_unlock(&mgrq[comp->ix].mtx);
 	}
 
 	return r;
@@ -495,7 +500,7 @@ int dsscomp_get_mgr(dsscomp_t comp, struct dss2_mgr_info *mgr)
 
 	if (comp && mgr) {
 		dsscomp_t chkcomp;
-		mutex_lock(&mtx);
+		mutex_lock(&mgrq[comp->ix].mtx);
 
 		/* check if composition is active */
 		chkcomp = validate(comp);
@@ -508,7 +513,7 @@ int dsscomp_get_mgr(dsscomp_t comp, struct dss2_mgr_info *mgr)
 			*mgr = comp->frm.mgr;
 		}
 
-		mutex_unlock(&mtx);
+		mutex_unlock(&mgrq[comp->ix].mtx);
 	}
 
 	return r;
@@ -523,7 +528,7 @@ int dsscomp_setup(dsscomp_t comp, enum dsscomp_setup_mode mode,
 
 	if (comp) {
 		dsscomp_t chkcomp;
-		mutex_lock(&mtx);
+		mutex_lock(&mgrq[comp->ix].mtx);
 
 		/* check if composition is active */
 		chkcomp = validate(comp);
@@ -537,7 +542,7 @@ int dsscomp_setup(dsscomp_t comp, enum dsscomp_setup_mode mode,
 			comp->frm.win = win;
 		}
 
-		mutex_unlock(&mtx);
+		mutex_unlock(&mgrq[comp->ix].mtx);
 	}
 
 	return r;
@@ -647,7 +652,10 @@ int dsscomp_apply(dsscomp_t comp)
 	bool change = false;
 	dsscomp_t chkcomp;
 
-	mutex_lock(&mtx);
+	if (!comp)
+		return -EINVAL;
+
+	mutex_lock(&mgrq[comp->ix].mtx);
 
 	/* check if composition is active */
 	chkcomp = validate(comp);
@@ -791,7 +799,7 @@ done:
 	if (change)
 		refresh_masks(display_ix);
 
-	mutex_unlock(&mtx);
+	mutex_unlock(&mgrq[comp->ix].mtx);
 
 	return r;
 }
@@ -820,7 +828,10 @@ int dsscomp_wait(dsscomp_t comp, enum dsscomp_wait_phase phase, int timeout)
 	u32 id;
 	dsscomp_t chkcomp;
 
-	mutex_lock(&mtx);
+	if (!comp)
+		return -EINVAL;
+
+	mutex_lock(&mgrq[comp->ix].mtx);
 
 	chkcomp = validate(comp);
 	id = IS_ERR(chkcomp) ? 0 : comp->frm.sync_id;
@@ -832,15 +843,17 @@ int dsscomp_wait(dsscomp_t comp, enum dsscomp_wait_phase phase, int timeout)
 
 	if (!IS_ERR(comp) && !is_wait_over(comp, phase)) {
 		u32 ix = comp->frm.mgr.ix;
+
+		mutex_unlock(&mgrq[comp->ix].mtx);
+
 		if (ix >= cdev->num_displays ||
 			!cdev->displays[ix] ||
 			!cdev->displays[ix]->manager)
-			return -1;
+			return -EINVAL;
 
 		ix = cdev->displays[ix]->manager->id;
 		if (ix >= cdev->num_mgrs)
-			return -1;
-		mutex_unlock(&mtx);
+			return -EINVAL;
 
 		/*
 		 * we can check being active without mutex because we will
@@ -856,10 +869,10 @@ int dsscomp_wait(dsscomp_t comp, enum dsscomp_wait_phase phase, int timeout)
 		if (timeout <= 0)
 			return timeout ? : -ETIME;
 
-		mutex_lock(&mtx);
+		mutex_lock(&mgrq[ix].mtx);
 	}
 
-	mutex_unlock(&mtx);
+	mutex_unlock(&mgrq[comp->ix].mtx);
 
 	return 0;
 }
@@ -875,6 +888,9 @@ void dsscomp_queue_exit(void)
 	struct dsscomp_data *c, *c2;
 	if (cis && ois && cdev) {
 		int i;
+		for (i = 0; i < cdev->num_mgrs; i++)
+			mutex_destroy(&mgrq[i].mtx);
+
 		for (i = 0; i < cdev->num_displays; i++) {
 			list_for_each_entry_safe(c, c2, &mgrq[i].q_ci, q)
 				dsscomp_drop(c);
