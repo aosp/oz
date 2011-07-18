@@ -115,7 +115,7 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
 		 * 2) CPU1 must re-enable the GIC distributor on
 		 * it's wakeup path.
 		 */
-		if (cpu_is_omap446x()) {
+		if (cpu_is_omap446x() && disable_gd) {
 			disable_gic_distributor();
 			disable_gd = 0;
 		}
