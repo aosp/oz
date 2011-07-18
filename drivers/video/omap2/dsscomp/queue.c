@@ -27,6 +27,7 @@
 #include <video/dsscomp.h>
 #include <plat/dsscomp.h>
 #include <mach/tiler.h>
+#include <linux/slab.h>
 
 #include "dsscomp.h"
 
@@ -63,6 +64,7 @@ static struct dsscomp_data {
 	struct list_head q;
 	struct list_head ois;
 	struct omapdss_ovl_cb cb;
+	void (*extra_cb)(dsscomp_t comp, int status);
 } *cis;
 
 static struct dss2_overlay {
@@ -79,6 +81,7 @@ static struct {
 	u32 ovl_mask;		/* overlays used on this display */
 	u32 ovl_qmask;		/* overlays queued to this display */
 	struct mutex mtx;
+	struct workqueue_struct *cb_wkq;
 } mgrq[MAX_MANAGERS];
 
 static struct dsscomp_dev *cdev;
@@ -97,7 +100,7 @@ static struct dsscomp_dev *cdev;
 /* Initialize queue structures, and set up state of the displays */
 int dsscomp_queue_init(struct dsscomp_dev *cdev_)
 {
-	u32 i, j, ncis, nois;
+	u32 i, j, ncis, nois, k;
 
 	cdev = cdev_;
 	ncis = QUEUE_SIZE * cdev->num_mgrs;
@@ -134,6 +137,12 @@ int dsscomp_queue_init(struct dsscomp_dev *cdev_)
 					mgrq[i].ovl_mask |= 1 << j;
 			}
 			mutex_init(&mgrq[i].mtx);
+			mgrq[i].cb_wkq = create_workqueue("dsscomp_cb");
+			if (!mgrq[i].cb_wkq) {
+				for (k = 0; k < i; k++)
+					destroy_workqueue(mgrq[k].cb_wkq);
+				return -EFAULT;
+			}
 		}
 		return 0;
 	} else {
@@ -587,27 +596,41 @@ void dsscomp_drop(dsscomp_t c)
 }
 EXPORT_SYMBOL(dsscomp_drop);
 
-static void dsscomp_mgr_callback(void *data, int id, int status)
+struct dsscomp_cb_work {
+	struct work_struct work;
+	struct dsscomp_data *comp;
+	int status;
+};
+
+static void dsscomp_mgr_delayed_cb(struct work_struct *work)
 {
-	struct dsscomp_data *comp = data;
+	struct dsscomp_cb_work *wk = container_of(work, typeof(*wk), work);
+	struct dsscomp_data *comp = wk->comp;
+	int status = wk->status;
 	u32 ix;
 
-	/* do any other callbacks */
-	if (comp->cb.fn)
-		comp->cb.fn(comp->cb.data, id, status);
+	kfree(work);
+	if (!comp)
+		return;
+
+	mutex_lock(&mgrq[comp->ix].mtx);
 
 	/* verify validity */
 	if (IS_ERR(validate(comp)))
 		return;
 
+	/* call extra callbacks if requested */
+	if (comp->extra_cb)
+		comp->extra_cb(comp, status);
+
 	ix = comp->frm.mgr.ix;
 	if (ix >= cdev->num_displays ||
 	    !cdev->displays[ix] ||
 	    !cdev->displays[ix]->manager)
-		return;
+		goto done;
 	ix = cdev->displays[ix]->manager->id;
 	if (ix >= cdev->num_mgrs)
-		return;
+		goto done;
 
 	/* handle programming & release */
 	if (status == DSS_COMPLETION_PROGRAMMED) {
@@ -618,10 +641,6 @@ static void dsscomp_mgr_callback(void *data, int id, int status)
 
 		/* update used overlay mask */
 		mgrq[ix].ovl_mask = comp->ovl_mask & ~comp->ovl_dmask;
-
-		/* if all overlays were disabled, the composition is complete */
-		if (comp->blank)
-			dsscomp_drop(comp);
 		refresh_masks(ix);
 	} else if ((status & DSS_COMPLETION_DISPLAYED) &&
 		   comp->magic == MAGIC_PROGRAMMED) {
@@ -635,6 +654,32 @@ static void dsscomp_mgr_callback(void *data, int id, int status)
 		/* composition is no longer displayed */
 		dsscomp_drop(comp);
 		refresh_masks(ix);
+	}
+done:
+
+	mutex_unlock(&mgrq[comp->ix].mtx);
+
+}
+
+static void dsscomp_mgr_callback(void *data, int id, int status)
+{
+	struct dsscomp_data *comp = data;
+	if (!comp)
+		return;
+
+	/* do any other callbacks */
+	if (comp->cb.fn)
+		comp->cb.fn(comp->cb.data, id, status);
+
+	if (status == DSS_COMPLETION_PROGRAMMED ||
+	    (status == DSS_COMPLETION_DISPLAYED &&
+	     comp->magic != MAGIC_DISPLAYED) ||
+	    (status & DSS_COMPLETION_RELEASED)) {
+		struct dsscomp_cb_work *wk = kzalloc(sizeof(*wk), GFP_ATOMIC);
+		wk->comp = comp;
+		wk->status = status;
+		INIT_WORK(&wk->work, dsscomp_mgr_delayed_cb);
+		queue_work(mgrq[comp->ix].cb_wkq, &wk->work);
 	}
 }
 
@@ -750,7 +795,11 @@ done_ovl:
 	if (r) {
 		dev_err(DEV(cdev), "[%08x] [%d] set failed %d\n",
 					d->sync_id, mgr->id, r);
+		/* extra callbacks in case of delayed apply */
+		if (comp->extra_cb)
+			comp->extra_cb(comp, DSS_COMPLETION_ECLIPSED_SET);
 		dsscomp_drop(comp);
+		refresh_masks(mgr->id);
 		change = true;
 		goto done;
 	} else {
@@ -795,10 +844,16 @@ done_ovl:
 	} else {
 		/* wait for sync to avoid tear */
 		r = mgr->apply(mgr) ? : mgr->wait_for_vsync(mgr);
+		if (r)
+			dev_err(DEV(cdev), "failed while applying %d", r);
+
+		/* ignore this error if callback has already been registered */
+		if (!mgr->info_dirty)
+			r = 0;
 	}
 done:
 	if (change)
-		refresh_masks(display_ix);
+		refresh_masks(mgr->id);
 
 	mutex_unlock(&mgrq[comp->ix].mtx);
 
@@ -900,6 +955,9 @@ void dsscomp_queue_exit(void)
 		vfree(ois);
 		cis = NULL;
 		ois = NULL;
+		for (i = 0; i < cdev->num_mgrs; i++)
+			destroy_workqueue(mgrq[i].cb_wkq);
+
 		cdev = NULL;
 	}
 }
