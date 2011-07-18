@@ -335,6 +335,7 @@ int dsscomp_set_ovl(dsscomp_t comp, struct dss2_ovl_info *ovl)
 		u32 i, mask = 1 << ovl->cfg.ix;
 		struct omap_overlay *o;
 		struct dss2_overlay *oi;
+		dsscomp_t chkcomp;
 		u32 ix = comp->frm.mgr.ix;
 		if (ix < cdev->num_displays &&
 		    cdev->displays[ix] &&
@@ -348,9 +349,9 @@ int dsscomp_set_ovl(dsscomp_t comp, struct dss2_ovl_info *ovl)
 		mutex_lock(&mtx);
 
 		/* check if composition is active */
-		comp = validate(comp);
-		if (IS_ERR(comp)) {
-			r = PTR_ERR(comp);
+		chkcomp = validate(comp);
+		if (IS_ERR(chkcomp)) {
+			r = PTR_ERR(chkcomp);
 			goto done;
 		}
 
@@ -420,12 +421,13 @@ int dsscomp_get_ovl(dsscomp_t comp, u32 ix, struct dss2_ovl_info *ovl)
 	struct dss2_overlay *oi;
 
 	if (comp && ovl) {
+		dsscomp_t chkcomp;
 		mutex_lock(&mtx);
 
 		/* check if composition is active */
-		comp = validate(comp);
-		if (IS_ERR(comp)) {
-			r = PTR_ERR(comp);
+		chkcomp = validate(comp);
+		if (IS_ERR(chkcomp)) {
+			r = PTR_ERR(chkcomp);
 		} else if (comp->magic != MAGIC_ACTIVE) {
 			r = -EACCES;
 		} else {
@@ -459,12 +461,13 @@ int dsscomp_set_mgr(dsscomp_t comp, struct dss2_mgr_info *mgr)
 	int r = -EFAULT;
 
 	if (comp && mgr) {
+		dsscomp_t chkcomp;
 		mutex_lock(&mtx);
 
 		/* check if composition is active */
-		comp = validate(comp);
-		if (IS_ERR(comp)) {
-			r = PTR_ERR(comp);
+		chkcomp = validate(comp);
+		if (IS_ERR(chkcomp)) {
+			r = PTR_ERR(chkcomp);
 			goto done;
 		}
 
@@ -491,12 +494,13 @@ int dsscomp_get_mgr(dsscomp_t comp, struct dss2_mgr_info *mgr)
 	int r = -EFAULT;
 
 	if (comp && mgr) {
+		dsscomp_t chkcomp;
 		mutex_lock(&mtx);
 
 		/* check if composition is active */
-		comp = validate(comp);
-		if (IS_ERR(comp)) {
-			r = PTR_ERR(comp);
+		chkcomp = validate(comp);
+		if (IS_ERR(chkcomp)) {
+			r = PTR_ERR(chkcomp);
 		} else if (comp->magic != MAGIC_ACTIVE) {
 			r = -EACCES;
 		} else {
@@ -518,12 +522,13 @@ int dsscomp_setup(dsscomp_t comp, enum dsscomp_setup_mode mode,
 	int r = -EFAULT;
 
 	if (comp) {
+		dsscomp_t chkcomp;
 		mutex_lock(&mtx);
 
 		/* check if composition is active */
-		comp = validate(comp);
-		if (IS_ERR(comp)) {
-			r = PTR_ERR(comp);
+		chkcomp = validate(comp);
+		if (IS_ERR(chkcomp)) {
+			r = PTR_ERR(chkcomp);
 		} else if (comp->magic != MAGIC_ACTIVE) {
 			r = -EACCES;
 		} else {
@@ -576,15 +581,13 @@ static void dsscomp_mgr_callback(void *data, int id, int status)
 {
 	struct dsscomp_data *comp = data;
 	u32 ix;
-	struct dss2_overlay *o, *o2;
 
 	/* do any other callbacks */
 	if (comp->cb.fn)
 		comp->cb.fn(comp->cb.data, id, status);
 
 	/* verify validity */
-	comp = validate(comp);
-	if (IS_ERR(comp))
+	if (IS_ERR(validate(comp)))
 		return;
 
 	ix = comp->frm.mgr.ix;
@@ -642,13 +645,14 @@ int dsscomp_apply(dsscomp_t comp)
 	struct dsscomp_data *c, *c2;
 	struct dss2_overlay *o, *o2;
 	bool change = false;
+	dsscomp_t chkcomp;
 
 	mutex_lock(&mtx);
 
 	/* check if composition is active */
-	comp = validate(comp);
-	if (IS_ERR(comp)) {
-		r = PTR_ERR(comp);
+	chkcomp = validate(comp);
+	if (IS_ERR(chkcomp)) {
+		r = PTR_ERR(chkcomp);
 		goto done;
 	}
 
@@ -801,8 +805,7 @@ EXPORT_SYMBOL(dsscomp_apply);
 /* return true iff composition phase has passed */
 static bool is_wait_over(dsscomp_t comp, enum dsscomp_wait_phase phase)
 {
-	comp = validate(comp);
-	return IS_ERR(comp) ||
+	return IS_ERR(validate(comp)) ||
 		(phase == DSSCOMP_WAIT_PROGRAMMED &&
 			(comp->magic == MAGIC_PROGRAMMED ||
 			 comp->magic == MAGIC_DISPLAYED)) ||
@@ -814,11 +817,12 @@ static bool is_wait_over(dsscomp_t comp, enum dsscomp_wait_phase phase)
 int dsscomp_wait(dsscomp_t comp, enum dsscomp_wait_phase phase, int timeout)
 {
 	u32 id;
+	dsscomp_t chkcomp;
 
 	mutex_lock(&mtx);
 
-	comp = validate(comp);
-	id = IS_ERR(comp) ? 0 : comp->frm.sync_id;
+	chkcomp = validate(comp);
+	id = IS_ERR(chkcomp) ? 0 : comp->frm.sync_id;
 	if (debug & DEBUG_WAITS)
 		dev_info(DEV(cdev), "wait %s on [%08x]\n",
 			phase == DSSCOMP_WAIT_DISPLAYED ? "display" :
