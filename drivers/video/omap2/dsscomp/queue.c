@@ -617,7 +617,7 @@ static void dsscomp_mgr_delayed_cb(struct work_struct *work)
 
 	/* verify validity */
 	if (IS_ERR(validate(comp)))
-		return;
+		goto done;
 
 	/* call extra callbacks if requested */
 	if (comp->extra_cb)
