@@ -45,7 +45,7 @@
 int omap_type(void);
 
 struct omap_chip_id {
-	u16 oc;
+	u32 oc:24;
 	u8 type;
 };
 
@@ -412,6 +412,7 @@ IS_OMAP_TYPE(4460, 0x4460)
 
 #define OMAP446X_CLASS 0x44600044
 #define OMAP4460_REV_ES1_0 (OMAP446X_CLASS | (0x10 << 8))
+#define OMAP4460_REV_ES1_1 (OMAP446X_CLASS | (0x20 << 8))
 
 /*
  * omap_chip bits
@@ -443,6 +444,7 @@ IS_OMAP_TYPE(4460, 0x4460)
 #define CHIP_IS_OMAP4430ES2_2		(1 << 13)
 #define CHIP_IS_OMAP4430ES2_3		(1 << 14)
 #define CHIP_IS_OMAP4460ES1_0		(1 << 15)
+#define CHIP_IS_OMAP4460ES1_1		(1 << 16)
 
 #define CHIP_IS_OMAP24XX		(CHIP_IS_OMAP2420 | CHIP_IS_OMAP2430)
 
@@ -452,9 +454,10 @@ IS_OMAP_TYPE(4460, 0x4460)
 						CHIP_IS_OMAP4430ES2_2 |\
 						CHIP_IS_OMAP4430ES2_3)
 
-#define CHIP_IS_OMAP4460 CHIP_IS_OMAP4460ES1_0
+#define CHIP_IS_OMAP4460		(CHIP_IS_OMAP4460ES1_0 | \
+						CHIP_IS_OMAP4460ES1_1)
 
-#define CHIP_IS_OMAP44XX (CHIP_IS_OMAP4430 | CHIP_IS_OMAP4460)
+#define CHIP_IS_OMAP44XX		(CHIP_IS_OMAP4430 | CHIP_IS_OMAP4460)
 
 /*
  * "GE" here represents "greater than or equal to" in terms of ES

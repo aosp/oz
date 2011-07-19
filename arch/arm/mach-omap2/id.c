@@ -401,10 +401,17 @@ void __init omap4_check_revision(void)
 			}
 			break;
 		case 0xa:
-			omap_revision = OMAP4460_REV_ES1_0;
-			omap_chip.oc |= CHIP_IS_OMAP4460ES1_0;
-			rev = 1;
-			dot = 0;
+			if (omap_rev_reg == 0x00) {
+				omap_revision = OMAP4460_REV_ES1_0;
+				omap_chip.oc |= CHIP_IS_OMAP4460ES1_0;
+				rev = 1;
+				dot = 0;
+			} else {
+				omap_revision = OMAP4460_REV_ES1_1;
+				omap_chip.oc |= CHIP_IS_OMAP4460ES1_1;
+				rev = 1;
+				dot = 1;
+			}
 			break;
 		default:
 			omap_revision = OMAP4430_REV_ES2_3;
