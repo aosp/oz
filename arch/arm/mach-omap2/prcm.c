@@ -36,6 +36,7 @@
 #include "prm-regbits-24xx.h"
 #include "prm-regbits-44xx.h"
 #include "cm-regbits-44xx.h"
+#include "cm-regbits-34xx.h"
 
 static void __iomem *prm_base;
 static void __iomem *prcm_mpu_base;
@@ -696,6 +697,8 @@ struct omap3_cm_regs {
 	u32 per_cm_clksel;
 	u32 emu_cm_clksel;
 	u32 emu_cm_clkstctrl;
+	/* Workaround for errata i671 */
+	u32 pll_cm_autoidle;
 	u32 pll_cm_autoidle2;
 	u32 pll_cm_clksel4;
 	u32 pll_cm_clksel5;
@@ -768,6 +771,9 @@ void omap3_cm_save_context(void)
 		cm_read_mod_reg(OMAP3430_EMU_MOD, CM_CLKSEL1);
 	cm_context.emu_cm_clkstctrl =
 		cm_read_mod_reg(OMAP3430_EMU_MOD, OMAP2_CM_CLKSTCTRL);
+	/*Workaround for errata i671*/
+	cm_context.pll_cm_autoidle =
+		cm_read_mod_reg(PLL_MOD, CM_AUTOIDLE);
 	cm_context.pll_cm_autoidle2 =
 		cm_read_mod_reg(PLL_MOD, CM_AUTOIDLE2);
 	cm_context.pll_cm_clksel4 =
@@ -873,6 +879,7 @@ void omap3_cm_save_context(void)
 
 void omap3_cm_restore_context(void)
 {
+	u32 v;
 	cm_write_mod_reg(cm_context.iva2_cm_clksel1, OMAP3430_IVA2_MOD,
 			       CM_CLKSEL1);
 	cm_write_mod_reg(cm_context.iva2_cm_clksel2, OMAP3430_IVA2_MOD,
@@ -890,6 +897,10 @@ void omap3_cm_restore_context(void)
 			       CM_CLKSEL1);
 	cm_write_mod_reg(cm_context.emu_cm_clkstctrl, OMAP3430_EMU_MOD,
 			       OMAP2_CM_CLKSTCTRL);
+	/*Workaround for errata i671. Restore only AUTO_PERIPH_DPLL field.*/
+	v = cm_read_mod_reg(PLL_MOD, CM_AUTOIDLE) & ~(OMAP3430_AUTO_PERIPH_DPLL_MASK);
+	v |= (cm_context.pll_cm_autoidle & OMAP3430_AUTO_PERIPH_DPLL_MASK);
+	cm_write_mod_reg(v, PLL_MOD, CM_AUTOIDLE);
 	cm_write_mod_reg(cm_context.pll_cm_autoidle2, PLL_MOD,
 			       CM_AUTOIDLE2);
 	cm_write_mod_reg(cm_context.pll_cm_clksel4, PLL_MOD,

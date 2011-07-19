@@ -268,8 +268,9 @@ void omap3_save_scratchpad_contents(void)
 			cm_read_mod_reg(WKUP_MOD, CM_CLKSEL);
 	prcm_block_contents.cm_clken_pll =
 			cm_read_mod_reg(PLL_MOD, CM_CLKEN);
+	/*Workaround for errata i671. Avoid extra latency at wakeup*/
 	prcm_block_contents.cm_autoidle_pll =
-			cm_read_mod_reg(PLL_MOD, OMAP3430_CM_AUTOIDLE_PLL);
+			cm_read_mod_reg(PLL_MOD, OMAP3430_CM_AUTOIDLE_PLL) & ~(OMAP3430_AUTO_PERIPH_DPLL_MASK);
 	prcm_block_contents.cm_clksel1_pll =
 			cm_read_mod_reg(PLL_MOD, OMAP3430_CM_CLKSEL1_PLL);
 	prcm_block_contents.cm_clksel2_pll =
