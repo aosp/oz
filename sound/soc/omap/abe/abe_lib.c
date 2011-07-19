@@ -143,6 +143,8 @@ void abe_write_fifo(u32 memory_bank, u32 descr_addr, u32 *data, u32 nb_data32)
 void abe_monitoring(void)
 {
 	abe->dbg_param = 0;
+
+	abe_src_filters_saturation_monitoring();
 }
 
 /**
@@ -450,4 +452,126 @@ void abe_decide_main_port(void)
 void abe_reset_filter(u32 address, u32 size)
 {
 	abe_reset_mem(ABE_SMEM, address << 3, size << 3);
+}
+
+/**
+ * abe_check_filter_is_saturating
+ * @address: filter address
+ * @size: filter size in byte
+ *
+ * Check if filter is saturating
+ * it is assumed that filter is located in SMEM
+ * if saturated return 1 otherwise 0.
+ */
+int abe_check_filter_is_saturating(u32 address, u32 size)
+{
+	/* need to be the highest buffer size among all buffer in SMEM */
+	u32 filter_value[S_XinASRC_DL_VX_sizeof << 1];
+	int i = 0;
+
+	abe_block_copy(COPY_FROM_ABE_TO_HOST, ABE_SMEM, address << 3,
+			&filter_value[0],
+			size << 3);
+
+	while ((i < (size << 3)) &&
+		(filter_value[i] < 0x700000 || filter_value[i] > 0x900000))
+			i++;
+
+	if (i < (size << 3))
+		return 1;
+
+	return 0;
+}
+
+/**
+ * abe_ul_src_filters_saturation_monitoring - monitor ABE UL SRC filters and
+ * check if some are saturating, if it's the case then reset these filters.
+ *
+ * it is assumed that filter is located in SMEM
+ */
+void abe_ul_src_filters_saturation_monitoring(void)
+{
+	int filter_saturating = 0;
+	u16 vx[NBROUTE_UL];
+
+	abe_block_copy(COPY_FROM_ABE_TO_HOST, ABE_DMEM,
+			D_aUplinkRouting_ADDR,
+			(u32 *) vx, D_aUplinkRouting_sizeof);
+
+	switch (vx[12]) {
+	case ZERO_labelID:
+		/* no MIC used */
+		return;
+	case DMIC1_L_labelID:
+	case DMIC1_R_labelID:
+		/* DMIC0 used */
+		filter_saturating =
+			abe_check_filter_is_saturating(S_DMIC1_ADDR,
+							S_DMIC1_sizeof);
+		break;
+	case DMIC2_L_labelID:
+	case DMIC2_R_labelID:
+		/* DMIC1 used */
+		filter_saturating =
+			abe_check_filter_is_saturating(S_DMIC2_ADDR,
+							S_DMIC2_sizeof);
+		break;
+	case DMIC3_L_labelID:
+	case DMIC3_R_labelID:
+		/* DMIC2 used */
+		filter_saturating =
+			abe_check_filter_is_saturating(S_DMIC3_ADDR,
+							S_DMIC3_sizeof);
+		break;
+	case BT_UL_L_labelID:
+	case BT_UL_R_labelID:
+		/* BT MIC used */
+		filter_saturating =
+			abe_check_filter_is_saturating(S_BT_UL_ADDR,
+							S_BT_UL_sizeof);
+		break;
+	case AMIC_L_labelID:
+	case AMIC_R_labelID:
+		/* AMIC used */
+		filter_saturating =
+			abe_check_filter_is_saturating(S_AMIC_ADDR,
+							S_AMIC_sizeof);
+		break;
+	default:
+		return;
+	}
+	if (filter_saturating) {
+		abe_reset_mic_ul_src_filters();
+		abe_reset_vx_ul_src_filters();
+	}
+}
+
+/**
+ * abe_vx_dl_src_filters_saturation_monitoring - monitor ABE VX-DL SRC filters and
+ * check if some are saturating, if it's the case then reset these filters.
+ *
+ * it is assumed that filter is located in SMEM
+ */
+void abe_vx_dl_src_filters_saturation_monitoring(void)
+{
+	if (abe_check_filter_is_saturating(S_VX_DL_ADDR, S_VX_DL_sizeof)) {
+		abe_reset_vx_dl_src_filters();
+		abe_reset_dl1_src_filters();
+		abe_reset_dl2_src_filters();
+	}
+
+	if (abe_check_filter_is_saturating(S_BT_DL_ADDR, S_BT_DL_sizeof))
+		abe_reset_bt_dl_src_filters();
+}
+
+/**
+ * abe_src_filters_saturation_monitoring - monitor ABE SRC filters and
+ * check if some are saturating, if it's the case then reset these filters.
+ *
+ * it is assumed that filter is located in SMEM
+ */
+void abe_src_filters_saturation_monitoring(void)
+{
+	abe_ul_src_filters_saturation_monitoring();
+	abe_vx_dl_src_filters_saturation_monitoring();
 }

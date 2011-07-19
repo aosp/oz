@@ -120,6 +120,8 @@ int abe_load_fw_param(u32 *ABE_FW)
 {
 	u32 pmem_size, dmem_size, smem_size, cmem_size;
 	u32 *pmem_ptr, *dmem_ptr, *smem_ptr, *cmem_ptr, *fw_ptr;
+	/* fast counter timer set at 4096 * 250us = 1,024s */
+	u32 data = 0x10001000;
 
 	_log(id_load_fw_param, 0, 0, 0);
 #define ABE_FW_OFFSET 5
@@ -141,6 +143,10 @@ int abe_load_fw_param(u32 *ABE_FW)
 		       smem_ptr, smem_size);
 	abe_block_copy(COPY_FROM_HOST_TO_ABE, ABE_DMEM, 0,
 		       dmem_ptr, dmem_size);
+
+	abe_block_copy(COPY_FROM_HOST_TO_ABE, ABE_DMEM,
+			D_fastCounter_ADDR, &data,
+			D_fastCounter_sizeof);
 
 	return 0;
 }

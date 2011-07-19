@@ -67,6 +67,7 @@
 /*
  * HAL INTERNAL AP
  */
+void abe_src_filters_saturation_monitoring(void);
 void abe_reset_filter(u32 address, u32 size);
 void abe_decide_main_port(void);
 void abe_gain_offset(u32 id, u32 *mixer_offset);
