@@ -137,7 +137,9 @@ int dsscomp_queue_init(struct dsscomp_dev *cdev_)
 					mgrq[i].ovl_mask |= 1 << j;
 			}
 			mutex_init(&mgrq[i].mtx);
-			mgrq[i].cb_wkq = create_workqueue("dsscomp_cb");
+
+			mgrq[i].cb_wkq =
+				__create_workqueue("dsscomp_cb", 1, 1, 1);
 			if (!mgrq[i].cb_wkq) {
 				for (k = 0; k < i; k++)
 					destroy_workqueue(mgrq[k].cb_wkq);
