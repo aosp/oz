@@ -911,6 +911,7 @@ static void unmute_be_capture(struct snd_pcm_substream *substream)
 		case OMAP_ABE_DAI_BT_VX:
 		case OMAP_ABE_DAI_MM_FM:
 		case OMAP_ABE_DAI_MODEM:
+			abe_reset_mic_ul_src_filters();
 			break;
 		case OMAP_ABE_DAI_DMIC0:
 			abe_unmute_gain(GAINS_DMIC1, GAIN_LEFT_OFFSET);
@@ -988,7 +989,17 @@ static void unmute_be_playback(struct snd_pcm_substream *substream)
 		case OMAP_ABE_DAI_PDM_VIB:
 		case OMAP_ABE_DAI_BT_VX:
 		case OMAP_ABE_DAI_MM_FM:
+			break;
 		case OMAP_ABE_DAI_MODEM:
+			if (abe_data.be_active[OMAP_ABE_DAI_PDM_DL1]
+						[SNDRV_PCM_STREAM_PLAYBACK])
+				abe_reset_dl1_src_filters();
+			if (abe_data.be_active[OMAP_ABE_DAI_PDM_DL2]
+						[SNDRV_PCM_STREAM_PLAYBACK])
+				abe_reset_dl2_src_filters();
+			if (abe_data.be_active[OMAP_ABE_DAI_BT_VX]
+						[SNDRV_PCM_STREAM_PLAYBACK])
+				abe_reset_bt_dl_src_filters();
 			break;
 		}
 	}
@@ -1331,7 +1342,24 @@ static void mute_fe_port(struct snd_pcm_substream *substream, int stream)
 		}
 		break;
 	case ABE_FRONTEND_DAI_VIBRA:
-
+		break;
+	case ABE_FRONTEND_DAI_MODEM:
+		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
+			if (abe_data.be_active[OMAP_ABE_DAI_PDM_DL2]
+						[SNDRV_PCM_STREAM_PLAYBACK]) {
+				abe_mute_gain(MIXDL2, MIX_DL2_INPUT_VX_DL);
+			}
+			if ((abe_data.be_active[OMAP_ABE_DAI_PDM_DL1]
+						[SNDRV_PCM_STREAM_PLAYBACK]) ||
+			    (abe_data.be_active[OMAP_ABE_DAI_MM_FM]
+						[SNDRV_PCM_STREAM_PLAYBACK]) ||
+			    (abe_data.be_active[OMAP_ABE_DAI_BT_VX]
+						[SNDRV_PCM_STREAM_PLAYBACK])) {
+				abe_mute_gain(MIXDL1, MIX_DL1_INPUT_VX_DL);
+			}
+		} else {
+			abe_mute_gain(MIXAUDUL, MIX_AUDUL_INPUT_UPLINK);
+		}
 		break;
 	}
 }
@@ -1373,7 +1401,26 @@ static void unmute_fe_port(struct snd_pcm_substream *substream, int stream)
 		}
 		break;
 	case ABE_FRONTEND_DAI_VIBRA:
-
+		break;
+	case ABE_FRONTEND_DAI_MODEM:
+		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
+			abe_reset_vx_dl_src_filters();
+			if (abe_data.be_active[OMAP_ABE_DAI_PDM_DL2]
+						[SNDRV_PCM_STREAM_PLAYBACK]) {
+				abe_unmute_gain(MIXDL2, MIX_DL2_INPUT_VX_DL);
+			}
+			if ((abe_data.be_active[OMAP_ABE_DAI_PDM_DL1]
+						[SNDRV_PCM_STREAM_PLAYBACK]) ||
+			    (abe_data.be_active[OMAP_ABE_DAI_MM_FM]
+						[SNDRV_PCM_STREAM_PLAYBACK]) ||
+			    (abe_data.be_active[OMAP_ABE_DAI_BT_VX]
+						[SNDRV_PCM_STREAM_PLAYBACK])) {
+				abe_unmute_gain(MIXDL1, MIX_DL1_INPUT_VX_DL);
+			}
+		} else {
+			abe_reset_vx_ul_src_filters();
+			abe_unmute_gain(MIXAUDUL, MIX_AUDUL_INPUT_UPLINK);
+		}
 		break;
 	}
 }
@@ -1435,18 +1482,30 @@ static void capture_trigger(struct snd_pcm_substream *substream, int cmd)
 
 		/* Restore ABE GAINS AMIC */
 		unmute_be_capture(substream);
+
+		/* unmute front-end */
+		unmute_fe_port(substream, SNDRV_PCM_STREAM_CAPTURE);
 		break;
 	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
 		/* Enable sDMA / Enable ABE MM_UL2 */
 		enable_fe_ports(substream, SNDRV_PCM_STREAM_CAPTURE);
+
+		/* unmute front-end */
+		unmute_fe_port(substream, SNDRV_PCM_STREAM_CAPTURE);
 		break;
 	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
 		/* Disable sDMA / Enable ABE MM_UL2 */
 		disable_fe_ports(substream, SNDRV_PCM_STREAM_CAPTURE);
+
+		/* mute front-end */
+		mute_fe_port(substream, SNDRV_PCM_STREAM_CAPTURE);
 		break;
 	case SNDRV_PCM_TRIGGER_STOP:
 		/* Disable sDMA */
 		disable_fe_ports(substream, SNDRV_PCM_STREAM_CAPTURE);
+
+		/* mute front-end */
+		mute_fe_port(substream, SNDRV_PCM_STREAM_CAPTURE);
 
 		disable_be_ports(substream, SNDRV_PCM_STREAM_CAPTURE);
 
@@ -1487,14 +1546,14 @@ static void playback_trigger(struct snd_pcm_substream *substream, int cmd)
 		/*  trigger ALL BE ports */
 		trigger_be_ports(substream, cmd);
 
-		/* TODO: unmute DL1 */
-		unmute_be_playback(substream);
-
 		/* Enable Frontend sDMA  */
 		enable_fe_ports(substream, SNDRV_PCM_STREAM_PLAYBACK);
 
 		/* unmute ABE_MM_DL */
 		unmute_fe_port(substream, SNDRV_PCM_STREAM_PLAYBACK);
+
+		/* TODO: unmute DL1 */
+		unmute_be_playback(substream);
 		break;
 	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
 		/* Enable Frontend sDMA  */
