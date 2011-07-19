@@ -1340,6 +1340,7 @@ static void dss_completion_irq_handler(void *data, u32 mask)
 	struct overlay_cache_data *oc;
 	const int num_ovls = ARRAY_SIZE(dss_cache.overlay_cache);
 	const int num_mgrs = MAX_DSS_MANAGERS;
+	unsigned long flags;
 	const u32 masks[] = {
 		DISPC_IRQ_FRAMEDONE | DISPC_IRQ_VSYNC,
 		DISPC_IRQ_FRAMEDONE_DIG | DISPC_IRQ_EVSYNC_EVEN |
@@ -1349,7 +1350,7 @@ static void dss_completion_irq_handler(void *data, u32 mask)
 	int i;
 	bool notify = false;
 
-	spin_lock(&dss_cache.lock);
+	spin_lock_irqsave(&dss_cache.lock, flags);
 
 	for (i = 0; i < num_mgrs; i++) {
 		mc = &dss_cache.manager_cache[i];
@@ -1382,7 +1383,7 @@ static void dss_completion_irq_handler(void *data, u32 mask)
 		dss_cache.comp_irq_enabled = false;
 	}
 
-	spin_unlock(&dss_cache.lock);
+	spin_unlock_irqrestore(&dss_cache.lock, flags);
 }
 
 void dss_start_update(struct omap_dss_device *dssdev)
@@ -1452,11 +1453,12 @@ static void dss_apply_irq_handler(void *data, u32 mask)
 	int i, r;
 	bool mgr_busy[MAX_DSS_MANAGERS];
 	bool notify = false;
+	unsigned long flags;
 
 	for (i = 0; i < num_mgrs; i++)
 		mgr_busy[i] = dispc_go_busy(i);
 
-	spin_lock(&dss_cache.lock);
+	spin_lock_irqsave(&dss_cache.lock, flags);
 
 	for (i = 0; i < num_ovls; ++i) {
 		oc = &dss_cache.overlay_cache[i];
@@ -1515,7 +1517,7 @@ static void dss_apply_irq_handler(void *data, u32 mask)
 	dss_cache.irq_enabled = false;
 
 end:
-	spin_unlock(&dss_cache.lock);
+	spin_unlock_irqrestore(&dss_cache.lock, flags);
 }
 
 static int omap_dss_mgr_apply(struct omap_overlay_manager *mgr)
