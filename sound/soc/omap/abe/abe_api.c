@@ -2140,3 +2140,159 @@ void abe_write_pdmdl_offset(u32 path, u32 offset_left, u32 offset_right)
 }
 EXPORT_SYMBOL(abe_write_pdmdl_offset);
 
+/**
+ * abe_reset_vx_ul_src_filters - reset VX-UL port SRC filters
+ *
+ * it is assumed that filters are located in SMEM
+ */
+void abe_reset_vx_ul_src_filters(void)
+{
+	if (abe_port[VX_UL_PORT].format.f == 8000) {
+		abe_reset_filter(S_VX_UL_48_8_LP_data_ADDR,
+				S_VX_UL_48_8_LP_data_sizeof);
+		abe_reset_filter(S_VX_UL_48_8_HP_data_ADDR,
+				S_VX_UL_48_8_HP_data_sizeof);
+	} else if (abe_port[VX_UL_PORT].format.f == 16000) {
+		abe_reset_filter(S_VX_UL_48_16_LP_data_ADDR,
+				S_VX_UL_48_16_LP_data_sizeof);
+		abe_reset_filter(S_VX_UL_48_16_HP_data_ADDR,
+				S_VX_UL_48_16_HP_data_sizeof);
+	}
+}
+EXPORT_SYMBOL(abe_reset_vx_ul_src_filters);
+
+/**
+ * abe_reset_mic_ul_src_filters - reset AMIC or DMICs or BT UL SRC filters
+ *
+ * it is assumed that filters are located in SMEM
+ */
+void abe_reset_mic_ul_src_filters(void)
+{
+	u16 vx[NBROUTE_UL];
+
+	abe_block_copy(COPY_FROM_ABE_TO_HOST, ABE_DMEM,
+			D_aUplinkRouting_ADDR,
+			(u32 *) vx, D_aUplinkRouting_sizeof);
+
+	switch (vx[12]) {
+	case ZERO_labelID:
+		/* no MIC used */
+		return;
+	case DMIC1_L_labelID:
+	case DMIC1_R_labelID:
+		/* DMIC0 used */
+		abe_reset_filter(S_DMIC0_96_48_data_ADDR,
+				S_DMIC0_96_48_data_sizeof);
+		break;
+	case DMIC2_L_labelID:
+	case DMIC2_R_labelID:
+		/* DMIC1 used */
+		abe_reset_filter(S_DMIC1_96_48_data_ADDR,
+				S_DMIC1_96_48_data_sizeof);
+		break;
+	case DMIC3_L_labelID:
+	case DMIC3_R_labelID:
+		/* DMIC2 used */
+		abe_reset_filter(S_DMIC2_96_48_data_ADDR,
+				S_DMIC2_96_48_data_sizeof);
+		break;
+	case BT_UL_L_labelID:
+	case BT_UL_R_labelID:
+		/* BT MIC used */
+		if (abe_port[BT_VX_UL_PORT].format.f == 8000) {
+			abe_reset_filter(S_BT_UL_8_48_HP_data_ADDR,
+					S_BT_UL_8_48_HP_data_sizeof);
+			abe_reset_filter(S_BT_UL_8_48_OSR_LP_data_ADDR,
+					S_BT_UL_8_48_OSR_LP_data_sizeof);
+			abe_reset_filter(S_BT_UL_8_48_LP_data_ADDR,
+					S_BT_UL_8_48_LP_data_sizeof);
+		} else if (abe_port[BT_VX_UL_PORT].format.f == 16000) {
+			abe_reset_filter(S_BT_UL_16_48_HP_data_ADDR,
+					S_BT_UL_16_48_HP_data_sizeof);
+			abe_reset_filter(S_BT_UL_16_48_LP_data_ADDR,
+					S_BT_UL_16_48_LP_data_sizeof);
+		}
+		break;
+	case AMIC_L_labelID:
+	case AMIC_R_labelID:
+		/* AMIC used */
+		abe_reset_filter(S_AMIC_96_48_data_ADDR,
+				S_AMIC_96_48_data_sizeof);
+		break;
+	default:
+		return;
+	}
+}
+EXPORT_SYMBOL(abe_reset_mic_ul_src_filters);
+
+/**
+ * abe_reset_vx_dl_src_filters - reset VX-DL port SRC filters
+ *
+ * it is assumed that filters are located in SMEM
+ */
+void abe_reset_vx_dl_src_filters(void)
+{
+	if (abe_port[VX_DL_PORT].format.f == 8000) {
+		abe_reset_filter(S_VX_DL_8_48_HP_data_ADDR,
+				S_VX_DL_8_48_HP_data_sizeof);
+		abe_reset_filter(S_VX_DL_8_48_OSR_LP_data_ADDR,
+				S_VX_DL_8_48_OSR_LP_data_sizeof);
+		abe_reset_filter(S_VX_DL_8_48_LP_data_ADDR,
+				S_VX_DL_8_48_LP_data_sizeof);
+	} else if (abe_port[VX_DL_PORT].format.f == 16000) {
+		abe_reset_filter(S_VX_DL_16_48_HP_data_ADDR,
+				S_VX_DL_16_48_HP_data_sizeof);
+		abe_reset_filter(S_VX_DL_16_48_LP_data_ADDR,
+				S_VX_DL_16_48_LP_data_sizeof);
+	}
+}
+EXPORT_SYMBOL(abe_reset_vx_dl_src_filters);
+
+/**
+ * abe_reset_dl1_src_filters - reset DL1 path filters
+ *
+ * it is assumed that filters are located in SMEM
+ */
+void abe_reset_dl1_src_filters(void)
+{
+	abe_reset_filter(S_DL1_M_EQ_data_ADDR,
+			S_DL1_M_EQ_data_sizeof);
+	abe_reset_filter(S_EARP_48_96_LP_data_ADDR,
+			S_EARP_48_96_LP_data_sizeof);
+}
+EXPORT_SYMBOL(abe_reset_dl1_src_filters);
+
+/**
+ * abe_reset_dl2_src_filters - reset DL2 path filters
+ *
+ * it is assumed that filters are located in SMEM
+ */
+void abe_reset_dl2_src_filters(void)
+{
+	abe_reset_filter(S_DL2_M_LR_EQ_data_ADDR,
+			S_DL2_M_LR_EQ_data_sizeof);
+	abe_reset_filter(S_IHF_48_96_LP_data_ADDR,
+			S_IHF_48_96_LP_data_sizeof);
+}
+EXPORT_SYMBOL(abe_reset_dl2_src_filters);
+
+/**
+ * abe_reset_bt_dl_src_filters - reset bluetooth DL SRC path filters
+ *
+ * it is assumed that filters are located in SMEM
+ */
+void abe_reset_bt_dl_src_filters(void)
+{
+	if (abe_port[BT_VX_DL_PORT].format.f == 8000) {
+		abe_reset_filter(S_BT_DL_48_8_LP_data_ADDR,
+				S_BT_DL_48_8_LP_data_sizeof);
+		abe_reset_filter(S_BT_DL_48_8_HP_data_ADDR,
+				S_BT_DL_48_8_HP_data_sizeof);
+	} else if (abe_port[BT_VX_DL_PORT].format.f == 16000) {
+		abe_reset_filter(S_BT_DL_48_16_LP_data_ADDR,
+				S_BT_DL_48_16_LP_data_sizeof);
+		abe_reset_filter(S_BT_DL_48_16_HP_data_ADDR,
+				S_BT_DL_48_16_HP_data_sizeof);
+	}
+}
+EXPORT_SYMBOL(abe_reset_bt_dl_src_filters);

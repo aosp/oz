@@ -67,6 +67,7 @@
 /*
  * HAL INTERNAL AP
  */
+void abe_reset_filter(u32 address, u32 size);
 void abe_decide_main_port(void);
 void abe_gain_offset(u32 id, u32 *mixer_offset);
 void abe_int_2_float16(u32 data, u32 *mantissa, u32 *exp);

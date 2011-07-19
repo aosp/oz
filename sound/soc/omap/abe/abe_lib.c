@@ -439,3 +439,15 @@ void abe_decide_main_port(void)
 	else
 		abe_select_main_port(abe_port_priority[id]);
 }
+
+/**
+ * abe_reset_filter
+ * @address: filter address
+ * @size: filter size in byte
+ *
+ * it is assumed that filter is located in SMEM
+ */
+void abe_reset_filter(u32 address, u32 size)
+{
+	abe_reset_mem(ABE_SMEM, address << 3, size << 3);
+}

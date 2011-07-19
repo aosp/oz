@@ -667,5 +667,47 @@ void abe_add_subroutine(u32 *id, abe_subroutine2 f, u32 nparam, u32 *params);
  */
 int abe_read_next_ping_pong_buffer(u32 port, u32 *p, u32 *n);
 
+/**
+ * abe_reset_vx_ul_src_filters - reset VX-UL port SRC filters
+ *
+ * it is assumed that filters are located in SMEM
+ */
+void abe_reset_vx_ul_src_filters(void);
+
+/**
+ * abe_reset_mic_ul_src_filters - reset AMIC or DMICs or BT UL SRC filters
+ *
+ * it is assumed that filters are located in SMEM
+ */
+void abe_reset_mic_ul_src_filters(void);
+
+/**
+ * abe_reset_vx_dl_src_filters - reset VX-DL port SRC filters
+ *
+ * it is assumed that filters are located in SMEM
+ */
+void abe_reset_vx_dl_src_filters(void);
+
+/**
+ * abe_reset_dl1_src_filters - reset DL1 path filters
+ *
+ * it is assumed that filters are located in SMEM
+ */
+void abe_reset_dl1_src_filters(void);
+
+/**
+ * abe_reset_dl2_src_filters - reset DL2 path filters
+ *
+ * it is assumed that filters are located in SMEM
+ */
+void abe_reset_dl2_src_filters(void);
+
+/**
+ * abe_reset_bt_dl_src_filters - reset bluetooth DL SRC path filters
+ *
+ * it is assumed that filters are located in SMEM
+ */
+void abe_reset_bt_dl_src_filters(void);
+
 extern u32 abe_irq_pingpong_player_id;
 #endif/* _ABE_API_H_ */
