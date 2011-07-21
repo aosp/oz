@@ -127,6 +127,7 @@ int omap4_charger_detect(void)
 		chargertype = ((usb2phycore >> 21) & 0x7);
 		if (usb2phycore & USB2PHY_CHGDETECTED)
 			break;
+		msleep_interruptible(10);
 	} while (!time_after(jiffies, timeout));
 
 	switch (chargertype) {
