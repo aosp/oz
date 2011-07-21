@@ -249,7 +249,8 @@ static int __init omap_l2_cache_init(void)
 		omap4_secure_dispatcher(
 				PPA_SERVICE_PL310_POR, 0x7, 1,
 				l2x0_por, 0, 0, 0);
-	}
+	} else if (omap_rev() > OMAP4430_REV_ES2_1)
+			omap_smc1(0x113, l2x0_por);
 
 	/*
 	 * FIXME : Temporary WA for the OMAP4460 stability

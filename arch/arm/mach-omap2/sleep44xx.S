@@ -175,21 +175,34 @@ skip_enable_smp_bit:			@ GP device should execute from here
 	smc     #0
 	b	skip_l2en
 check_por:
-	ldr	r0, =OMAP44XX_SAR_RAM_BASE  @ Check DEVICE type
-	ldr	r1, [r0, #OMAP_TYPE_OFFSET]
-	cmp	r1, #0x1                   @ Check for HS device
-	bne	skip_por
 	CPU_REV_CMP #0xa	@Check for 4460 family
 	itt	lt
-	adrlt	r3, POR_params	@Check for ES1.0
-	blt	por_setup
-	CPU_MINOR_REV_CMP #0x0
+	adrlt	r3, POR_params
+	blt	check_dev_type
+	CPU_MINOR_REV_CMP #0x0	@Check for ES1.0
 	ite	eq
 	adreq	r3, POR_4460es10_params
 	adrgt	r3, POR_4460_params
-por_setup:
+check_dev_type:
+	ldr	r0, =OMAP44XX_SAR_RAM_BASE  @ Check DEVICE type
+	ldr	r1, [r0, #OMAP_TYPE_OFFSET]
+	cmp	r1, #0x1	@Check for HS device
+	bne	por_setup_gp
+por_setup_emu:
 	ldr	r0, =PPA_SERVICE_PL310_POR @ Setup PPA HAL call
 	LM_CALL_PPA_SERVICE_PA
+	b	skip_por
+por_setup_gp:
+	adr	r4, POR_params
+	cmp	r3, r4
+	bne	smc_call
+	CPU_MINOR_REV_CMP #0x4	@Check for ES2.2
+	blt	skip_por
+smc_call:
+	ldr	r0, [r3, #0x4]
+	ldr	r12, =0x113	@Setup POR value
+	dsb
+	smc	#0
 skip_por:
 	CPU_REV_CMP #0xa	@Check for 4460 family
 	itt	lt
