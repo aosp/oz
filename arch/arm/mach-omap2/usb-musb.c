@@ -442,19 +442,16 @@ void __init usb_musb_init(struct omap_musb_board_data *board_data)
 			put_device(dev);
 		}
 
-		if (omap_rev() > OMAP3630_REV_ES1_1) {
-			otg_base = ioremap(OMAP34XX_HSUSB_OTG_BASE, SZ_4K);
+		otg_base = ioremap(OMAP34XX_HSUSB_OTG_BASE, SZ_4K);
 
-			if (WARN_ON(!otg_base))
-				return;
+		if (WARN_ON(!otg_base))
+			return;
 
-			/* Reset OTG controller.  After reset, it will be in
-			 * force-idle, force-standby mode. */
-			__raw_writel(OTG_SYSC_SOFTRESET, otg_base +
-								OTG_SYSCONFIG);
+		/* Reset OTG controller.  After reset, it will be in
+		 * force-idle, force-standby mode. */
+		__raw_writel(OTG_SYSC_SOFTRESET, otg_base + OTG_SYSCONFIG);
 
-			iounmap(otg_base);
-		}
+		iounmap(otg_base);
 
 		/* powerdown the phy */
 		if (board_data->interface_type == MUSB_INTERFACE_UTMI)

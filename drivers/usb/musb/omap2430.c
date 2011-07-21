@@ -422,31 +422,17 @@ int __init musb_platform_init(struct musb *musb)
 		wake_lock_destroy(&plat->musb_lock);
 	}
 
-	/* Keep the old initalization code for revisions < 1.2
-	 * since the new code seem to crash the older boards
-	 * when coming out of power off mode
-	 */
-	if (omap_rev() < OMAP3630_REV_ES1_2) {
+	devctl = musb_readb(musb->mregs, MUSB_DEVCTL);
+	if ((devctl & MUSB_DEVCTL_VBUS) != (3 << MUSB_DEVCTL_VBUS_SHIFT)) {
 		/* configure in force idle/ standby */
 		musb_writel(musb->mregs, OTG_FORCESTDBY, 1);
-		val = musb_readl(musb->mregs, OTG_SYSCONFIG);
-		val &= ~(SMARTIDLEWKUP | NOSTDBY | ENABLEWAKEUP);
-		val |= FORCEIDLE | FORCESTDBY;
+		val = FORCEIDLE | FORCESTDBY;
 		musb_writel(musb->mregs, OTG_SYSCONFIG, val);
 	} else {
-		devctl = musb_readb(musb->mregs, MUSB_DEVCTL);
-		if ((devctl & MUSB_DEVCTL_VBUS) !=
-					(3 << MUSB_DEVCTL_VBUS_SHIFT)) {
-			/* configure in force idle/ standby */
-			musb_writel(musb->mregs, OTG_FORCESTDBY, 1);
-			val = FORCEIDLE | FORCESTDBY;
-			musb_writel(musb->mregs, OTG_SYSCONFIG, val);
-		} else {
-			/* configure smart idle when usb cable inserted at *
-			 * startup*/
-			val =  SMARTIDLE | SMARTSTDBY | ENABLEWAKEUP;
-			musb_writel(musb->mregs, OTG_SYSCONFIG, val);
-		}
+		/* configure smart idle when usb cable inserted at *
+		 * startup*/
+		val =  SMARTIDLE | SMARTSTDBY | ENABLEWAKEUP;
+		musb_writel(musb->mregs, OTG_SYSCONFIG, val);
 	}
 
 	return 0;
@@ -486,8 +472,6 @@ void musb_platform_restore_context(struct musb *musb,
 	}
 	musb_writel(musb->mregs, OTG_INTERFSEL,
 					musb_context->otg_interfacesel);
-	if (omap_rev() < OMAP3630_REV_ES1_2)
-		forcestandby = 0;
 	musb_writel(musb_base, OTG_FORCESTDBY, forcestandby);
 }
 #endif
