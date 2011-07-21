@@ -159,30 +159,6 @@ OMAP_ERROR OMAPLFBGetLibFuncAddr (char *szFunctionName,
 	return OMAP_OK;
 }
 
-#if defined(FLIP_TECHNIQUE_FRAMEBUFFER)
-/*
- * Presents the flip in the display with the framebuffer API
- * in: psSwapChain, aPhyAddr
- */
-static void OMAPLFBFlipNoLock(OMAPLFB_SWAPCHAIN *psSwapChain,
-	unsigned long aPhyAddr)
-{
-	OMAPLFB_DEVINFO *psDevInfo = (OMAPLFB_DEVINFO *)psSwapChain->pvDevInfo;
-	struct fb_info *framebuffer = psDevInfo->psLINFBInfo;
-
-	/* Get the framebuffer physical address base */
-	unsigned long fb_base_phyaddr =
-		psDevInfo->sSystemBuffer.sSysAddr.uiAddr;
-
-	/* Calculate the virtual Y to move in the framebuffer */
-	framebuffer->var.yoffset =
-		(aPhyAddr - fb_base_phyaddr) / framebuffer->fix.line_length;
-	framebuffer->var.activate = FB_ACTIVATE_FORCE;
-	fb_set_var(framebuffer, &framebuffer->var);
-}
-
-#elif defined(FLIP_TECHNIQUE_OVERLAY)
-
 /* Must be called within framebuffer lock to prevent race conditions */
 static dsscomp_t find_dsscomp_obj(struct omap_overlay_manager *manager)
 {
@@ -208,7 +184,6 @@ static void vdisp_sync_handler(struct work_struct *work)
 
 /*
  * Presents the flip in the display with the DSSComp API
- * in: psSwapChain, aPhyAddr
  */
 static void OMAPLFBFlipDSSComp(OMAPLFB_SWAPCHAIN *psSwapChain,
 	unsigned long aPhyAddr, dsscomp_t comp)
@@ -297,6 +272,30 @@ tv_comp_invalid:
 done:
 	return;
 }
+
+#if defined(FLIP_TECHNIQUE_FRAMEBUFFER)
+/*
+ * Presents the flip in the display with the framebuffer API
+ * in: psSwapChain, aPhyAddr
+ */
+static void OMAPLFBFlipDSS(OMAPLFB_SWAPCHAIN *psSwapChain,
+	unsigned long aPhyAddr)
+{
+	OMAPLFB_DEVINFO *psDevInfo = (OMAPLFB_DEVINFO *)psSwapChain->pvDevInfo;
+	struct fb_info *framebuffer = psDevInfo->psLINFBInfo;
+
+	/* Get the framebuffer physical address base */
+	unsigned long fb_base_phyaddr =
+		psDevInfo->sSystemBuffer.sSysAddr.uiAddr;
+
+	/* Calculate the virtual Y to move in the framebuffer */
+	framebuffer->var.yoffset =
+		(aPhyAddr - fb_base_phyaddr) / framebuffer->fix.line_length;
+	framebuffer->var.activate = FB_ACTIVATE_FORCE;
+	fb_set_var(framebuffer, &framebuffer->var);
+}
+
+#elif defined(FLIP_TECHNIQUE_OVERLAY)
 
 /*
  * Presents the flip in the display with the DSS2 overlay API
