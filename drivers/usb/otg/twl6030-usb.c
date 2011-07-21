@@ -371,7 +371,7 @@ static int twl6030_enable_irq(struct otg_transceiver *x)
 {
 	struct twl6030_usb *twl = xceiv_to_twl(x);
 
-	twl6030_writeb(twl, TWL_MODULE_USB, USB_ID_INT_EN_HI_SET, 0x1);
+	twl6030_writeb(twl, TWL_MODULE_USB, 0x01, USB_ID_INT_EN_HI_SET);
 	twl6030_interrupt_unmask(0x05, REG_INT_MSK_LINE_C);
 	twl6030_interrupt_unmask(0x05, REG_INT_MSK_STS_C);
 
