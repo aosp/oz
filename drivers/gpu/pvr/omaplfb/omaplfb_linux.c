@@ -338,13 +338,15 @@ static void OMAPLFBFlipDSS(OMAPLFB_SWAPCHAIN *psSwapChain,
 		}
 
 		if (dss_ovl_manually_updated(overlay)) {
-			if (driver->update)
+			if (driver->sched_update)
+				driver->sched_update(display, 0, 0,
+					overlay_info.width,
+					overlay_info.height);
+			else if (driver->update)
 				driver->update(display, 0, 0,
 					overlay_info.width,
 					overlay_info.height);
-
 		}
-
 	}
 }
 
