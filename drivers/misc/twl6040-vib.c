@@ -70,44 +70,50 @@ static irqreturn_t twl6040_vib_irq_handler(int irq, void *data)
 	return IRQ_HANDLED;
 }
 
-static void vib_set(int on)
+static void vib_set(int const new_power_state)
 {
 	struct twl6040_codec *twl6040 = misc_data->twl6040;
 
 	mutex_lock(&misc_data->io_mutex);
 
 	/* already in requested state */
-	if (misc_data->vib_power_state == on)
+	if (new_power_state == misc_data->vib_power_state)
 		goto out;
 
-	if (on) {
+	/**
+	 * @warning  VIBDATx registers MUST be setted BEFORE VIBENAx bit
+	 *           setted in corresponding VIBCTLx registers
+	 */
+	if (new_power_state) {
+		twl6040_reg_write(twl6040, TWL6040_REG_VIBDATL, 0x32);
+		twl6040_reg_write(twl6040, TWL6040_REG_VIBDATR, 0x32);
+
 		/*
 		 * ERRATA: Disable overcurrent protection for at least
 		 * 2.5ms when enabling vibrator drivers to avoid false
 		 * overcurrent detection
 		 */
 		twl6040_set_bits(twl6040, TWL6040_REG_VIBCTLL,
-				 TWL6040_VIBENAL | TWL6040_VIBCTRLR);
+				 TWL6040_VIBENAL | TWL6040_VIBCTRLL);
 		twl6040_set_bits(twl6040, TWL6040_REG_VIBCTLR,
 				 TWL6040_VIBENAR | TWL6040_VIBCTRLR);
 
 		mdelay(4);
+
 		twl6040_clear_bits(twl6040, TWL6040_REG_VIBCTLL,
 				 TWL6040_VIBCTRLL);
 		twl6040_clear_bits(twl6040, TWL6040_REG_VIBCTLR,
 				 TWL6040_VIBCTRLR);
-		twl6040_reg_write(twl6040, TWL6040_REG_VIBDATL, 0x26);
-		twl6040_reg_write(twl6040, TWL6040_REG_VIBDATR, 0x26);
-
 	} else {
 		twl6040_reg_write(twl6040, TWL6040_REG_VIBDATL, 0x00);
 		twl6040_reg_write(twl6040, TWL6040_REG_VIBDATR, 0x00);
+
 		twl6040_clear_bits(twl6040, TWL6040_REG_VIBCTLL,
 				   TWL6040_VIBENAL);
 		twl6040_clear_bits(twl6040, TWL6040_REG_VIBCTLR,
 				   TWL6040_VIBENAR);
 	}
-	misc_data->vib_power_state = on;
+	misc_data->vib_power_state = new_power_state;
 
 out:
 	mutex_unlock(&misc_data->io_mutex);
