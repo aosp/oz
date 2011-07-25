@@ -117,7 +117,7 @@ static struct usb_driver usb_audio_driver;
  *	use a switch to report to userspace what type of device
  *	is most recently connected.
  */
-static enum switch_state {
+enum switch_state {
 	STATE_CONNECTED_UNKNOWN = -1,
 	STATE_DISCONNECTED = 0,
 	STATE_CONNECTED = 1
