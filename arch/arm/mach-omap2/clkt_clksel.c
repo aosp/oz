@@ -113,6 +113,7 @@ u8 _get_div_and_fieldval(struct clk *src_clk, struct clk *clk,
 	 * switch, and if it cannot be found, to fall back to the
 	 * highest divisor.
 	 */
+	max_clkr = clks->rates;
 	for (clkr = clks->rates; clkr->div; clkr++) {
 		if (!(clkr->flags & cpu_mask))
 			continue;
