@@ -1094,6 +1094,10 @@ static void _init_twl6030_settings(void)
 	twl_i2c_write_u8(TWL6030_MODULE_ID0, 0x01, 0xCF);
 	twl_i2c_write_u8(TWL6030_MODULE_ID0, 0x20, 0xD0);
 
+	/* CLK32KG keep always on for supply WLAN&Modem schemes */
+	twl_i2c_write_u8(TWL6030_MODULE_ID0, 0x00, 0xBC);
+	twl_i2c_write_u8(TWL6030_MODULE_ID0, 0x15, 0xBD);
+
 	/* VBATMIN_HI */
 	twl_i2c_write_u8(TWL6030_MODULE_ID0, 0x00, 0xC9);
 
