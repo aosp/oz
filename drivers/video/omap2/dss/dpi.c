@@ -241,6 +241,12 @@ int omapdss_dpi_display_enable(struct omap_dss_device *dssdev)
 		return r;
 	}
 
+	/* turn on clock(s) */
+	dssdev->state = OMAP_DSS_DISPLAY_ACTIVE;
+	if (!cpu_is_omap44xx())
+		dss_clk_enable(DSS_CLK_ICK | DSS_CLK_FCK1);
+	dss_mainclk_state_enable();
+
 	if (use_dsi_for_hdmi && cpu_is_omap34xx()) {
 		if (dpi.vdds_dsi_reg == NULL) {
 			dpi.vdds_dsi_reg = dss_get_vdds_dsi();
@@ -249,19 +255,15 @@ int omapdss_dpi_display_enable(struct omap_dss_device *dssdev)
 						__func__, dssdev->name,
 						__LINE__);
 		}
+		dsi_pre_power_i675(lcd_channel_ix);
 		r = regulator_enable(dpi.vdds_dsi_reg);
+		dsi_post_power_i675(lcd_channel_ix);
 		if (r) {
 			DSSERR("%s %s (%d) regulator_enable() FAILED\n",
 					__func__, dssdev->name, __LINE__);
 			goto err0;
 		}
 	}
-
-	/* turn on clock(s) */
-	dssdev->state = OMAP_DSS_DISPLAY_ACTIVE;
-	if (!cpu_is_omap44xx())
-		dss_clk_enable(DSS_CLK_ICK | DSS_CLK_FCK1);
-	dss_mainclk_state_enable();
 
 	if (cpu_is_omap34xx()) {
 		if (dssdev->manager == NULL)
@@ -315,13 +317,13 @@ err2:
 	}
 err1:
 #endif
+	if (use_dsi_for_hdmi && cpu_is_omap34xx())
+		regulator_disable(dpi.vdds_dsi_reg);
+err0:
 	dssdev->state = OMAP_DSS_DISPLAY_DISABLED;
 	if (!cpu_is_omap44xx())
 		dss_clk_disable(DSS_CLK_ICK | DSS_CLK_FCK1);
 	dss_mainclk_state_disable(true);
-	if (use_dsi_for_hdmi && cpu_is_omap34xx())
-		regulator_disable(dpi.vdds_dsi_reg);
-err0:
 	omap_dss_stop_device(dssdev);
 	return r;
 }

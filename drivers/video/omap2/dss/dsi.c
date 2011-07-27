@@ -1320,7 +1320,9 @@ int dsi_pll_init(struct omap_dss_device *dssdev, bool enable_hsclk,
 	dsi_enable_pll_clock(ix, 1);
 
 	if (!cpu_is_omap44xx()) {
+		dsi_pre_power_i675(ix);
 		r = regulator_enable(dsi1.vdds_dsi_reg);
+		dsi_post_power_i675(ix);
 		if (r)
 			goto err0;
 	}
@@ -4198,3 +4200,36 @@ void dsi2_exit(void)
 
 	DSSDBG("omap_dsi2_exit\n");
 }
+
+/*
+ * The following two routines implement the i675 errata workaround.
+ * dsi_pre_power_i675() needs to be called prior to turning on VDDA_DSI
+ * (as it is called in the errata) or vdds_dsi (as it is called in the code)
+ * regulator to avoid glitches on the DSI lines.  dis_post_power_i675()
+ * needs to be called after turning on the regulator.
+ */
+void dsi_pre_power_i675(enum omap_dsi_index ix)
+{
+	u32 r;
+
+	REG_FLD_MOD(ix, DSI_CLK_CTRL, 1, 14, 14);
+
+	r = dsi_read_reg(ix, DSI_DSIPHY_CFG2);
+	r = FLD_MOD(r, 1, 16, 16);
+	r = FLD_MOD(r, 7, 15, 11);
+	dsi_write_reg(ix, DSI_DSIPHY_CFG2, r);
+
+}
+EXPORT_SYMBOL(dsi_pre_power_i675);
+
+void dsi_post_power_i675(enum omap_dsi_index ix)
+{
+	u32 r;
+
+	r = dsi_read_reg(ix, DSI_DSIPHY_CFG2);
+	r = FLD_MOD(r, 0, 16, 16);
+	r = FLD_MOD(r, 0, 15, 11);
+	dsi_write_reg(ix, DSI_DSIPHY_CFG2, r);
+
+}
+EXPORT_SYMBOL(dsi_post_power_i675);

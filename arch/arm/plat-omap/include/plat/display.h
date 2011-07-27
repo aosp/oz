@@ -890,6 +890,11 @@ void omapdss_display_disable(struct omap_dss_device *dssdev);
 
 void omapdss_dsi_vc_enable_hs(enum omap_dsi_index ix, int channel,
 			bool enable);
+
+void dsi_pre_power_i675(enum omap_dsi_index ix);
+
+void dsi_post_power_i675(enum omap_dsi_index ix);
+
 int omapdss_dsi_enable_te(struct omap_dss_device *dssdev, bool enable);
 
 int omap_dsi_sched_update_lock(struct omap_dss_device *dssdev,
