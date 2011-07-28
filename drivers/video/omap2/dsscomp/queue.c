@@ -304,6 +304,22 @@ dsscomp_t dsscomp_find(struct omap_overlay_manager *mgr, u32 sync_id)
 }
 EXPORT_SYMBOL(dsscomp_find);
 
+void dsscomp_release_active_comps()
+{
+	int ix;
+	struct dsscomp_data *c, *c2;
+	for (ix = 0; ix < omap_dss_get_num_overlay_managers(); ix++) {
+		mutex_lock(&mgrq[ix].mtx);
+		list_for_each_entry_safe(c, c2, &mgrq[ix].q_ci, q) {
+			if (c) {
+				if (c->magic == MAGIC_ACTIVE)
+					dsscomp_drop(c);
+				}
+			}
+		mutex_unlock(&mgrq[ix].mtx);
+	}
+}
+
 /* find first unapplied sync_id or 0 if none found */
 u32 dsscomp_first_sync_id(struct omap_overlay_manager *mgr)
 {
@@ -846,8 +862,12 @@ done_ovl:
 	} else {
 		/* wait for sync to avoid tear */
 		r = mgr->apply(mgr) ? : mgr->wait_for_vsync(mgr);
-		if (r)
+		if (r) {
 			dev_err(DEV(cdev), "failed while applying %d", r);
+			if (comp->extra_cb)
+				comp->extra_cb(comp,
+						DSS_COMPLETION_ECLIPSED_SET);
+		}
 
 		/* ignore this error if callback has already been registered */
 		if (!mgr->info_dirty)

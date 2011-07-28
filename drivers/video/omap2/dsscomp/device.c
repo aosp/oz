@@ -44,6 +44,12 @@
 #include "dsscomp.h"
 #include <mach/tiler.h>
 
+#ifdef CONFIG_HAS_EARLYSUSPEND
+#include <linux/earlysuspend.h>
+#endif
+static bool blanked;
+static int opencnt;
+
 static u32 hwc_virt_to_phys(u32 arg)
 {
 	pmd_t *pmd;
@@ -83,6 +89,13 @@ static long setup_mgr(struct dsscomp_dev *cdev,
 	if (!dev)
 		return -EINVAL;
 
+	/* ignore frames while we are blanked */
+	if (blanked) {
+		if (debug & DEBUG_PHASES)
+			dev_info(DEV(cdev), "[%08x] ignored\n", d->sync_id);
+		return 0;
+	}
+
 	/* HACK: prevent executing IOCTL when driver in suspend mode to avoid
 		kernel crash */
 	if (dev->state != OMAP_DSS_DISPLAY_ACTIVE)
@@ -108,12 +121,13 @@ static long setup_mgr(struct dsscomp_dev *cdev,
 	for (i = 0; i < d->num_ovls; i++) {
 		struct dss2_ovl_info *oi = d->ovls + i;
 		u32 addr = (u32) oi->address;
-
-		/* convert addresses to user space */
-		if (oi->cfg.color_mode == OMAP_DSS_COLOR_NV12)
-			oi->uv = hwc_virt_to_phys(addr +
+		if (oi->cfg.enabled) {
+			/* convert addresses to user space */
+			if (oi->cfg.color_mode == OMAP_DSS_COLOR_NV12)
+				oi->uv = hwc_virt_to_phys(addr +
 					oi->cfg.height * oi->cfg.stride);
-		oi->ba = hwc_virt_to_phys(addr);
+			oi->ba = hwc_virt_to_phys(addr);
+		}
 
 		r = r ? : dsscomp_set_ovl(comp, oi);
 	}
@@ -268,7 +282,7 @@ static long wait(struct dsscomp_dev *cdev, struct dsscomp_wait_data *wd)
 
 	/* get composition */
 	comp = dsscomp_find(mgr, wd->sync_id);
-	if (IS_ERR(comp))
+	if ((!comp) || (IS_ERR(comp)))
 		return 0;
 
 	return dsscomp_wait(comp, wd->phase, usecs_to_jiffies(wd->timeout_us));
@@ -355,15 +369,51 @@ static long comp_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 	return r;
 }
 
+#ifdef CONFIG_EARLYSUSPEND
+static void dsscomp_early_suspend(struct early_suspend *h)
+{
+	blanked = true;
+}
+
+static void dsscomp_late_resume(struct early_suspend *h)
+{
+	dsscomp_release_active_comps();
+	blanked = false;
+}
+
+static struct early_suspend early_suspend_info = {
+	.suspend = dsscomp_early_suspend,
+	.resume = dsscomp_late_resume,
+	.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN,
+};
+#endif
+
+
 /* must implement open for filp->private_data to be filled */
 static int comp_open(struct inode *inode, struct file *filp)
 {
+	opencnt++;
+#ifdef CONFIG_HAS_EARLYSUSPEND
+	if (opencnt == 1)
+		register_early_suspend(&early_suspend_info);
+#endif
+	return 0;
+}
+
+static int comp_release(struct inode *inode, struct file *filp)
+{
+	opencnt--;
+#ifdef CONFIG_HAS_EARLYSUSPEND
+	if (opencnt == 0)
+		unregister_early_suspend(&early_suspend_info);
+#endif
 	return 0;
 }
 
 static const struct file_operations comp_fops = {
 	.owner		= THIS_MODULE,
 	.open		= comp_open,
+	.release	= comp_release,
 	.unlocked_ioctl = comp_ioctl,
 };
 

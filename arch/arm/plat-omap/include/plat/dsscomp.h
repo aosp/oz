@@ -40,5 +40,6 @@ int dsscomp_setup(dsscomp_t comp, enum dsscomp_setup_mode mode,
 int dsscomp_apply(dsscomp_t comp);
 int dsscomp_wait(dsscomp_t comp, enum dsscomp_wait_phase phase, int timeout);
 void dsscomp_drop(dsscomp_t c);
+void dsscomp_release_active_comps(void);
 
 #endif
