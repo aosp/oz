@@ -1096,6 +1096,7 @@ static int hdmi_panel_probe(struct omap_dss_device *dssdev)
 				OMAP_DSS_LCD_IHS;
 
 	dssdev->panel.timings = omap_dss_hdmi_timings;
+	dssdev->s_mode = OMAP_DSS_DISPLAY_DEEP;
 
 	return 0;
 }

@@ -818,27 +818,27 @@ static int omap_dss_suspend(struct platform_device *pdev, pm_message_t state)
 {
 	DSSDBG("suspend %d\n", state.event);
 
-	return dss_suspend_all_devices();
+	return dss_suspend_all_devices(OMAP_DSS_DISPLAY_DEEP);
 }
 
 static int omap_dss_resume(struct platform_device *pdev)
 {
 	DSSDBG("resume\n");
 
-	return dss_resume_all_devices();
+	return dss_resume_all_devices(OMAP_DSS_DISPLAY_DEEP);
 }
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
 static void dss_early_suspend(struct early_suspend *h)
 {
 	DSSDBG("%s\n", __func__);
-	omap_dss_suspend(core.pdev, PMSG_SUSPEND);
+	dss_suspend_all_devices(OMAP_DSS_DISPLAY_EARLY);
 }
 
 static void dss_late_resume(struct early_suspend *h)
 {
 	DSSDBG("%s\n", __func__);
-	omap_dss_resume(core.pdev);
+	dss_resume_all_devices(OMAP_DSS_DISPLAY_EARLY);
 }
 #endif
 
@@ -1000,13 +1000,8 @@ static struct platform_driver omap_dsshw_driver = {
 	.probe          = omap_dsshw_probe,
 	.remove         = omap_dsshw_remove,
 	.shutdown	= NULL,
-#ifdef CONFIG_HAS_EARLYSUSPEND
-	.suspend	= NULL,
-	.resume		= NULL,
-#else
 	.suspend	= omap_dss_suspend,
 	.resume		= omap_dss_resume,
-#endif
 	.driver         = {
 		.name   = "dss",
 		.owner  = THIS_MODULE,

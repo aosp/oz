@@ -58,6 +58,7 @@ static int nec_8048_panel_probe(struct omap_dss_device *dssdev)
 				OMAP_DSS_LCD_ONOFF;
 	dssdev->panel.timings = nec_8048_panel_timings;
 	dssdev->ctrl.pixel_size = 16;
+	dssdev->s_mode = OMAP_DSS_DISPLAY_DEEP;
 
 	return 0;
 }

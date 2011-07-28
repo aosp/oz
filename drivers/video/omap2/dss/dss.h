@@ -257,8 +257,8 @@ void save_all_ctx(void);
 void restore_all_ctx(void);
 
 /* display */
-int dss_suspend_all_devices(void);
-int dss_resume_all_devices(void);
+int dss_suspend_all_devices(int early_deep);
+int dss_resume_all_devices(int early_deep);
 void dss_disable_all_devices(void);
 
 void dss_init_device(struct platform_device *pdev,
