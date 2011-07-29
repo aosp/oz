@@ -778,60 +778,67 @@ static void __init prcm_clear_statdep_regs(void)
 	return;
 #else
 	u32 reg;
+	struct clockdomain *l3_emif_clkdm, *l3_init_clkdm, *l4_per_clkdm;
 
 	pr_info("%s: Clearing static depndencies\n", __func__);
 
-#if 0
-	/*
-	 * REVISIT: Seen SGX issues with MPU -> EMIF. Keeping
-	 * it enabled.
-	 * REVISIT: Seen issue with MPU/DSP -> L3_2 and L4CFG.
-	 * Keeping them enabled
+	/* PRCM requires target clockdomain to be woken up before
+	 * changing its Static Dependencies settings
 	 */
-	/* MPU towards EMIF clockdomains */
-	reg = OMAP4430_MEMIF_STATDEP_MASK;
-	cm_rmw_mod_reg_bits(reg, 0, OMAP4430_CM1_MPU_MOD,
-		OMAP4_CM_MPU_STATICDEP_OFFSET);
-#endif
 
-	 /*
-	  * REVISIT: Issue seen with Ducati towards EMIF, L3_2, L3_1,
-	  * L4CFG and L4WKUP static
-	  * dependency. Keep it enabled as of now.
-	  */
-#if 0
-	/* Ducati towards EMIF, L3_2, L3_1, L4CFG and L4WKUP clockdomains */
-	reg = OMAP4430_MEMIF_STATDEP_MASK | OMAP4430_L3_1_STATDEP_MASK
-		| OMAP4430_L3_2_STATDEP_MASK | OMAP4430_L4CFG_STATDEP_MASK
-		| OMAP4430_L4WKUP_STATDEP_MASK;
-	cm_rmw_mod_reg_bits(reg, 0, OMAP4430_CM2_CORE_MOD,
-		OMAP4_CM_DUCATI_STATICDEP_OFFSET);
-#endif
-
-	/* SDMA towards EMIF, L3_2, L3_1, L4CFG, L4WKUP, L3INIT
-	 * and L4PER clockdomains
+	/* Note: Domains not built with SW_WKUP capability like
+	* L3_1, L3_2, L4_CFG and L4_WKUP may stall idle transition
+	* during 1 idle cycle if SD is changed while domain is OFF
 	*/
+
+	l3_emif_clkdm = clkdm_lookup("l3_emif_clkdm");
+	l3_init_clkdm = clkdm_lookup("l3_init_clkdm");
+	l4_per_clkdm = clkdm_lookup("l4_per_clkdm");
+
+	/* Configures MEMIF clockdomain in SW_WKUP */
+	omap2_clkdm_wakeup(l3_emif_clkdm);
+	pwrdm_clkdm_state_switch(l3_emif_clkdm);
+
+	/* Configures L3INIT clockdomain in SW_WKUP */
+	omap2_clkdm_wakeup(l3_init_clkdm);
+	pwrdm_clkdm_state_switch(l3_init_clkdm);
+
+	/* Configures L4_PER clockdomain in SW_WKUP */
+	omap2_clkdm_wakeup(l4_per_clkdm);
+	pwrdm_clkdm_state_switch(l4_per_clkdm);
+
+	/* SDMA towards EMIF, L3_1, L4CFG, L4WKUP, L3INIT and
+	 * L4PER clockdomains
+	 */
 	reg = OMAP4430_MEMIF_STATDEP_MASK | OMAP4430_L3_1_STATDEP_MASK
-		| OMAP4430_L3_2_STATDEP_MASK | OMAP4430_L4CFG_STATDEP_MASK
-		| OMAP4430_L4WKUP_STATDEP_MASK | OMAP4430_L4PER_STATDEP_MASK
-		| OMAP4430_L3INIT_STATDEP_MASK;
+		| OMAP4430_L4CFG_STATDEP_MASK | OMAP4430_L4WKUP_STATDEP_MASK
+		| OMAP4430_L4PER_STATDEP_MASK | OMAP4430_L3INIT_STATDEP_MASK;
 	cm_rmw_mod_reg_bits(reg, 0, OMAP4430_CM2_CORE_MOD,
 		OMAP4_CM_SDMA_STATICDEP_OFFSET);
 
-	/* C2C towards EMIF clockdomains */
+	/* C2C towards EMIF clockdomain */
 	cm_rmw_mod_reg_bits(OMAP4430_MEMIF_STATDEP_MASK, 0,
 		OMAP4430_CM2_CORE_MOD, OMAP4_CM_D2D_STATICDEP_OFFSET);
 
-	/* C2C_STATICDEP_RESTORE towards EMIF clockdomains */
+	/* C2C_RESTORE towards EMIF clockdomain */
 	cm_rmw_mod_reg_bits(OMAP4430_MEMIF_STATDEP_MASK, 0,
-			OMAP4430_CM2_RESTORE_MOD,
-			OMAP4_CM_D2D_STATICDEP_RESTORE_OFFSET);
+		OMAP4430_CM2_RESTORE_MOD,
+		OMAP4_CM_D2D_STATICDEP_RESTORE_OFFSET);
 
-	 /* SDMA_RESTORE towards EMIF, L3_1, L4_CFG,L4WKUP clockdomains */
+	/* SDMA_RESTORE towards EMIF, L3_1, L4_CFG, L4WKUP clockdomains */
 	reg = OMAP4430_MEMIF_STATDEP_MASK | OMAP4430_L3_1_STATDEP_MASK
 		| OMAP4430_L4CFG_STATDEP_MASK | OMAP4430_L4WKUP_STATDEP_MASK;
 	cm_rmw_mod_reg_bits(reg, 0, OMAP4430_CM2_RESTORE_MOD,
 		OMAP4_CM_SDMA_STATICDEP_RESTORE_OFFSET);
+
+	/* Configures MEMIF clockdomain back to HW_AUTO */
+	omap2_clkdm_allow_idle(l3_emif_clkdm);
+
+	/* Configures L3INIT clockdomain back to HW_AUTO */
+	omap2_clkdm_allow_idle(l3_init_clkdm);
+
+	/* Configures L4_PER clockdomain back to HW_AUTO */
+	omap2_clkdm_allow_idle(l4_per_clkdm);
 #endif
 };
 
