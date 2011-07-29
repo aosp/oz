@@ -30,4 +30,14 @@ struct omap_disp_led_platform_data {
 	void (*secondary_display_set)(u8 value);
 };
 
+struct display_led_data {
+	struct led_classdev pri_display_class_dev;
+	struct led_classdev sec_display_class_dev;
+	struct omap_disp_led_platform_data *led_pdata;
+	struct mutex pri_disp_lock;
+	struct mutex sec_disp_lock;
+};
+
+struct display_led_data *get_omap_led_info(void);
+
 #endif  /*__OMAP_DISPLAY_LED__*/

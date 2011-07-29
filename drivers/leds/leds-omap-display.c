@@ -26,13 +26,12 @@
 #include <linux/platform_device.h>
 #include <linux/i2c/twl.h>
 
-struct display_led_data {
-	struct led_classdev pri_display_class_dev;
-	struct led_classdev sec_display_class_dev;
-	struct omap_disp_led_platform_data *led_pdata;
-	struct mutex pri_disp_lock;
-	struct mutex sec_disp_lock;
-};
+static struct display_led_data *omap_led_data = NULL;
+
+struct display_led_data *get_omap_led_info(void)
+{
+	return omap_led_data;
+}
 
 static void omap_primary_disp_store(struct led_classdev *led_cdev,
 				enum led_brightness value)
@@ -84,6 +83,8 @@ static int omap_display_led_probe(struct platform_device *pdev)
 	info->pri_display_class_dev.name = "lcd-backlight";
 	info->pri_display_class_dev.brightness_set = omap_primary_disp_store;
 	info->pri_display_class_dev.max_brightness = LED_FULL;
+	/* used to boot backlight level when boot display enable */
+	info->pri_display_class_dev.brightness = LED_HALF;
 	mutex_init(&info->pri_disp_lock);
 
 	ret = led_classdev_register(&pdev->dev,
@@ -113,6 +114,8 @@ static int omap_display_led_probe(struct platform_device *pdev)
 		if (info->led_pdata->secondary_display_set)
 			info->led_pdata->secondary_display_set(0);
 	}
+
+	omap_led_data = info;
 
 	pr_info("%s:Exit\n", __func__);
 

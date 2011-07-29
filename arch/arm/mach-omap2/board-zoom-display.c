@@ -16,6 +16,8 @@
 #include <linux/spi/spi.h>
 #include <linux/regulator/machine.h>
 #include <linux/regulator/consumer.h>
+#include <linux/leds.h>
+#include <linux/leds-omap-display.h>
 #include <plat/common.h>
 #include <plat/control.h>
 #include <plat/mcspi.h>
@@ -110,6 +112,7 @@ static int zoom_panel_enable_lcd(struct omap_dss_device *dssdev)
 {
 	int ret;
 	struct zoom_dss_board_info *pdata;
+	struct display_led_data *b_led;
 
 	ret = zoom_panel_power_enable(1);
 	if (ret < 0)
@@ -127,11 +130,32 @@ static int zoom_panel_enable_lcd(struct omap_dss_device *dssdev)
 		gpio_set_value(LCD_PANEL_ENABLE_GPIO, 1);
 	}
 
+	b_led = get_omap_led_info();
+	if(b_led){
+		mutex_lock(&b_led->pri_disp_lock);
+		b_led->led_pdata->primary_display_set(
+			b_led->pri_display_class_dev.brightness);
+		mutex_unlock(&b_led->pri_disp_lock);
+	}else{
+		pr_err("unable to get backlight led data");
+	}
+
 	return 0;
 }
 
 static void zoom_panel_disable_lcd(struct omap_dss_device *dssdev)
 {
+	struct display_led_data *b_led;
+
+	b_led = get_omap_led_info();
+	if(b_led){
+		mutex_lock(&b_led->pri_disp_lock);
+		b_led->led_pdata->primary_display_set(0);
+		mutex_unlock(&b_led->pri_disp_lock);
+	}else{
+		pr_err("unable to get backlight led data");
+	}
+
 	zoom_panel_power_enable(0);
 	gpio_set_value(LCD_PANEL_ENABLE_GPIO, 0);
 }
