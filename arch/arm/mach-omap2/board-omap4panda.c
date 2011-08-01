@@ -33,6 +33,7 @@
 #include <mach/omap4-common.h>
 #include <mach/emif.h>
 #include <mach/lpddr2-elpida.h>
+#include <mach/dmm.h>
 
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
@@ -901,6 +902,7 @@ static void __init omap_panda_init(void)
 	omap_init_emif_timings();
 	omap4_audio_conf();
 	omap4_i2c_init();
+	omap_dmm_init();
 	omap4_display_init();
 	platform_add_devices(panda_devices, ARRAY_SIZE(panda_devices));
 	omap_serial_init(omap_serial_platform_data);

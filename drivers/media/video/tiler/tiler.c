@@ -46,16 +46,6 @@ struct tiler_dev {
 	struct blocking_notifier_head notifier;
 };
 
-static struct platform_driver tiler_driver_ldm = {
-	.driver = {
-		.owner = THIS_MODULE,
-		.name = "tiler",
-	},
-	.probe = NULL,
-	.shutdown = NULL,
-	.remove = NULL,
-};
-
 /* per process (thread group) info */
 struct process_info {
 	struct list_head list;		/* other processes */
@@ -1769,49 +1759,6 @@ s32 tiler_set_buf_state(u32 ssptr, enum buf_state state)
 }
 EXPORT_SYMBOL(tiler_set_buf_state);
 
-static void __exit tiler_exit(void)
-{
-	struct process_info *pi = NULL, *pi_ = NULL;
-	int i, j;
-
-	mutex_lock(&mtx);
-
-	/* free all process data */
-	list_for_each_entry_safe(pi, pi_, &procs, list)
-		_m_free_process_info(pi);
-
-	/* all lists should have cleared */
-	WARN_ON(!list_empty(&blocks));
-	WARN_ON(!list_empty(&procs));
-	WARN_ON(!list_empty(&orphan_onedim));
-	WARN_ON(!list_empty(&orphan_areas));
-
-	mutex_unlock(&mtx);
-
-	dma_free_coherent(NULL, TILER_WIDTH * TILER_HEIGHT * sizeof(*dmac_va),
-							dmac_va, dmac_pa);
-
-	/* close containers only once */
-	for (i = TILFMT_8BIT; i <= TILFMT_MAX; i++) {
-		/* remove identical containers (tmm is unique per tcm) */
-		for (j = i + 1; j <= TILFMT_MAX; j++)
-			if (TCM(i) == TCM(j)) {
-				TCM_SET(j, NULL);
-				TMM_SET(j, NULL);
-			}
-
-		tcm_deinit(TCM(i));
-		tmm_deinit(TMM(i));
-	}
-
-	mutex_destroy(&mtx);
-	platform_driver_unregister(&tiler_driver_ldm);
-	cdev_del(&tiler_device->cdev);
-	kfree(tiler_device);
-	device_destroy(tilerdev_class, MKDEV(tiler_major, tiler_minor));
-	class_destroy(tilerdev_class);
-}
-
 static s32 tiler_open(struct inode *ip, struct file *filp)
 {
 	struct process_info *pi = __get_pi(current->tgid, false);
@@ -1837,11 +1784,49 @@ static s32 tiler_release(struct inode *ip, struct file *filp)
 	return 0x0;
 }
 
+#ifdef CONFIG_PM
+static int tiler_resume(struct device *pdev)
+{
+	struct mem_info *mi;
+	struct pat_area area = {0};
+
+	/* clear out PAT entries and set dummy page */
+	area.x1 = TILER_WIDTH - 1;
+	area.y1 = TILER_HEIGHT - 1;
+	tmm_clear(TMM(TILFMT_8BIT), area);
+
+	/* iterate over all the blocks and refresh the PAT entries */
+	list_for_each_entry(mi, &blocks, global) {
+		if (mi->mem)
+			if (refill_pat(TMM_SS(mi->sys_addr), &mi->area,
+					mi->mem))
+				printk(KERN_ERR "Failed PAT restore - %08x\n",
+					mi->sys_addr);
+	}
+
+	return 0;
+}
+
+static const struct dev_pm_ops tiler_pm_ops = {
+	.resume = tiler_resume,
+};
+#endif
+
 static const struct file_operations tiler_fops = {
 	.open    = tiler_open,
 	.ioctl   = tiler_ioctl,
 	.release = tiler_release,
 	.mmap    = tiler_mmap,
+};
+
+static struct platform_driver tiler_driver_ldm = {
+	.driver = {
+		.owner = THIS_MODULE,
+		.name = "tiler",
+#ifdef CONFIG_PM
+		.pm = &tiler_pm_ops,
+#endif
+	},
 };
 
 static s32 __init tiler_init(void)
@@ -1941,6 +1926,49 @@ error:
 	}
 
 	return r;
+}
+
+static void __exit tiler_exit(void)
+{
+	struct process_info *pi = NULL, *pi_ = NULL;
+	int i, j;
+
+	mutex_lock(&mtx);
+
+	/* free all process data */
+	list_for_each_entry_safe(pi, pi_, &procs, list)
+		_m_free_process_info(pi);
+
+	/* all lists should have cleared */
+	WARN_ON(!list_empty(&blocks));
+	WARN_ON(!list_empty(&procs));
+	WARN_ON(!list_empty(&orphan_onedim));
+	WARN_ON(!list_empty(&orphan_areas));
+
+	mutex_unlock(&mtx);
+
+	dma_free_coherent(NULL, TILER_WIDTH * TILER_HEIGHT * sizeof(*dmac_va),
+							dmac_va, dmac_pa);
+
+	/* close containers only once */
+	for (i = TILFMT_8BIT; i <= TILFMT_MAX; i++) {
+		/* remove identical containers (tmm is unique per tcm) */
+		for (j = i + 1; j <= TILFMT_MAX; j++)
+			if (TCM(i) == TCM(j)) {
+				TCM_SET(j, NULL);
+				TMM_SET(j, NULL);
+			}
+
+		tcm_deinit(TCM(i));
+		tmm_deinit(TMM(i));
+	}
+
+	mutex_destroy(&mtx);
+	platform_driver_unregister(&tiler_driver_ldm);
+	cdev_del(&tiler_device->cdev);
+	kfree(tiler_device);
+	device_destroy(tilerdev_class, MKDEV(tiler_major, tiler_minor));
+	class_destroy(tilerdev_class);
 }
 
 MODULE_LICENSE("GPL v2");
