@@ -62,7 +62,7 @@
 /* WER = 0x7F
  * Enable module level wakeup in WER reg
  */
-#define OMAP_UART_WER_MOD_WKUP	0X7F
+#define OMAP_UART_WER_MOD_WKUP	0XFF
 
 /* Enable XON/XOFF flow control on output */
 #define OMAP_UART_SW_TX		0x04
@@ -126,6 +126,8 @@ struct omap_uart_port_info {
 	u16			cts_padconf;
 	u32			cts_padvalue;
 	bool                    (*plat_omap_bt_active)(void);
+	/* GPIO Number at this Pad Config Mux */
+	unsigned int		omap_uart_gpio_mux_mode;
 };
 
 struct uart_omap_dma {

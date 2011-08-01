@@ -27,6 +27,7 @@
 #include <linux/slab.h>
 #include <linux/serial_8250.h>
 #include <linux/console.h>
+#include <linux/gpio.h>
 
 #ifdef CONFIG_SERIAL_OMAP
 #include <plat/omap-serial.h>
@@ -41,13 +42,13 @@
 #include <plat/omap_hwmod.h>
 #include <plat/omap_device.h>
 
+#include "mux.h"
 #include "prm.h"
 #include "pm.h"
 #include "cm.h"
 #include "prm-regbits-34xx.h"
 
 #define UART_OMAP_NO_EMPTY_FIFO_READ_IP_REV	0x52
-#define UART_OMAP_WER		0x17	/* Wake-up enable register */
 
 /*
  * NOTE: By default the serial timeout is disabled as it causes lost characters
@@ -113,6 +114,10 @@ static LIST_HEAD(uart_list);
 static u8 num_uarts;
 
 static bool plat_check_bt_active(struct omap_uart_state *uart);
+static void omap_uart_disable_wakeup(struct omap_uart_state *uart);
+static void omap_uart_block_sleep(struct omap_uart_state *uart);
+static void omap_uart_smart_idle_enable(struct omap_uart_state *uart,
+							int enable);
 void __init omap2_set_globals_uart(struct omap_globals *omap2_globals)
 {
 }
@@ -343,10 +348,18 @@ static inline void omap_uart_restore_context(struct omap_uart_state *uart) {}
 
 static inline void omap_uart_enable_clocks(struct omap_uart_state *uart)
 {
+	struct platform_device *pdev = uart->pdev;
+	struct omap_device *od = NULL;
+
+	od = container_of(pdev, struct omap_device, pdev);
+
 	if (uart->clocked)
 		return;
 
 #ifdef CONFIG_PM_RUNTIME
+	if (od && (od->_state == OMAP_DEVICE_STATE_ENABLED))
+		return;
+
 	omap_device_enable(uart->pdev);
 #endif
 	uart->clocked = 1;
@@ -356,18 +369,43 @@ static inline void omap_uart_enable_clocks(struct omap_uart_state *uart)
 #ifdef CONFIG_PM
 static inline void omap_uart_disable_clocks(struct omap_uart_state *uart)
 {
+	struct platform_device *pdev = uart->pdev;
+	struct omap_device *od = NULL;
+
+	od = container_of(pdev, struct omap_device, pdev);
+
 	if (!uart->clocked)
 		return;
 
 	omap_uart_save_context(uart);
 	uart->clocked = 0;
 #ifdef CONFIG_PM_RUNTIME
+	if (od && (od->_state != OMAP_DEVICE_STATE_ENABLED))
+		return;
+
 	omap_device_idle(uart->pdev);
 #endif
 }
 
+static irqreturn_t omap_uart_gpio_irq(int irq, void *args)
+{
+	struct omap_uart_state *uart = (struct omap_uart_state *)args;
+
+	omap_uart_disable_wakeup(uart);
+	omap_uart_block_sleep(uart);
+	omap_uart_smart_idle_enable(uart, 1);
+	omap_uart_start_inactivity_timer(uart->num);
+
+	return IRQ_HANDLED;
+}
+
 static void omap_uart_enable_wakeup(struct omap_uart_state *uart)
 {
+	int irq = 0;
+	struct omap_uart_port_info *up = uart->pdev->dev.platform_data;
+	u16 offset = 0;
+	u32 mask = 0;
+
 	/* Set wake-enable bit */
 	if (uart->wk_en && uart->wk_mask) {
 		u32 v = __raw_readl(uart->wk_en);
@@ -383,9 +421,18 @@ static void omap_uart_enable_wakeup(struct omap_uart_state *uart)
 	}
 
 	if (cpu_is_omap44xx() && uart->padconf) {
-		u16 offset = uart->padconf & ~0x3; /* 32-bit align */
-		u32 mask = uart->padconf & 0x2 ? OMAP44XX_PADCONF_WAKEUPENABLE1
-			: OMAP44XX_PADCONF_WAKEUPENABLE0;
+		offset = uart->padconf & ~0x3; /* 32-bit align */
+		mask = 0;
+		mask = uart->padconf & 0x2 ?
+			OMAP44XX_PADCONF_WAKEUPENABLE1 :
+			OMAP44XX_PADCONF_WAKEUPENABLE0;
+
+		/* If set to -1 follow the normal wake-up setting,
+		 * else chnage the mode to GPIO wake-up if it has
+		 * a valid GPIO number.
+		 */
+		mask = (up && (up->omap_uart_gpio_mux_mode == -1)) ?
+			mask : (mask | OMAP_MUX_MODE3);
 
 		u32 v = omap4_ctrl_pad_readl(offset);
 		v |= mask;
@@ -395,6 +442,8 @@ static void omap_uart_enable_wakeup(struct omap_uart_state *uart)
 
 static void omap_uart_disable_wakeup(struct omap_uart_state *uart)
 {
+	struct omap_uart_port_info *up = uart->pdev->dev.platform_data;
+
 	/* Clear wake-enable bit */
 	if (uart->wk_en && uart->wk_mask) {
 		u32 v = __raw_readl(uart->wk_en);
@@ -412,8 +461,17 @@ static void omap_uart_disable_wakeup(struct omap_uart_state *uart)
 	/* Ensure IOPAD wake-enables are cleared */
 	if (cpu_is_omap44xx() && uart->padconf) {
 		u16 offset = uart->padconf & ~0x3; /* 32-bit align */
-		u32 mask = uart->padconf & 0x2 ? OMAP44XX_PADCONF_WAKEUPENABLE1
-			: OMAP44XX_PADCONF_WAKEUPENABLE0;
+		u32 mask = 0;
+		mask = uart->padconf & 0x2 ?
+			OMAP44XX_PADCONF_WAKEUPENABLE1 :
+			OMAP44XX_PADCONF_WAKEUPENABLE0;
+
+		/* If set to -1 follow the normal wake-up setting,
+		 * else chnage the mode to GPIO wake-up if it has
+		 * a valid GPIO number.
+		 */
+		mask = (up && (up->omap_uart_gpio_mux_mode == -1)) ?
+			mask : (mask | OMAP_MUX_MODE3);
 
 		u32 v = omap4_ctrl_pad_readl(offset);
 		v &= ~mask;
@@ -478,15 +536,6 @@ static void omap_uart_idle_timer(unsigned long data)
 		return;
 	}
 
-	if ((up->port_tx_active == 0) && (up->port_rx_active == 0) &&
-		(up->port_reg_access_active == 0)) {
-		omap_uart_allow_sleep(uart);
-		return;
-	} else {
-		omap_uart_block_sleep(uart);
-		omap_uart_start_inactivity_timer(uart->num);
-	}
-
 #ifdef CONFIG_SERIAL_OMAP
 	/* check if the uart port is active
 	 * if port is active then dont allow
@@ -498,6 +547,15 @@ static void omap_uart_idle_timer(unsigned long data)
 		return;
 	}
 #endif
+
+	if ((up->port_tx_active == 0) && (up->port_rx_active == 0) &&
+		(up->port_reg_access_active == 0)) {
+		omap_uart_allow_sleep(uart);
+		return;
+	} else {
+		omap_uart_block_sleep(uart);
+		omap_uart_start_inactivity_timer(uart->num);
+	}
 }
 
 static bool omap_uart_is_wakeup_src(struct omap_uart_state *uart)
@@ -593,6 +651,7 @@ void omap_uart_resume(int uart_num)
 
 	list_for_each_entry(uart, &uart_list, node) {
 		if (uart_num == uart->num) {
+			omap_uart_disable_wakeup(uart);
 			omap_uart_disable_rtspullup(uart);
 			omap_uart_block_sleep(uart);
 			omap_uart_start_inactivity_timer(uart->num);
@@ -1056,6 +1115,8 @@ void __init omap_serial_init_port(int port,
 	};
 	struct plat_serial8250_port *p = &ports[0];
 #else
+	char gpio_name[MAX_UART_HWMOD_NAME_LEN];
+	unsigned int gpio_irq = 0;
 	struct omap_uart_port_info omap_up;
 #endif
 
@@ -1139,6 +1200,8 @@ void __init omap_serial_init_port(int port,
 	omap_up.idle_timeout = platform_data->idle_timeout;
 	omap_up.plat_hold_wakelock = platform_data->plat_hold_wakelock;
 	omap_up.plat_omap_bt_active = platform_data->plat_omap_bt_active;
+	omap_up.omap_uart_gpio_mux_mode =
+			platform_data->omap_uart_gpio_mux_mode;
 
 	uart->rts_padconf = platform_data->rts_padconf;
 	uart->rts_override = platform_data->rts_override;
@@ -1195,6 +1258,22 @@ void __init omap_serial_init_port(int port,
 	uart->timeout = msecs_to_jiffies(platform_data->idle_timeout);
 	uart->port_timer_active = 0;
 	omap_uart_disable_clocks(uart);
+
+	/*set GPIO INTERRUPT*/
+	if (omap_up.omap_uart_gpio_mux_mode != -1) {
+		snprintf(gpio_name, MAX_UART_HWMOD_NAME_LEN,
+			 "gpio_%d", omap_up.omap_uart_gpio_mux_mode);
+		gpio_request(omap_up.omap_uart_gpio_mux_mode, gpio_name);
+		gpio_direction_input(omap_up.omap_uart_gpio_mux_mode);
+		gpio_irq = OMAP_GPIO_IRQ(omap_up.omap_uart_gpio_mux_mode);
+		/* By default the Line would be high, whenever it
+		 * falls and keeps toggling for data.
+		 * Hence set to Falling Edge if the Interrupt.
+		 */
+		request_threaded_irq(gpio_irq, NULL, omap_uart_gpio_irq,
+				IRQF_TRIGGER_FALLING | IRQF_SHARED,
+				gpio_name, (void *)uart);
+	}
 
 	if (((cpu_is_omap34xx() || cpu_is_omap44xx())
 		 && uart->padconf) ||

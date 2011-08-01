@@ -897,6 +897,10 @@ serial_omap_set_termios(struct uart_port *port, struct ktermios *termios,
 	}
 
 	serial_omap_set_mctrl(&up->port, up->port.mctrl);
+
+	/* Enable Wake Up Event for all */
+	serial_out(up, UART_OMAP_WER, OMAP_UART_WER_MOD_WKUP);
+
 	/* Software Flow Control Configuration */
 	if (termios->c_iflag & (IXON | IXOFF))
 		serial_omap_configure_xonxoff(up, termios);
@@ -926,9 +930,12 @@ serial_omap_pm(struct uart_port *port, unsigned int state,
 	serial_out(up, UART_LCR, 0);
 	/* Enable module level wake up */
 	serial_out(up, UART_OMAP_WER,
-		(state != 0) ? OMAP_UART_WER_MOD_WKUP : 0);
+			(state != 0) ? OMAP_UART_WER_MOD_WKUP : 0);
 
-	omap_uart_disable_clock_from_ext(up->pdev->id);
+	if (state != 0)
+		omap_uart_disable_clock_from_ext(up->pdev->id);
+	else
+		omap_uart_enable_clock_from_ext(up->pdev->id);
 }
 
 static void serial_omap_release_port(struct uart_port *port)
@@ -1112,6 +1119,7 @@ serial_omap_console_write(struct console *co, const char *s,
 	if (locked)
 		spin_unlock(&up->port.lock);
 	up->port_tx_active = 0;
+	up->port_activity = jiffies;
 	omap_uart_start_inactivity_timer(up->pdev->id);
 	local_irq_restore(flags);
 }
