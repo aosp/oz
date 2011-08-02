@@ -25,6 +25,7 @@
 #include <linux/slab.h>
 #include <linux/debugfs.h>
 #include <linux/cpufreq.h>
+#include <linux/cpu.h>
 #include <linux/notifier.h>
 #include <linux/workqueue.h>
 #include <linux/mutex.h>
@@ -67,6 +68,8 @@ static struct delayed_work work_exit_heat;
 static struct delayed_work work_enter_heat;
 static struct work_struct work_enter_cool0;
 static struct work_struct work_enter_cool1;
+static struct work_struct work_cpu1_plugin;
+static struct work_struct work_cpu1_plugout;
 static enum omap4_duty_state state;
 
 /* protect our data */
@@ -75,6 +78,11 @@ static DEFINE_MUTEX(mutex_duty);
 static void omap4_duty_enter_normal(void)
 {
 	struct cpufreq_policy *policy = cpufreq_cpu_get(0);
+
+	if (!policy) {
+		pr_err("No CPUfreq policy at this point.\n");
+		return;
+	}
 
 	pr_debug("%s enter at (%u)\n", __func__, policy->cur);
 	state = OMAP4_DUTY_NORMAL;
@@ -98,6 +106,11 @@ static void omap4_duty_enter_cooling(unsigned int next_max,
 					enum omap4_duty_state next_state)
 {
 	struct cpufreq_policy *policy = cpufreq_cpu_get(0);
+
+	if (!policy) {
+		pr_err("No CPUfreq policy at this point.\n");
+		return;
+	}
 
 	state = next_state;
 	pr_debug("%s enter at (%u)\n", __func__, policy->cur);
@@ -197,6 +210,87 @@ done:
 
 static struct notifier_block omap4_duty_nb = {
 	.notifier_call	= omap4_duty_frequency_change,
+};
+
+static int omap4_duty_cycle_set_enabled(bool val)
+{
+	int ret;
+
+	ret = mutex_lock_interruptible(&mutex_duty);
+	if (ret)
+		return ret;
+
+	if (enabled != val) {
+		enabled = val;
+		if (enabled) {
+			/* Register the cpufreq notification */
+			if (cpufreq_register_notifier(&omap4_duty_nb,
+						CPUFREQ_TRANSITION_NOTIFIER)) {
+				pr_err("%s: failed to setup cpufreq_notifier\n",
+							__func__);
+				ret = -EINVAL;
+				goto unlock;
+			}
+			omap4_duty_enter_normal();
+			/* We need to check in which frequency we are */
+			if (cpufreq_get(0) == nitro_rate)
+				queue_delayed_work(duty_wq, &work_enter_heat,
+						msecs_to_jiffies(1));
+		} else {
+			cpufreq_unregister_notifier(&omap4_duty_nb,
+					CPUFREQ_TRANSITION_NOTIFIER);
+			cancel_delayed_work_sync(&work_exit_cool);
+			cancel_delayed_work_sync(&work_exit_heat);
+			cancel_delayed_work_sync(&work_enter_heat);
+			cancel_work_sync(&work_enter_cool0);
+			cancel_work_sync(&work_enter_cool1);
+			omap4_duty_enter_normal();
+		}
+	}
+
+unlock:
+	mutex_unlock(&mutex_duty);
+	return ret;
+}
+
+static void omap4_duty_enable_wq(struct work_struct *work)
+{
+	omap4_duty_cycle_set_enabled(true);
+}
+
+static void omap4_duty_disable_wq(struct work_struct *work)
+{
+	omap4_duty_cycle_set_enabled(false);
+}
+
+static int omap4_duty_cycle_cpu_callback(struct notifier_block *nfb,
+					unsigned long action, void *hcpu)
+{
+	unsigned int cpu = (unsigned long)hcpu;
+
+	/* for now we don't care about cpu 0 */
+	if (cpu == 0 || duty_wq == NULL)
+		return NOTIFY_OK;
+
+	switch (action) {
+	case CPU_ONLINE:
+	case CPU_ONLINE_FROZEN:
+		queue_work(duty_wq, &work_cpu1_plugin);
+		break;
+	case CPU_DOWN_PREPARE:
+	case CPU_DOWN_PREPARE_FROZEN:
+		queue_work(duty_wq, &work_cpu1_plugout);
+		break;
+	case CPU_DOWN_FAILED:
+	case CPU_DOWN_FAILED_FROZEN:
+		queue_work(duty_wq, &work_cpu1_plugin);
+		break;
+	}
+	return NOTIFY_OK;
+}
+
+static struct notifier_block __refdata omap4_duty_cycle_cpu_notifier = {
+    .notifier_call = omap4_duty_cycle_cpu_callback,
 };
 
 static ssize_t show_nitro_interval(struct device *dev,
@@ -374,41 +468,16 @@ static ssize_t store_enabled(struct device *dev,
 					const char *buf,
 					size_t count)
 {
-	unsigned long val;
 	int ret;
+	unsigned long val;
 
 	ret = strict_strtoul(buf, 0, &val);
 	if (ret)
 		return ret;
 
-	ret = mutex_lock_interruptible(&mutex_duty);
+	ret = omap4_duty_cycle_set_enabled(!!val);
 	if (ret)
 		return ret;
-
-	if (enabled != (!!val)) {
-		enabled = !!val;
-		if (enabled) {
-			/* Register the cpufreq notification */
-			if (cpufreq_register_notifier(&omap4_duty_nb,
-						CPUFREQ_TRANSITION_NOTIFIER)) {
-				pr_err("%s: failed to setup cpufreq_notifier\n",
-							__func__);
-				mutex_unlock(&mutex_duty);
-				return -EINVAL;
-			}
-		} else {
-			cpufreq_unregister_notifier(&omap4_duty_nb,
-					CPUFREQ_TRANSITION_NOTIFIER);
-			cancel_delayed_work_sync(&work_exit_cool);
-			cancel_delayed_work_sync(&work_exit_heat);
-			cancel_delayed_work_sync(&work_enter_heat);
-			cancel_work_sync(&work_enter_cool0);
-			cancel_work_sync(&work_enter_cool1);
-		}
-		omap4_duty_enter_normal();
-	}
-
-	mutex_unlock(&mutex_duty);
 
 	return count;
 }
@@ -477,15 +546,24 @@ static int __init omap4_duty_module_init(void)
 	INIT_DELAYED_WORK(&work_enter_heat, omap4_duty_enter_heat_wq);
 	INIT_WORK(&work_enter_cool0, omap4_duty_enter_c0_wq);
 	INIT_WORK(&work_enter_cool1, omap4_duty_enter_c1_wq);
+	INIT_WORK(&work_cpu1_plugin, omap4_duty_enable_wq);
+	INIT_WORK(&work_cpu1_plugout, omap4_duty_disable_wq);
 	heating_budget = NITRO_P(nitro_percentage, nitro_interval);
-	enabled = true;
 
-	/* Register the cpufreq notification */
-	if (cpufreq_register_notifier(&omap4_duty_nb,
-						CPUFREQ_TRANSITION_NOTIFIER)) {
-		pr_err("%s: failed to setup cpufreq_notifier\n", __func__);
-		err = -EINVAL;
+	if (num_online_cpus() > 1)
+		err = omap4_duty_cycle_set_enabled(true);
+	else
+		err = omap4_duty_cycle_set_enabled(false);
+	if (err) {
+		pr_err("%s: failed to initialize the duty cycle\n", __func__);
 		goto exit;
+	}
+
+	err = register_hotcpu_notifier(&omap4_duty_cycle_cpu_notifier);
+	if (err) {
+		pr_err("%s: failed to register cpu hotplug callback\n",
+								__func__);
+		goto disable;
 	}
 
 	omap4_duty_device = platform_device_register_simple("omap4_duty_cycle",
@@ -493,7 +571,7 @@ static int __init omap4_duty_module_init(void)
 	if (IS_ERR(omap4_duty_device)) {
 		err = PTR_ERR(omap4_duty_device);
 		pr_err("Unable to register omap4 duty cycle device\n");
-		goto exit_cpufreq_nb;
+		goto unregister_hotplug;
 	}
 
 	err = platform_driver_probe(&omap4_duty_driver, omap4_duty_probe);
@@ -504,9 +582,11 @@ static int __init omap4_duty_module_init(void)
 
 exit_pdevice:
 	platform_device_unregister(omap4_duty_device);
-exit_cpufreq_nb:
-	cpufreq_unregister_notifier(&omap4_duty_nb,
-						CPUFREQ_TRANSITION_NOTIFIER);
+unregister_hotplug:
+	unregister_hotcpu_notifier(&omap4_duty_cycle_cpu_notifier);
+disable:
+	if (enabled)
+		omap4_duty_cycle_set_enabled(false);
 exit:
 	return err;
 }
@@ -518,13 +598,15 @@ static void __exit omap4_duty_module_exit(void)
 
 	cpufreq_unregister_notifier(&omap4_duty_nb,
 						CPUFREQ_TRANSITION_NOTIFIER);
-
+	unregister_hotcpu_notifier(&omap4_duty_cycle_cpu_notifier);
 
 	cancel_delayed_work_sync(&work_exit_cool);
 	cancel_delayed_work_sync(&work_exit_heat);
 	cancel_delayed_work_sync(&work_enter_heat);
 	cancel_work_sync(&work_enter_cool0);
 	cancel_work_sync(&work_enter_cool1);
+	cancel_work_sync(&work_cpu1_plugin);
+	cancel_work_sync(&work_cpu1_plugout);
 
 	destroy_workqueue(duty_wq);
 
