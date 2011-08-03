@@ -216,23 +216,7 @@ error1:
 
 static struct gpio_led sdp4430_gpio_leds[] = {
 	{
-		.name	= "omap4:green:debug0",
-		.gpio	= 61,
-	},
-	{
-		.name	= "omap4:green:debug1",
-		.gpio	= 30,
-	},
-	{
-		.name	= "omap4:green:debug2",
-		.gpio	= 7,
-	},
-	{
-		.name	= "omap4:green:debug3",
-		.gpio	= 8,
-	},
-	{
-		.name	= "omap4:green:debug4",
+		.name	= "tablet:led_gp_4_c",
 		.gpio	= 50,
 	},
 	{
