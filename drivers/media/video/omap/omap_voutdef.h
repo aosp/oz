@@ -191,9 +191,9 @@ struct omap_vout_device {
 };
 
 struct vout_platform_data {
-	void (*set_min_bus_tput)(struct device *dev, u8 agent_id,
-			unsigned long r);
-	void (*set_max_mpu_wakeup_lat)(struct device *dev, long t);
+	int (*set_min_bus_tput)(struct device *dev, u8 agent_id, long r);
+	int (*set_max_mpu_wakeup_lat)(struct pm_qos_request_list **pmqos_req,
+			long t);
 	void (*set_cpu_freq)(unsigned long f);
 };
 #endif	/* ifndef OMAP_VOUTDEF_H */
