@@ -1312,7 +1312,10 @@ static struct usbhs_omap_platform_data usbhs_pdata __initconst = {
 	.phy_reset  = false,
 	.reset_gpio_port[0]  = -EINVAL,
 	.reset_gpio_port[1]  = -EINVAL,
-	.reset_gpio_port[2]  = -EINVAL
+	.reset_gpio_port[2]  = -EINVAL,
+	.power_gpio_num = 30,
+	.power_gpio_inv = 1,
+	.power_pad_conf = OMAP_PULL_ENA
 };
 
 static struct omap_i2c_bus_board_data __initdata tablet_i2c_bus_pdata;

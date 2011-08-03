@@ -2292,6 +2292,15 @@ static int uhhtll_store(enum driver_type drvtype, enum data_type datatype,
 	return 0;
 }
 
+static void uhhtll_power_sw(const struct usbhs_omap_platform_data *pdata,
+				int on)
+{
+	if (pdata->power_gpio_num < 0)
+		return;
+
+	gpio_set_value(pdata->power_gpio_num,
+			pdata->power_gpio_inv^(on ? 1 : 0));
+}
 
 static int uhhtll_drv_enable(enum driver_type drvtype)
 {
@@ -2318,6 +2327,9 @@ static int uhhtll_drv_enable(enum driver_type drvtype)
 		usbhs_ohci_clk(omap, 1);
 		set_bit(USBHS_OHCI_LOADED, &omap->event_state);
 	}
+
+	if (!ret)
+		uhhtll_power_sw(pdata, 1);
 
 	up(&omap->mutex);
 
@@ -2362,6 +2374,8 @@ static int uhhtll_drv_disable(enum driver_type drvtype)
 		ret = -EINVAL;
 
 	usbhs_disable(omap, 1);
+
+	uhhtll_power_sw(pdata, 0);
 
 	up(&omap->mutex);
 
@@ -2938,6 +2952,29 @@ void __init usb_uhhtll_init(const struct usbhs_omap_platform_data *pdata)
 	} else if (cpu_is_omap44xx()) {
 		setup_4430ehci_io_mux(pdata->port_mode);
 		setup_4430ohci_io_mux(pdata->port_mode);
+	}
+	/*
+	 * Init external power supplier switch ON/OFF via GPIO
+	 */
+	if (pdata->power_gpio_num >= 0) {
+		if (omap_mux_init_gpio(pdata->power_gpio_num,
+					pdata->power_pad_conf)) {
+			pr_err("Could not configure MUX for GPIO:%d\n",
+				pdata->power_gpio_num);
+		}
+		if (gpio_request(pdata->power_gpio_num, "USB_POWER_GPIO")) {
+			pr_err("Could not execute GPIO:%d request\n",
+				pdata->power_gpio_num);
+			return;
+		}
+		if (gpio_direction_output(pdata->power_gpio_num,
+			pdata->power_gpio_inv)) {
+			gpio_free(pdata->power_gpio_num);
+			pr_err("Could not set GPIO:%d to output direction\n",
+				pdata->power_gpio_num);
+			return;
+		}
+		uhhtll_power_sw(pdata, 0);
 	}
 
 	oh[0] = omap_hwmod_lookup(USB_UHH_HS_HWMODNAME);

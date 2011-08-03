@@ -1470,7 +1470,8 @@ static struct usbhs_omap_platform_data usbhs_pdata __initconst = {
 	.phy_reset  = false,
 	.reset_gpio_port[0]  = -EINVAL,
 	.reset_gpio_port[1]  = -EINVAL,
-	.reset_gpio_port[2]  = -EINVAL
+	.reset_gpio_port[2]  = -EINVAL,
+	.power_gpio_num = -EINVAL
 };
 
 static struct omap_i2c_bus_board_data __initdata sdp4430_i2c_bus_pdata;

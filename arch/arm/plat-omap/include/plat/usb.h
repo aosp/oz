@@ -52,6 +52,12 @@ struct usbhs_omap_platform_data {
 	 * Each PHY can have a separate regulator.
 	 */
 	struct regulator        *regulator[OMAP3_HS_USB_PORTS];
+	/* Device can have USB power supply
+	 * switch driven via GPIO
+	 */
+	int	power_gpio_num;
+	unsigned	power_gpio_inv:1;
+	unsigned	power_pad_conf;
 };
 
 
