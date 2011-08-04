@@ -33,6 +33,7 @@ dsscomp_t dsscomp_find(struct omap_overlay_manager *mgr, u32 sync_id);
 u32 dsscomp_get_ovls(dsscomp_t comp);
 int dsscomp_set_ovl(dsscomp_t comp, struct dss2_ovl_info *ovl);
 int dsscomp_get_ovl(dsscomp_t comp, u32 ix, struct dss2_ovl_info *ovl);
+int dsscomp_get_first_ovl(dsscomp_t comp, struct dss2_ovl_info *ovl);
 int dsscomp_set_mgr(dsscomp_t comp, struct dss2_mgr_info *mgr);
 int dsscomp_get_mgr(dsscomp_t comp, struct dss2_mgr_info *mgr);
 int dsscomp_setup(dsscomp_t comp, enum dsscomp_setup_mode mode,

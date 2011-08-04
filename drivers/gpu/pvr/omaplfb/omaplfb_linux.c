@@ -236,12 +236,8 @@ static void OMAPLFBFlipDSSComp(OMAPLFB_SWAPCHAIN *psSwapChain,
 			(struct work_struct *)&vdisp_sync_primary);
 	}
 
-	/* TODO: Find a proper way to look in the composition object
-	 * the pipe used for UI cloning, use vid2 for now
-	 */
-	overlay = omap_dss_get_overlay(OMAP_DSS_VIDEO2);
 	if (tv_comp)
-		r = dsscomp_get_ovl(tv_comp, overlay->id, &dss2_ovl);
+		r = dsscomp_get_first_ovl(tv_comp, &dss2_ovl);
 	else
 		goto tv_comp_invalid;
 

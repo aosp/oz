@@ -438,7 +438,7 @@ int dsscomp_set_ovl(dsscomp_t comp, struct dss2_ovl_info *ovl)
 			mgrq[ix].ovl_qmask |= mask;
 
 			oi = list_first_entry(&free_ois, typeof(*oi), q);
-			list_move(&oi->q, &comp->ois);
+			list_move_tail(&oi->q, &comp->ois);
 		}
 
 		oi->ovl = *ovl;
@@ -491,6 +491,38 @@ int dsscomp_get_ovl(dsscomp_t comp, u32 ix, struct dss2_ovl_info *ovl)
 	return r;
 }
 EXPORT_SYMBOL(dsscomp_get_ovl);
+
+/* get first overlay info in the composition*/
+int dsscomp_get_first_ovl(dsscomp_t comp, struct dss2_ovl_info *ovl)
+{
+	int r = -EFAULT;
+	struct dss2_overlay *oi;
+
+	if (comp && ovl) {
+		dsscomp_t chkcomp;
+		mutex_lock(&mgrq[comp->ix].mtx);
+
+		/* check if composition is active */
+		chkcomp = validate(comp);
+		if (IS_ERR(chkcomp))
+			r = PTR_ERR(chkcomp);
+		else if (comp->magic != MAGIC_ACTIVE)
+			r = -EACCES;
+		else {
+			if (!list_empty(&comp->ois)) {
+				r = 0;
+				oi = list_first_entry(&comp->ois,
+						typeof(*oi), q);
+				*ovl = oi->ovl;
+			}
+		}
+		mutex_unlock(&mgrq[comp->ix].mtx);
+	}
+
+	return r;
+}
+EXPORT_SYMBOL(dsscomp_get_first_ovl);
+
 
 /* set manager info */
 int dsscomp_set_mgr(dsscomp_t comp, struct dss2_mgr_info *mgr)
