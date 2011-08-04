@@ -158,9 +158,16 @@ static long query_display(struct dsscomp_dev *cdev,
 
 	/* fill out display information */
 	dis->channel = dev->channel;
-	dis->enabled = (dev->state == OMAP_DSS_DISPLAY_SUSPENDED) ?
-		dev->activate_after_resume :
-		(dev->state == OMAP_DSS_DISPLAY_ACTIVE);
+
+	/* use smart_disable if present */
+	if (dev->driver->smart_is_enabled)
+		dis->enabled = dev->driver->smart_is_enabled(dev);
+	/* show resume info for suspended displays */
+	else if (dev->state == OMAP_DSS_DISPLAY_SUSPENDED)
+		dis->enabled = OMAP_DSS_DISPLAY_DISABLED;
+	else
+		dis->enabled  = dev->state != OMAP_DSS_DISPLAY_DISABLED;
+
 	dis->overlays_available = 0;
 	dis->overlays_owned = 0;
 	dis->s3d_info = dev->panel.s3d_info;
