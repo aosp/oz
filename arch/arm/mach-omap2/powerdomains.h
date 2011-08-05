@@ -99,6 +99,8 @@ int _get_mem_bank_stst_mask(u8 bank);
 int _get_mem_bank_lastmemst_mask(u8 bank);
 
 /* As powerdomains are added or removed above, this list must also be changed */
+static struct powerdomain *powerdomains_omap[] __attribute__ ((unused));
+
 static struct powerdomain *powerdomains_omap[] __initdata = {
 
 #if defined(CONFIG_ARCH_OMAP2) || defined(CONFIG_ARCH_OMAP3)
