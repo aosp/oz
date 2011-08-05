@@ -1454,6 +1454,8 @@ static void omap_abb_enable(struct omap_vdd_info *vdd_info)
   * omap_abb_disable - Clears ABB_LDO_SETUP.SR2EN bit
   * Disables ABB.
   */
+static void omap_abb_disable(struct omap_vdd_info *vdd_info) __attribute__ ((unused));
+
 static void omap_abb_disable(struct omap_vdd_info *vdd_info)
 {
 	if (cpu_is_omap3630())
