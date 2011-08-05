@@ -475,8 +475,9 @@ static struct platform_device udc_device = {
 
 #endif
 
-#if	defined(CONFIG_USB_OHCI_HCD) || defined(CONFIG_USB_OHCI_HCD_MODULE)
+#ifdef	CONFIG_ARCH_OMAP_OTG
 
+#if	defined(CONFIG_USB_OHCI_HCD) || defined(CONFIG_USB_OHCI_HCD_MODULE)
 /* The dmamask must be set for OHCI to work */
 static u64 ohci_dmamask = ~(u32)0;
 
@@ -502,6 +503,7 @@ static struct platform_device ohci_device = {
 	.num_resources	= ARRAY_SIZE(ohci_resources),
 	.resource		= ohci_resources,
 };
+#endif
 
 #endif
 
