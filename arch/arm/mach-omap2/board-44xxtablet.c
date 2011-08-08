@@ -1615,30 +1615,45 @@ static struct omap_volt_pmic_info omap_pmic_iva = {
 static struct omap_volt_vc_data vc446x_config = {
 	.vdd0_on = 1350000,	/* 1.35v */
 	.vdd0_onlp = 1350000,	/* 1.35v */
-	.vdd0_ret = 837500,	/* 0.8375v */
+	.vdd0_ret = 750000,	/* 0.75v */
 	.vdd0_off = 600000,	/* 0.6 v */
 	.vdd1_on = 1350000,	/* 1.35v */
 	.vdd1_onlp = 1350000,	/* 1.35v */
-	.vdd1_ret = 837500,	/* 0.8375v */
+	.vdd1_ret = 750000,	/* 0.75v */
 	.vdd1_off = 600000,	/* 0.6 v */
 	.vdd2_on = 1350000,	/* 1.35v */
 	.vdd2_onlp = 1350000,	/* 1.35v */
-	.vdd2_ret = 837500,	/* .8375v */
+	.vdd2_ret = 750000,	/* .75v */
 	.vdd2_off = 600000,	/* 0.6 v */
 };
 
 static struct omap_volt_vc_data vc_config = {
-	.vdd0_on = 1350000,        /* 1.35v */
-	.vdd0_onlp = 1350000,      /* 1.35v */
-	.vdd0_ret = 837500,       /* 0.8375v */
+	.vdd0_on = 1350000,	/* 1.35v */
+	.vdd0_onlp = 1350000,	/* 1.35v */
+	.vdd0_ret = 750000,	/* 0.75v */
 	.vdd0_off = 0,		/* 0 v */
-	.vdd1_on = 1100000,        /* 1.1v */
-	.vdd1_onlp = 1100000,      /* 1.1v */
-	.vdd1_ret = 837500,       /* 0.8375v */
+	.vdd1_on = 1100000,	/* 1.1v */
+	.vdd1_onlp = 1100000,	/* 1.1v */
+	.vdd1_ret = 750000,	/* 0.75v */
 	.vdd1_off = 0,		/* 0 v */
-	.vdd2_on = 1100000,        /* 1.1v */
-	.vdd2_onlp = 1100000,      /* 1.1v */
-	.vdd2_ret = 837500,       /* .8375v */
+	.vdd2_on = 1100000,	/* 1.1v */
+	.vdd2_onlp = 1100000,	/* 1.1v */
+	.vdd2_ret = 750000,	/* .75v */
+	.vdd2_off = 0,		/* 0 v */
+};
+
+static struct omap_volt_vc_data vc_config_old = {
+	.vdd0_on = 1350000,	/* 1.35v */
+	.vdd0_onlp = 1350000,	/* 1.35v */
+	.vdd0_ret = 837500,	/* 0.837500v */
+	.vdd0_off = 0,		/* 0 v */
+	.vdd1_on = 1100000,	/* 1.1v */
+	.vdd1_onlp = 1100000,	/* 1.1v */
+	.vdd1_ret = 837500,	/* 0.837500v */
+	.vdd1_off = 0,		/* 0 v */
+	.vdd2_on = 1100000,	/* 1.1v */
+	.vdd2_onlp = 1100000,	/* 1.1v */
+	.vdd2_ret = 837500,	/* .837500v */
 	.vdd2_off = 0,		/* 0 v */
 };
 
@@ -1904,9 +1919,13 @@ static void __init omap_44xxtablet_init(void)
 
 	if (cpu_is_omap446x())
 		omap_voltage_init_vc(&vc446x_config);
-	else
-		omap_voltage_init_vc(&vc_config);
-
+	else {
+		if (omap_rev() <= OMAP4430_REV_ES2_1) {
+			omap_voltage_init_vc(&vc_config_old);
+		} else {
+			omap_voltage_init_vc(&vc_config);
+		}
+	}
 }
 
 static void __init omap_4430sdp_map_io(void)
