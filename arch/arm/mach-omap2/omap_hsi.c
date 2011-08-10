@@ -33,7 +33,7 @@
 #include "mux.h"
 #include <asm/clkdev.h>
 #include <../drivers/staging/omap_hsi/hsi_driver.h>
-
+#include "pm.h"
 
 static int omap_hsi_wakeup_enable(int hsi_port);
 static int omap_hsi_wakeup_disable(int hsi_port);
@@ -243,6 +243,7 @@ static int omap_hsi_wakeup_enable(int hsi_port)
 	if (omap_hsi_is_io_pad_hsi(hsi_port)) {
 		port_ctx = hsi_get_hsi_port_ctx_data(hsi_port);
 		ret = omap_mux_enable_wakeup(port_ctx->cawake_padconf_name);
+		omap4_trigger_ioctrl();
 	} else {
 		pr_debug("HSI port %d not muxed, failed to enable IO wakeup\n",
 			 hsi_port);
@@ -268,6 +269,7 @@ static int omap_hsi_wakeup_disable(int hsi_port)
 	if (omap_hsi_is_io_pad_hsi(hsi_port)) {
 		port_ctx = hsi_get_hsi_port_ctx_data(hsi_port);
 		ret = omap_mux_disable_wakeup(port_ctx->cawake_padconf_name);
+		omap4_trigger_ioctrl();
 	} else {
 		pr_debug("HSI port %d not muxed, failed to disable IO wakeup\n",
 			 hsi_port);
