@@ -535,7 +535,7 @@ loop5:
 	bne	scu_gp_clear
 
 	mov     r0, #0x00
-	mov     r12, #0x100
+	mov     r1, #0x00
 	stmfd   r13!, {r4-r12, r14}
 	ldr	r12, =0x108		@ SCU power state secure API
 	dsb
