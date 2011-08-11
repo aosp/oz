@@ -920,6 +920,7 @@ static int hsi_suspend_noirq(struct device *dev)
 	struct hsi_platform_data *pdata = dev->platform_data;
 	struct platform_device *pd = to_platform_device(dev);
 	struct hsi_dev *hsi_ctrl = platform_get_drvdata(pd);
+	unsigned int i;
 
 	dev_dbg(dev, "%s\n", __func__);
 
@@ -933,7 +934,9 @@ static int hsi_suspend_noirq(struct device *dev)
 
 	/* Perform HSI board specific action before platform suspend */
 	if (pdata->board_suspend)
-		pdata->board_suspend(0, device_may_wakeup(dev));
+		for (i = 0; i < hsi_ctrl->max_p; i++)
+			pdata->board_suspend(hsi_ctrl->hsi_port[i].port_number,
+					     device_may_wakeup(dev));
 
 	return 0;
 }
@@ -941,6 +944,9 @@ static int hsi_suspend_noirq(struct device *dev)
 static int hsi_resume_noirq(struct device *dev)
 {
 	struct hsi_platform_data *pdata = dev->platform_data;
+	struct platform_device *pd = to_platform_device(dev);
+	struct hsi_dev *hsi_ctrl = platform_get_drvdata(pd);
+	unsigned int i;
 
 	dev_dbg(dev, "%s\n", __func__);
 
@@ -957,7 +963,8 @@ static int hsi_resume_noirq(struct device *dev)
 
 	/* Perform (optional) HSI board specific action after platform wakeup */
 	if (pdata->board_resume)
-		pdata->board_resume(0);
+		for (i = 0; i < hsi_ctrl->max_p; i++)
+			pdata->board_resume(hsi_ctrl->hsi_port[i].port_number);
 
 	return 0;
 }

@@ -324,6 +324,9 @@ static int hsi_enable_hwmod(struct omap_device *od)
 /**
 * omap_hsi_prepare_suspend - Prepare HSI for suspend mode
 *
+* @hsi_port - reference to the HSI port. Range [1, 2]
+* @dev_may_wakeup - value of sysfs flag indicating device wakeup capability
+*
 * Return value :* 0 if CAWAKE padconf has been configured properly
 *		* -ENODEV if CAWAKE is not muxed on padconf.
 *
@@ -362,7 +365,7 @@ int omap_hsi_io_wakeup_check(void)
 * omap_hsi_wakeup - Prepare HSI for wakeup from suspend mode (RET/OFF)
 *
 * @hsi_port - reference to the HSI port which triggered wakeup.
-*	      Range [0, 1]
+*	      Range [1, 2]
 *
 * Return value : * 0 if HSI tasklet scheduled.
 *		 * negative value else.
