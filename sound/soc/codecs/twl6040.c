@@ -256,6 +256,48 @@ static int twl6040_write(struct snd_soc_codec *codec,
 	if (reg >= TWL6040_CACHEREGNUM)
 		return -EIO;
 
+	/* SW Workaround for Pops during device switch */
+	if (snd_soc_read(codec, TWL6040_REG_ASICREV) < TWL6040_REV_1_3) {
+		u8 reg_sync_dac = 0;
+		/* Synchronize HS DAC enables */
+		if (reg == TWL6040_REG_HSLCTL) {
+			reg_sync_dac = twl6040_reg_read(twl6040,
+							TWL6040_REG_HSRCTL);
+			reg_sync_dac &= ~TWL6040_HSDACENAR;
+			reg_sync_dac |= value & TWL6040_HSDACENAL;
+			twl6040_write_reg_cache(codec, TWL6040_REG_HSRCTL,
+						reg_sync_dac);
+			twl6040_reg_write(twl6040, TWL6040_REG_HSRCTL,
+					  reg_sync_dac);
+		}
+		/* Write all but DAC TWL6040_HSDACENAR bit */
+		if (reg == TWL6040_REG_HSRCTL) {
+			reg_sync_dac = twl6040_reg_read(twl6040,
+							TWL6040_REG_HSRCTL);
+			value = (value & ~TWL6040_HSDACENAL) |
+					    (reg_sync_dac & TWL6040_HSDACENAR);
+		}
+
+		/* Synchronize HF DAC enables */
+		if (reg == TWL6040_REG_HFLCTL) {
+			reg_sync_dac = twl6040_reg_read(twl6040,
+							TWL6040_REG_HFRCTL);
+			reg_sync_dac &= ~TWL6040_HFDACENAR;
+			reg_sync_dac |= value & TWL6040_HFDACENAL;
+			twl6040_write_reg_cache(codec,
+						TWL6040_REG_HFRCTL,
+						reg_sync_dac);
+			twl6040_reg_write(twl6040, TWL6040_REG_HFRCTL,
+					  reg_sync_dac);
+		}
+		/* Write all but DAC TWL6040_HFDACENAR bit */
+		if (reg == TWL6040_REG_HFRCTL) {
+			reg_sync_dac = twl6040_reg_read(twl6040,
+							TWL6040_REG_HFRCTL);
+			value = (value & ~TWL6040_HFDACENAL) |
+					(reg_sync_dac & TWL6040_HFDACENAR);
+		}
+	}
 	twl6040_write_reg_cache(codec, reg, value);
 	return twl6040_reg_write(twl6040, reg, value);
 }
