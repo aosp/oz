@@ -3144,11 +3144,11 @@ static int vidioc_streamon(struct file *file, void *fh, enum v4l2_buf_type i)
 
 #ifdef CONFIG_PM
 	if (pdata->set_min_bus_tput) {
-		if (cpu_is_omap3630() || cpu_is_omap44xx()) {
+		if (cpu_is_omap3630()) {
 			pdata->set_min_bus_tput(
 				((vout->vid_dev)->v4l2_dev).dev ,
 					OCP_INITIATOR_AGENT, 200 * 1000 * 4);
-		} else {
+		} else if (!cpu_is_omap44xx()) {
 			pdata->set_min_bus_tput(
 				((vout->vid_dev)->v4l2_dev).dev ,
 					OCP_INITIATOR_AGENT, 166 * 1000 * 4);
