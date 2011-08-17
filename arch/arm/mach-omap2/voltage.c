@@ -2117,8 +2117,16 @@ int omap_voltage_add_userreq(struct voltagedomain *voltdm, struct device *dev,
 	struct plist_node *node;
 	int found = 0;
 
-	if (!voltdm || IS_ERR(voltdm)) {
-		pr_warning("%s: VDD specified does not exist!\n", __func__);
+	if (WARN_ON(voltdm == NULL || dev == NULL || volt == NULL))
+		return -EFAULT;
+
+	if (IS_ERR(voltdm)) {
+		pr_err("%s: VDD specified does not exist!\n", __func__);
+		return -EINVAL;
+	}
+
+	if (IS_ERR(dev)) {
+		pr_err("%s: device specified does not exist!\n", __func__);
 		return -EINVAL;
 	}
 
