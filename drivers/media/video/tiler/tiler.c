@@ -1753,8 +1753,11 @@ s32 tiler_set_buf_state(u32 ssptr, enum buf_state state)
 		if (tcm_is_in(pt, mi->area)) {
 			if (state == TILBUF_BUSY)
 				mi->state++;
-			else if (state == TILBUF_FREE)
-				mi->state--;
+
+			else if (state == TILBUF_FREE) {
+				if (mi->state > 0)
+					mi->state--;
+			}
 
 			if (mi->state == 0)
 				wake_up_interruptible_sync(&wq);
