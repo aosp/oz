@@ -192,11 +192,11 @@ static long query_display(struct dsscomp_dev *cdev,
 		dis->mgr.trans_enabled = mgr->info.trans_enabled;
 		dis->mgr.trans_key = mgr->info.trans_key;
 		dis->mgr.trans_key_type = mgr->info.trans_key_type;
+		dis->mgr.ix = mgr->id;
 	} else {
 		/* display is disabled if it has no manager */
 		memset(&dis->mgr, 0, sizeof(dis->mgr));
 	}
-	dis->mgr.ix = dis->ix;
 
 	return 0;
 }
