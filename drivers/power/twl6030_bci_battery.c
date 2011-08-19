@@ -1890,13 +1890,16 @@ static int __devinit twl6030_bci_battery_probe(struct platform_device *pdev)
 
 	di->charger_incurrentmA = twl6030_get_usb_max_power(di->otg);
 
+	twl_i2c_read_u8(TWL6030_MODULE_ID0, &hw_state, STS_HW_CONDITIONS);
 	if (!is_battery_present()) {
-		dev_dbg(di->dev, "BATTERY NOT DETECTED! PUT in HZ mode\n");
-		twl_i2c_read_u8(TWL6030_MODULE_CHARGER, &chargerusb_ctrl1,
-						CHARGERUSB_CTRL1);
-		chargerusb_ctrl1 |= HZ_MODE;
-		twl_i2c_write_u8(TWL6030_MODULE_CHARGER, chargerusb_ctrl1,
-						CHARGERUSB_CTRL1);
+		if (!(hw_state & STS_USB_ID)) {
+			dev_dbg(di->dev, "Put USB in HZ mode\n");
+			twl_i2c_read_u8(TWL6030_MODULE_CHARGER,
+					&chargerusb_ctrl1, CHARGERUSB_CTRL1);
+			chargerusb_ctrl1 |= HZ_MODE;
+			twl_i2c_write_u8(TWL6030_MODULE_CHARGER,
+					 chargerusb_ctrl1, CHARGERUSB_CTRL1);
+		}
 	} else {
 		if (controller_stat & VAC_DET) {
 			di->ac_online = POWER_SUPPLY_TYPE_MAINS;
@@ -1906,8 +1909,6 @@ static int __devinit twl6030_bci_battery_probe(struct platform_device *pdev)
 			 * In HOST mode (ID GROUND) with a device connected,
 			 * do no enable usb charging
 			 */
-			twl_i2c_read_u8(TWL6030_MODULE_ID0, &hw_state,
-							STS_HW_CONDITIONS);
 			if (!(hw_state & STS_USB_ID)) {
 				di->usb_online = POWER_SUPPLY_TYPE_USB;
 				di->charger_source = POWER_SUPPLY_TYPE_USB;
