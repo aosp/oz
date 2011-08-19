@@ -655,6 +655,8 @@ static const char *twl6040_hs_texts[] =
 static const char *twl6040_hf_texts[] =
 	{"Off", "HF DAC", "Line-In amp"};
 
+static const char *twl6040_ep_texts[] = {"Off", "On"};
+
 static const struct soc_enum twl6040_enum[] = {
 	SOC_ENUM_SINGLE(TWL6040_REG_MICLCTL, 3, 4, twl6040_amicl_texts),
 	SOC_ENUM_SINGLE(TWL6040_REG_MICRCTL, 3, 4, twl6040_amicr_texts),
@@ -663,6 +665,9 @@ static const struct soc_enum twl6040_enum[] = {
 	SOC_ENUM_SINGLE(TWL6040_REG_HFLCTL, 2, 3, twl6040_hf_texts),
 	SOC_ENUM_SINGLE(TWL6040_REG_HFRCTL, 2, 3, twl6040_hf_texts),
 };
+
+static const struct soc_enum twl6040_virt_enum =
+	SOC_ENUM_SINGLE(0, 0, 2, twl6040_ep_texts);
 
 static const struct snd_kcontrol_new amicl_control =
 	SOC_DAPM_ENUM("Route", twl6040_enum[0]);
@@ -676,6 +681,10 @@ static const struct snd_kcontrol_new hsl_mux_controls =
 
 static const struct snd_kcontrol_new hsr_mux_controls =
 	SOC_DAPM_ENUM("Route", twl6040_enum[3]);
+
+/* EP playback virtual mux */
+static const struct snd_kcontrol_new ep_virt_mux_controls =
+	SOC_DAPM_ENUM_VIRT("Route", twl6040_virt_enum);
 
 /* Handsfree DAC playback switches */
 static const struct snd_kcontrol_new hfl_mux_controls =
@@ -791,6 +800,8 @@ static const struct snd_soc_dapm_widget twl6040_dapm_widgets[] = {
 			SND_SOC_NOPM, 0, 0, &hsl_mux_controls),
 	SND_SOC_DAPM_MUX("HS Right Playback",
 			SND_SOC_NOPM, 0, 0, &hsr_mux_controls),
+	SND_SOC_DAPM_MUX("EP Playback",
+			SND_SOC_NOPM, 0, 0, &ep_virt_mux_controls),
 
 	/* Analog playback drivers */
 	SND_SOC_DAPM_DRV_E("Handsfree Left Driver",
@@ -805,8 +816,8 @@ static const struct snd_soc_dapm_widget twl6040_dapm_widgets[] = {
 			TWL6040_REG_HSLCTL, 2, 0, NULL, 0),
 	SND_SOC_DAPM_DRV("Headset Right Driver",
 			TWL6040_REG_HSRCTL, 2, 0, NULL, 0),
-	SND_SOC_DAPM_SWITCH_E("Earphone Driver",
-			SND_SOC_NOPM, 0, 0, &ep_driver_switch_controls,
+	SND_SOC_DAPM_DRV_E("Earphone Driver",
+			TWL6040_REG_EARCTL, 0, 0, NULL, 0,
 			twl6040_power_mode_event,
 			SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_POST_PMD),
 
@@ -850,8 +861,8 @@ static const struct snd_soc_dapm_route intercon[] = {
 	{"HSOL", NULL, "Headset Left Driver"},
 	{"HSOR", NULL, "Headset Right Driver"},
 
-	/* Earphone playback path */
-	{"Earphone Driver", "Switch", "HSDAC Left"},
+	{"EP Playback", "On", "HSDAC Left"},
+	{"Earphone Driver", "NULL", "EP Playback"},
 	{"EP", NULL, "Earphone Driver"},
 
 	{"HF Left Playback", "HF DAC", "HFDAC Left"},
