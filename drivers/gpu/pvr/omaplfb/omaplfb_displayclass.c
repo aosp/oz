@@ -73,6 +73,14 @@ static OMAPLFB_DEVINFO *pDisplayDevices = NULL;
 
 static void OMAPLFBSyncIHandler(struct work_struct*);
 
+OMAPLFB_DEVINFO *omaplfb_get_devinfo(int index)
+{
+	if (index < 0 || index >= FRAMEBUFFER_COUNT || !pDisplayDevices)
+		return NULL;
+
+	return &pDisplayDevices[index];
+}
+
 /*
  * Swap to display buffer. This buffer refers to one inside the
  * framebuffer memory.
@@ -1632,11 +1640,13 @@ OMAP_ERROR OMAPLFBInit(struct omaplfb_device *omaplfb_dev)
 		}
 
 		mutex_init(&psDevInfo->sSwapChainLockMutex);
-
+		mutex_init(&psDevInfo->clone_lock);
 		psDevInfo->psSwapChain = 0;
 		psDevInfo->bFlushCommands = OMAP_FALSE;
 		psDevInfo->bDeviceSuspended = OMAP_FALSE;
 		psDevInfo->ignore_sync = OMAP_FALSE;
+		psDevInfo->cloning_enabled = 0;
+		psDevInfo->clone_data = NULL;
 
 		if(psDevInfo->sDisplayInfo.ui32MaxSwapChainBuffers > 1)
 		{

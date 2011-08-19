@@ -29,9 +29,9 @@
 #endif
 
 #include <linux/version.h>
-#include <linux/module.h>
 #include <linux/fb.h>
-#include <asm/io.h>
+#include <plat/dma.h>
+#include <mach/tiler.h>
 
 #include <video/dsscomp.h>
 #include <plat/dsscomp.h>
@@ -59,30 +59,12 @@
 #define HOST_PAGEALIGN(addr)	(((addr)+HOST_PAGESIZE-1)&HOST_PAGEMASK)
 #endif
 
-#if defined(LDM_PLATFORM)
-#include <linux/platform_device.h>
-#if defined(SGX_EARLYSUSPEND)
-#include <linux/earlysuspend.h>
-#endif
-#endif
-
-
 #include "img_defs.h"
 #include "servicesext.h"
 #include "kerneldisplay.h"
 #include "omaplfb.h"
-#include "pvrmodule.h"
 
-/* Workqueues for virtual display (primary, seconday)*/
-struct omap_display_sync_item {
-	struct work_struct work;
-	dsscomp_t comp;
-};
-
-static struct workqueue_struct *vdisp_wq_primary;
-static struct workqueue_struct *vdisp_wq_secondary;
-static struct omap_display_sync_item vdisp_sync_primary;
-static struct omap_display_sync_item vdisp_sync_secondary;
+static int g_use_dsscomp;
 
 MODULE_SUPPORTED_DEVICE(DEVNAME);
 
@@ -159,6 +141,11 @@ OMAP_ERROR OMAPLFBGetLibFuncAddr (char *szFunctionName,
 	return OMAP_OK;
 }
 
+void set_use_dsscomp(int use)
+{
+	g_use_dsscomp = use;
+}
+
 /* Must be called within framebuffer lock to prevent race conditions */
 static dsscomp_t find_dsscomp_obj(struct omap_overlay_manager *manager)
 {
@@ -173,100 +160,193 @@ static dsscomp_t find_dsscomp_obj(struct omap_overlay_manager *manager)
 	return comp;
 }
 
-static void vdisp_sync_handler(struct work_struct *work)
+static void omaplfb_dma_cb(int channel, u16 status, void *data)
 {
-	struct omap_display_sync_item *sync_item =
-		(struct omap_display_sync_item *) work;
-	int r = dsscomp_apply(sync_item->comp);
-	if (r)
-		DEBUG_PRINTK("DSSComp apply failed %p", sync_item->comp);
+	struct omaplfb_clone_data *clone_data =
+		(struct omaplfb_clone_data *)data;
+
+	if (!(status & OMAP_DMA_BLOCK_IRQ) && (status != 0))
+		ERROR_PRINTK("DMA transfer failed, channel %d status %u",
+			channel, status);
+	clone_data->dma_transfer_done = 1;
+	wake_up_interruptible(&clone_data->dma_waitq);
+}
+
+static int omaplfb_transfer_buf(OMAPLFB_DEVINFO *display_info,
+	unsigned long src_addr, unsigned long dst_addr,
+	unsigned long buf_size)
+{
+	int err;
+	struct omaplfb_clone_data *clone_data = display_info->clone_data;
+
+	/* DMA parameters */
+	int channel, device_id, sync_mode, data_type, elem_in_frame, frame_num;
+	int src_ei, src_fi, src_addr_mode, dst_ei, dst_fi, dst_addr_mode;
+	int src_burst_mode, dst_burst_mode;
+
+	clone_data->dma_transfer_done = 0;
+	device_id = OMAP_DMA_NO_DEVICE;
+	sync_mode = OMAP_DMA_SYNC_ELEMENT;
+	data_type = OMAP_DMA_DATA_TYPE_S32;
+	elem_in_frame = buf_size / 4; /* Divided by 4 because type is S32 */
+	frame_num = 1; /* Destination buffer is Tiler1D, one shot transfer */
+
+	err = omap_request_dma(device_id, "pvr_uiclone_dma", omaplfb_dma_cb,
+		clone_data, &channel);
+
+	if (err) {
+		ERROR_PRINTK("Unable to get an available DMA channel");
+		goto transfer_done;
+	}
+
+	omap_set_dma_transfer_params(channel, data_type, elem_in_frame,
+		frame_num, sync_mode, device_id, 0x0);
+
+	/* Source buffer parameters */
+
+	/* Framebuffer and Tiler1D are physically contiguous, EI and FI are
+	 * equal on both source and destination, addressing and burst modes too
+	 * as well
+	 */
+	src_ei = src_fi = dst_ei = dst_fi = 1;
+	src_addr_mode = dst_addr_mode = OMAP_DMA_AMODE_POST_INC;
+	src_burst_mode = dst_burst_mode = OMAP_DMA_DATA_BURST_16;
+
+	omap_set_dma_src_params(channel, 0, src_addr_mode, src_addr,
+		src_ei, src_fi);
+	omap_set_dma_src_data_pack(channel, 1);
+	omap_set_dma_src_burst_mode(channel, src_burst_mode);
+
+	omap_set_dma_dest_params(channel, 0, dst_addr_mode, dst_addr,
+		dst_ei, dst_fi);
+	omap_set_dma_dest_data_pack(channel, 1);
+	omap_set_dma_dest_burst_mode(channel, dst_burst_mode);
+
+	/* Transfer as soon as possible, high priority */
+	omap_dma_set_prio_lch(channel, DMA_CH_PRIO_HIGH, DMA_CH_PRIO_HIGH);
+	omap_dma_set_global_params(DMA_DEFAULT_ARB_RATE, 0xFF, 0);
+
+	omap_start_dma(channel);
+
+	/* Wait until the callback changes the status of the transfer */
+	wait_event_interruptible_timeout(clone_data->dma_waitq,
+		clone_data->dma_transfer_done, msecs_to_jiffies(30));
+
+	omap_stop_dma(channel);
+	omap_free_dma(channel);
+transfer_done:
+	return err;
+}
+
+static void omaplfb_clone_handler(struct work_struct *work)
+{
+	struct omaplfb_clone_work *clone_work =
+		(struct omaplfb_clone_work *) work;
+	OMAPLFB_DEVINFO *display_info = clone_work->display_info;
+	struct omaplfb_clone_data *clone_data = display_info->clone_data;
+	dsscomp_t comp = clone_work->comp;
+	struct dss2_ovl_info dss2_ovl;
+	int err;
+	int dst_buff_idx;
+	u32 dst_paddr;
+
+	dst_buff_idx = (clone_data->active_buf_idx + 1) % clone_data->buff_num;
+
+	dst_paddr = clone_data->buffs[dst_buff_idx];
+	/* DMA transfer begins here, buffer size is already page aligned */
+	err = omaplfb_transfer_buf(display_info, clone_work->src_buf_addr,
+		dst_paddr, display_info->sSystemBuffer.ulBufferSize);
+
+	/* Unlock any client waiting for the transfer to be done */
+	clone_work->transfer_active = 0;
+	wake_up_interruptible(&clone_data->transfer_waitq);
+
+	/* If the transfer was not successful don't switch from the
+	 * active buffer, we need to consume the composition anyway
+	 */
+	if (err)
+		dst_paddr = clone_data->buffs[clone_data->active_buf_idx];
+	else
+		clone_data->active_buf_idx = dst_buff_idx;
+
+	/* Apply the composition */
+	err = dsscomp_get_first_ovl(comp, &dss2_ovl);
+	if (err)
+		ERROR_PRINTK("Overlay not found in comp %p", comp);
+	else {
+		dss2_ovl.ba = dst_paddr;
+		dsscomp_set_ovl(comp, &dss2_ovl);
+	}
+
+	if (dsscomp_apply(comp))
+		ERROR_PRINTK("DSSComp apply failed %p", comp);
 }
 
 /*
  * Presents the flip in the display with the DSSComp API
  */
-static void OMAPLFBFlipDSSComp(OMAPLFB_SWAPCHAIN *psSwapChain,
-	unsigned long aPhyAddr, dsscomp_t comp)
+static void OMAPLFBFlipDSSComp(OMAPLFB_DEVINFO *display_info,
+	unsigned long phy_addr, dsscomp_t comp)
 {
-	OMAPLFB_DEVINFO *psDevInfo = (OMAPLFB_DEVINFO *)psSwapChain->pvDevInfo;
-	struct fb_info * framebuffer = psDevInfo->psLINFBInfo;
-	struct omapfb_info *ofbi = FB2OFB(framebuffer);
-	unsigned long fb_offset;
-	struct omap_overlay *overlay;
 	struct dss2_ovl_info dss2_ovl;
+	struct omaplfb_clone_data *clone_data = NULL;
+	struct omaplfb_clone_work *work = NULL;
+	dsscomp_t clone_comp;
+	int queued_clone_work = 0;
+	int mgr_id_dst;
 	int r = 0;
-	/* Arbitrarily look in the TV manager if there is a
-	 * composition available, if it is, then UI cloning is requested
+
+	mutex_lock(&display_info->clone_lock);
+
+	if (!display_info->cloning_enabled)
+		goto clone_unlock;
+
+	/* Look for compositions in the manager to clone */
+	clone_data = display_info->clone_data;
+	mgr_id_dst = clone_data->mgr_id_dst;
+	clone_comp = find_dsscomp_obj(omap_dss_get_overlay_manager(mgr_id_dst));
+
+	if (!clone_comp)
+		goto clone_unlock;
+
+	work = &clone_data->work;
+	INIT_WORK((struct work_struct *)work, omaplfb_clone_handler);
+	work->display_info = display_info;
+	work->src_buf_addr = phy_addr;
+	work->comp = clone_comp;
+	work->transfer_active = 1;
+	r = queue_work(clone_data->workqueue, (struct work_struct *)work);
+	/* If queueing the work failed we need to consume the
+	 * composition
 	 */
-	dsscomp_t tv_comp = find_dsscomp_obj(
-		omap_dss_get_overlay_manager(OMAP_DSS_OVL_MGR_TV));
+	if (r == 0) {
+		DEBUG_PRINTK("Failed to queue cloning work, "
+			"droppping comp %p error %d", clone_comp, r);
+		dsscomp_drop(clone_comp);
+	} else
+		queued_clone_work = 1;
 
-	fb_offset = aPhyAddr - psDevInfo->sSystemBuffer.sSysAddr.uiAddr;
+clone_unlock:
+	mutex_unlock(&display_info->clone_lock);
 
-	/* Always get the first overlay from fb */
-	overlay = ofbi->overlays[0];
+	r = dsscomp_get_first_ovl(comp, &dss2_ovl);
 
-	/* Handle LCD composition*/
-	r = dsscomp_get_ovl(comp, overlay->id, &dss2_ovl);
-
-	if (r) {
-		struct omap_overlay_info overlay_info;
-		DEBUG_PRINTK("Overlay %d not found in comp %p,"
-			"updating manually", overlay->id, comp);
-		overlay->get_overlay_info(overlay, &overlay_info);
-		overlay_info.paddr =
-			framebuffer->fix.smem_start + fb_offset;
-		overlay_info.vaddr =
-			framebuffer->screen_base + fb_offset;
-		overlay->set_overlay_info(overlay, &overlay_info);
-	} else {
-		dss2_ovl.ba = framebuffer->fix.smem_start + fb_offset;
+	if (r)
+		ERROR_PRINTK("Overlay not found in comp %p", comp);
+	else {
+		dss2_ovl.ba = phy_addr;
 		dsscomp_set_ovl(comp, &dss2_ovl);
-
-		/* If there is no comp for the TV no need to use the wq */
-		if (!tv_comp) {
-			if (dsscomp_apply(comp))
-				DEBUG_PRINTK("DSSComp apply failed %p", comp);
-			goto done;
-		}
-		vdisp_sync_primary.comp = comp;
-		INIT_WORK((struct work_struct *)&vdisp_sync_primary,
-			vdisp_sync_handler);
-		queue_work(vdisp_wq_primary,
-			(struct work_struct *)&vdisp_sync_primary);
 	}
 
-	if (tv_comp)
-		r = dsscomp_get_first_ovl(tv_comp, &dss2_ovl);
-	else
-		goto tv_comp_invalid;
+	if (dsscomp_apply(comp))
+		ERROR_PRINTK("DSSComp apply failed %p", comp);
 
-	/* Handle TV cloning composition */
-	if (r) {
-		struct omap_overlay_info overlay_info;
-		DEBUG_PRINTK("Overlay %d not found in TV comp %p,"
-			"updating manually", overlay->id, tv_comp);
-		overlay->get_overlay_info(overlay, &overlay_info);
-		overlay_info.paddr =
-			framebuffer->fix.smem_start + fb_offset;
-		overlay_info.vaddr =
-			framebuffer->screen_base + fb_offset;
-		overlay->set_overlay_info(overlay, &overlay_info);
-	} else {
-		dss2_ovl.ba = framebuffer->fix.smem_start + fb_offset;
-		dsscomp_set_ovl(tv_comp, &dss2_ovl);
-		vdisp_sync_secondary.comp = tv_comp;
-		INIT_WORK((struct work_struct *)&vdisp_sync_secondary,
-			vdisp_sync_handler);
-		queue_work(vdisp_wq_secondary,
-			(struct work_struct *)&vdisp_sync_secondary);
-		flush_work((struct work_struct *)&vdisp_sync_secondary);
-	}
-
-tv_comp_invalid:
-	flush_work((struct work_struct *)&vdisp_sync_primary);
-done:
-	return;
+	/* We need to wait here until the transfer to the buffer used for
+	 * cloning ends
+	 */
+	if (queued_clone_work)
+		wait_event_interruptible_timeout(clone_data->transfer_waitq,
+			!work->transfer_active, msecs_to_jiffies(25));
 }
 
 #if defined(FLIP_TECHNIQUE_FRAMEBUFFER)
@@ -371,7 +451,7 @@ void OMAPLFBFlip(OMAPLFB_SWAPCHAIN *psSwapChain, unsigned long aPhyAddr)
 	}
 
 	if (comp)
-		OMAPLFBFlipDSSComp(psSwapChain, aPhyAddr, comp);
+		OMAPLFBFlipDSSComp(psDevInfo, aPhyAddr, comp);
 	else
 		OMAPLFBFlipDSS(psSwapChain, aPhyAddr);
 
@@ -393,277 +473,228 @@ void OMAPLFBPresentSync(OMAPLFB_DEVINFO *psDevInfo,
 	struct omap_overlay_manager *manager;
 	dsscomp_t comp = NULL;
 	unsigned long aPhyAddr = (unsigned long)psFlipItem->sSysAddr->uiAddr;
+	struct omap_dss_device *display;
+	struct omap_dss_driver *driver;
+	int err = 1;
 
 	omapfb_lock(fbdev);
 
-	/* Always get the first overlay for main LCD */
-	if (ofbi->num_overlays > 0) {
-		struct omap_overlay *overlay;
-		overlay = ofbi->overlays[0];
-		manager = overlay->manager;
-		comp = find_dsscomp_obj(manager);
+	/* DSSComp will do the flip */
+	if (g_use_dsscomp) {
+		/* Always get the first overlay for main display */
+		if (ofbi->num_overlays > 0) {
+			struct omap_overlay *overlay;
+			overlay = ofbi->overlays[0];
+			manager = overlay->manager;
+			comp = find_dsscomp_obj(manager);
+		}
+		if (comp)
+			OMAPLFBFlipDSSComp(psDevInfo, aPhyAddr, comp);
+		goto exit_unlock;
 	}
 
-	if (comp)
-		OMAPLFBFlipDSSComp(psDevInfo->psSwapChain, aPhyAddr, comp);
-	else {
-		struct omap_dss_device *display;
-		struct omap_dss_driver *driver;
-		int err = 1;
+	/* OMAPLFB will do the flip */
+	display = fb2display(framebuffer);
+	/* The framebuffer doesn't have a display attached, just bail out */
+	if (!display)
+		goto exit_unlock;
 
-		display = fb2display(framebuffer);
-		/* The framebuffer doesn't have a display attached, just bail out */
-		if (!display) {
-			omapfb_unlock(fbdev);
-			return;
-		}
+	driver = display->driver;
+	manager = display->manager;
 
-		driver = display->driver;
-		manager = display->manager;
-
-		if (driver && driver->sync &&
-			driver->get_update_mode(display) == OMAP_DSS_UPDATE_MANUAL) {
-			/* Wait first for the DSI bus to be released then update */
-			err = driver->sync(display);
-			OMAPLFBFlipDSS(psDevInfo->psSwapChain, aPhyAddr);
-		} else if (manager && manager->wait_for_vsync) {
-			/*
-			 * Update the video pipelines registers then wait until the
-			 * frame is shown with a VSYNC
-			 */
-			OMAPLFBFlipDSS(psDevInfo->psSwapChain, aPhyAddr);
-			err = manager->wait_for_vsync(manager);
-		}
-
-		if (err)
-			DEBUG_PRINTK("Unable to sync with display %u!",
-				psDevInfo->uDeviceID);
+	if (driver && driver->sync &&
+		driver->get_update_mode(display) == OMAP_DSS_UPDATE_MANUAL) {
+		/* Wait first for the DSI bus to be released then update */
+		err = driver->sync(display);
+		OMAPLFBFlipDSS(psDevInfo->psSwapChain, aPhyAddr);
+	} else if (manager && manager->wait_for_vsync) {
+		/*
+		 * Update the video pipelines registers then wait until the
+		 * frame is shown with a VSYNC
+		 */
+		OMAPLFBFlipDSS(psDevInfo->psSwapChain, aPhyAddr);
+		err = manager->wait_for_vsync(manager);
 	}
 
+	if (err)
+		DEBUG_PRINTK("Unable to sync with display %u!",
+			psDevInfo->uDeviceID);
+
+exit_unlock:
 	omapfb_unlock(fbdev);
 }
 
-#if defined(LDM_PLATFORM)
-
-static volatile OMAP_BOOL bDeviceSuspended;
-
-static int omaplfb_probe(struct platform_device *pdev)
+static int omaplfb_alloc_buf_cloning(OMAPLFB_DEVINFO *display_info)
 {
-	struct omaplfb_device *odev;
+	struct omaplfb_clone_data *clone_data = display_info->clone_data;
+	int i, j, err;
+	/* We already know the buffer size for each display is page aligned */
+	unsigned long buff_size = display_info->sSystemBuffer.ulBufferSize;
 
-	odev = kzalloc(sizeof(*odev), GFP_KERNEL);
+	if (clone_data->buff_num < 0 ||
+		clone_data->buff_num > OMAPLFB_CLONING_BUFFER_NUM)
+		return -EINVAL;
 
-	if (!odev)
-		return -ENOMEM;
-
-	if (OMAPLFBInit(odev) != OMAP_OK) {
-		dev_err(&pdev->dev, "failed to setup omaplfb\n");
-		kfree(odev);
-		return -ENODEV;
+	for (i = 0; i < clone_data->buff_num; i++) {
+		/* Allocate Tiler1D buffer */
+		err = tiler_alloc(TILFMT_PAGE, buff_size, 1,
+			(u32 *) &clone_data->buffs[i]);
+		if (err) {
+			ERROR_PRINTK("Cloning buffer allocation failed %d",
+				err);
+			goto exit_free;
+		}
+		DEBUG_PRINTK("Cloning buffer allocated %p",
+			(u32 *) clone_data->buffs[i]);
 	}
 
-	odev->dev = &pdev->dev;
-	platform_set_drvdata(pdev, odev);
-	omaplfb_create_sysfs(odev);
-
 	return 0;
+
+exit_free:
+	for (j = 0; j < i; j++)
+		tiler_free(clone_data->buffs[j]);
+	return err;
 }
 
-static int omaplfb_remove(struct platform_device *pdev)
+static int omaplfb_free_buf_cloning(OMAPLFB_DEVINFO *display_info)
 {
-	struct omaplfb_device *odev;
-
-	odev = platform_get_drvdata(pdev);
-
-	omaplfb_remove_sysfs(odev);
-
-	if (OMAPLFBDeinit() != OMAP_OK)
-		WARNING_PRINTK("Driver cleanup failed");
-
-	kfree(odev);
-
-	return 0;
+	struct omaplfb_clone_data *clone_data = display_info->clone_data;
+	int i, res = 0, err = 0;
+	for (i = 0; i < clone_data->buff_num; i++) {
+		DEBUG_PRINTK("Freeing cloning buffer %p",
+			(u32 *)clone_data->buffs[i]);
+		err = tiler_free(clone_data->buffs[i]);
+		if (err) {
+			ERROR_PRINTK("Unable to free cloning buffer %p",
+				(u32 *)clone_data->buffs[i]);
+			res = 1;
+		}
+	}
+	clone_data->buff_num = 0;
+	return res;
 }
 
-/*
- * Common suspend driver function
- * in: psSwapChain, aPhyAddr
- */
-static void OMAPLFBCommonSuspend(void)
+int omaplfb_enable_cloning(int mgr_id_src, int mgr_id_dst, int buff_num)
 {
-	if (bDeviceSuspended)
-	{
-		DEBUG_PRINTK("Driver is already suspended");
-		return;
+	int err = 0;
+	OMAPLFB_DEVINFO *display_info = omaplfb_get_devinfo(mgr_id_src);
+	struct omaplfb_clone_data *clone_data = NULL;
+
+	if (!display_info)
+		return -EINVAL;
+
+	mutex_lock(&display_info->clone_lock);
+
+	if (mgr_id_src == mgr_id_dst ||
+		buff_num <= 0 || buff_num > OMAPLFB_CLONING_BUFFER_NUM) {
+		err = -EINVAL;
+		goto exit_unlock;
 	}
 
-	OMAPLFBDriverSuspend();
-	bDeviceSuspended = OMAP_TRUE;
-}
-
-#if 0
-/*
- * Function called when the driver is requested to release
- * in: pDevice
- */
-static void OMAPLFBDeviceRelease_Entry(struct device unref__ *pDevice)
-{
-	DEBUG_PRINTK("Requested driver release");
-	OMAPLFBCommonSuspend();
-}
-
-static struct platform_device omaplfb_device = {
-	.name = DEVNAME,
-	.id = -1,
-	.dev = {
-		.release = OMAPLFBDeviceRelease_Entry
+	if (display_info->cloning_enabled) {
+		err = -EBUSY;
+		goto exit_unlock;
 	}
-};
-#endif
 
-#if defined(SGX_EARLYSUSPEND) && defined(CONFIG_HAS_EARLYSUSPEND)
-
-/*
- * Android specific, driver is requested to be suspended
- * in: ea_event
- */
-static void OMAPLFBDriverSuspend_Entry(struct early_suspend *ea_event)
-{
-	DEBUG_PRINTK("Requested driver suspend");
-	OMAPLFBCommonSuspend();
-}
-
-/*
- * Android specific, driver is requested to be suspended
- * in: ea_event
- */
-static void OMAPLFBDriverResume_Entry(struct early_suspend *ea_event)
-{
-	DEBUG_PRINTK("Requested driver resume");
-	OMAPLFBDriverResume();
-	bDeviceSuspended = OMAP_FALSE;
-}
-
-static struct platform_driver omaplfb_driver = {
-	.driver = {
-		.name = DRVNAME,
-		.owner  = THIS_MODULE,
-	},
-	.probe = omaplfb_probe,
-	.remove = omaplfb_remove,
-};
-
-static struct early_suspend omaplfb_early_suspend = {
-	.suspend = OMAPLFBDriverSuspend_Entry,
-	.resume = OMAPLFBDriverResume_Entry,
-	.level = EARLY_SUSPEND_LEVEL_STOP_DRAWING,
-};
-
-#else /* defined(SGX_EARLYSUSPEND) && defined(CONFIG_HAS_EARLYSUSPEND) */
-
-/*
- * Function called when the driver is requested to be suspended
- * in: pDevice, state
- */
-static int OMAPLFBDriverSuspend_Entry(struct platform_device unref__ *pDevice,
-	pm_message_t unref__ state)
-{
-	DEBUG_PRINTK("Requested driver suspend");
-	OMAPLFBCommonSuspend();
-	return 0;
-}
-
-/*
- * Function called when the driver is requested to resume
- * in: pDevice
- */
-static int OMAPLFBDriverResume_Entry(struct platform_device unref__ *pDevice)
-{
-	DEBUG_PRINTK("Requested driver resume");
-	OMAPLFBDriverResume();
-	bDeviceSuspended = OMAP_FALSE;
-	return 0;
-}
-
-/*
- * Function called when the driver is requested to shutdown
- * in: pDevice
- */
-static IMG_VOID OMAPLFBDriverShutdown_Entry(
-	struct platform_device unref__ *pDevice)
-{
-	DEBUG_PRINTK("Requested driver shutdown");
-	OMAPLFBCommonSuspend();
-}
-
-static struct platform_driver omaplfb_driver = {
-	.driver = {
-		.name = DRVNAME,
-		.owner  = THIS_MODULE,
-	},
-	.probe = omaplfb_probe,
-	.remove = omaplfb_remove,
-	.suspend = OMAPLFBDriverSuspend_Entry,
-	.resume	= OMAPLFBDriverResume_Entry,
-	.shutdown = OMAPLFBDriverShutdown_Entry,
-};
-
-#endif /* defined(SGX_EARLYSUSPEND) && defined(CONFIG_HAS_EARLYSUSPEND) */
-
-#endif /* defined(LDM_PLATFORM) */
-
-/*
- * Driver init function
- */
-static int __init OMAPLFB_Init(void)
-{
-#if defined(LDM_PLATFORM)
-	DEBUG_PRINTK("Registering platform driver");
-	if (platform_driver_register(&omaplfb_driver))
-		return -ENODEV;
-#if 0
-	DEBUG_PRINTK("Registering device driver");
-	if (platform_device_register(&omaplfb_device))
-	{
-		WARNING_PRINTK("Unable to register platform device");
-		platform_driver_unregister(&omaplfb_driver);
-		if(OMAPLFBDeinit() != OMAP_OK)
-			WARNING_PRINTK("Driver cleanup failed\n");
-		return -ENODEV;
+	clone_data = kzalloc(sizeof(*clone_data), GFP_KERNEL);
+	if (!clone_data) {
+		err = -ENOMEM;
+		goto exit_unlock;
 	}
-#endif
 
-#if defined(SGX_EARLYSUSPEND) && defined(CONFIG_HAS_EARLYSUSPEND)
-	register_early_suspend(&omaplfb_early_suspend);
-	DEBUG_PRINTK("Registered early suspend support");
-#endif
-	vdisp_wq_primary =
-		__create_workqueue("pvr_aux_sync_wq1", 1, 1, 1);
-	vdisp_wq_secondary =
-		__create_workqueue("pvr_aux_sync_wq2", 1, 1, 1);
-#endif
-	return 0;
+	display_info->clone_data = clone_data;
+
+	clone_data->workqueue = create_singlethread_workqueue("pvr_wq_clone");
+	if (!clone_data->workqueue) {
+		WARNING_PRINTK("Unable to create workqueue for UI cloning");
+		err = -EBUSY;
+		goto exit_unlock;
+	}
+
+	clone_data->mgr_id_src = mgr_id_src;
+	clone_data->mgr_id_dst = mgr_id_dst;
+	clone_data->buff_num = buff_num;
+	clone_data->active_buf_idx = 0;
+	init_waitqueue_head(&clone_data->transfer_waitq);
+	init_waitqueue_head(&clone_data->dma_waitq);
+
+	if (omaplfb_alloc_buf_cloning(display_info)) {
+		WARNING_PRINTK("Unable to allocate buffers for UI cloning");
+		err = -ENOMEM;
+		goto alloc_failed;
+	}
+
+	display_info->cloning_enabled = 1;
+	DEBUG_PRINTK("Cloning enabled for display %d to %d",
+		clone_data->mgr_id_src, clone_data->mgr_id_dst);
+
+	goto exit_unlock;
+
+alloc_failed:
+	destroy_workqueue(clone_data->workqueue);
+	kfree(display_info->clone_data);
+	display_info->clone_data = NULL;
+exit_unlock:
+	mutex_unlock(&display_info->clone_lock);
+	return err;
 }
 
-/*
- * Driver exit function
- */
-static IMG_VOID __exit OMAPLFB_Cleanup(IMG_VOID)
+static int omaplfb_disable_cloning_disp(OMAPLFB_DEVINFO *display_info)
 {
-#if defined(LDM_PLATFORM)
-#if 0
-	DEBUG_PRINTK(format,...)("Removing platform device");
-	platform_device_unregister(&omaplfb_device);
-#endif
-	DEBUG_PRINTK("Removing platform driver");
-	platform_driver_unregister(&omaplfb_driver);
-#if defined(SGX_EARLYSUSPEND) && defined(CONFIG_HAS_EARLYSUSPEND)
-	DEBUG_PRINTK("Removed early suspend support");
-	unregister_early_suspend(&omaplfb_early_suspend);
-#endif
-#endif
+	struct omaplfb_clone_data *clone_data = display_info->clone_data;
+	int err = 0;
+	dsscomp_t comp;
+
+	mutex_lock(&display_info->clone_lock);
+
+	if (!display_info->cloning_enabled) {
+		err = 0;
+		goto exit_unlock;
+	}
+
+	err = omaplfb_free_buf_cloning(display_info);
+
+	/* Wait for any pending DMA transfers and apply calls to the
+	 * destination manager
+	 */
+	flush_workqueue(clone_data->workqueue);
+	destroy_workqueue(clone_data->workqueue);
+
+	/* Drop all pending compositions from the destination manager */
+	do {
+		comp = find_dsscomp_obj(
+			omap_dss_get_overlay_manager(clone_data->mgr_id_dst));
+		if (comp)
+			dsscomp_drop(comp);
+		else
+			break;
+	} while (true);
+
+	display_info->cloning_enabled = 0;
+	kfree(display_info->clone_data);
+	display_info->clone_data = NULL;
+	DEBUG_PRINTK("Cloning disabled for display %d", clone_data->mgr_id_src);
+
+exit_unlock:
+	mutex_unlock(&display_info->clone_lock);
+	return err;
 }
 
-late_initcall(OMAPLFB_Init);
-module_exit(OMAPLFB_Cleanup);
+int omaplfb_disable_cloning(int mgr_id_src)
+{
+	OMAPLFB_DEVINFO *display_info = omaplfb_get_devinfo(mgr_id_src);
+	if (!display_info)
+		return -EINVAL;
+	return omaplfb_disable_cloning_disp(display_info);
+}
 
+void omaplfb_disable_cloning_alldisp(void)
+{
+	OMAPLFB_DEVINFO *display_info;
+	int i;
+	for (i = 0; i < FRAMEBUFFER_COUNT; i++) {
+		display_info = omaplfb_get_devinfo(i);
+		if (display_info && display_info->cloning_enabled)
+			omaplfb_disable_cloning_disp(display_info);
+	}
+}

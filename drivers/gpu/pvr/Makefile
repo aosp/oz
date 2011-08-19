@@ -142,6 +142,7 @@ sgx_displayclass-y := \
 
 omaplfb-y := \
 	omaplfb/omaplfb_displayclass.o \
+	omaplfb/omaplfb-dev.o \
 	omaplfb/omaplfb-sysfs.o \
 	omaplfb/omaplfb_linux.o
 
