@@ -343,7 +343,25 @@ static int headset_power_mode(struct snd_soc_codec *codec, int high_perf)
 static int twl6040_hs_dac_event(struct snd_soc_dapm_widget *w,
 			struct snd_kcontrol *kcontrol, int event)
 {
+	struct snd_soc_codec *codec = w->codec;
+	struct twl6040_codec *twl6040 = codec->control_data;
+	int reg, reg_save;
 	msleep(1);
+
+	/* SW Workaround for errata "DC Offset On EAR Differential Output" */
+	if ((twl6040_get_icrev(twl6040) <= TWL6040_REV_1_3) &&
+		(SND_SOC_DAPM_EVENT_ON(event))) {
+		reg = twl6040_read_reg_cache(codec,  w->reg);
+		reg_save = reg;
+		reg &= ~(TWL6040_HSDACENAL | TWL6040_HSDACMODEL);
+		reg |= TWL6040_HSDACENAL;
+		twl6040_write(codec,  w->reg, reg);
+		reg |= TWL6040_HSDACMODEL;
+		twl6040_write(codec,  w->reg, reg);
+		reg &= ~TWL6040_HSDACMODEL;
+		twl6040_write(codec,  w->reg, reg);
+		twl6040_write(codec,  w->reg, reg_save);
+	}
 	return 0;
 }
 
@@ -819,7 +837,7 @@ static const struct snd_soc_dapm_widget twl6040_dapm_widgets[] = {
 	SND_SOC_DAPM_DRV_E("Earphone Driver",
 			TWL6040_REG_EARCTL, 0, 0, NULL, 0,
 			twl6040_power_mode_event,
-			SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_POST_PMD),
+			SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMD),
 
 	/* Analog playback PGAs */
 	SND_SOC_DAPM_PGA("HFDAC Left PGA",
