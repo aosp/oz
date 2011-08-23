@@ -134,8 +134,24 @@ void dss_restore_context(void)
 #undef SR
 #undef RR
 
+static int dss_check_state(struct device *dev, void *data)
+{
+	struct omap_dss_device *dssdev = to_dss_device(dev);
+
+	if (dssdev->state == OMAP_DSS_DISPLAY_DISABLED ||
+			dssdev->state == OMAP_DSS_DISPLAY_SUSPENDED)
+		return 0;
+	else
+		return -EINVAL;
+}
+
 bool dss_get_mainclk_state()
 {
+	struct bus_type *bus = dss_get_bus();
+	int ret_value = bus_for_each_dev(bus, NULL, NULL, dss_check_state);
+
+	dss.mainclk_state = (ret_value) ? true : false;
+
 	return dss.mainclk_state;
 }
 
