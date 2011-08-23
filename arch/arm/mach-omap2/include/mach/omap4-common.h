@@ -81,6 +81,10 @@
 #define OMAP446X_PL310_POR_ES1				0x40000007
 #define OMAP446X_PL310_POR				0x50000007
 
+/* L2 controller Data RAM latency */
+#define OMAP443X_PL310_D_RAM_LAT			0x00000111
+#define OMAP446X_PL310_D_RAM_LAT			0x00000110
+
 #define A9_ES1_REV					0x410FC091
 
 #ifndef __ASSEMBLER__

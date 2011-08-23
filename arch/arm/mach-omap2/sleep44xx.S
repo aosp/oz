@@ -216,6 +216,20 @@ auxctl_setup:
 	ldr     r12, =0x109		@ Setup L2 AUXCTL value
 	dsb
 	smc     #0
+	dsb
+	/*
+	 * Restore values of Data&Tag RAM latency regisers
+	 */
+	CPU_REV_CMP #0xa
+	ite	ge
+	ldrge	r1, =OMAP446X_PL310_D_RAM_LAT
+	ldrlt	r1, =OMAP443X_PL310_D_RAM_LAT
+	ldr	r3, =OMAP44XX_L2CACHE_BASE
+	ldr	r0, [r3, #0x108]
+	ldr	r12, =0x112
+	dsb
+	smc	#0
+	dsb
 	/*
 	 * Restore the L2X0 lockdown registers before enabling L2X0.
 	 * OMAP4430 restore values will be 0x0
