@@ -76,13 +76,13 @@ static inline void l2x0_inv_line(unsigned long addr)
 #if defined(CONFIG_PL310_ERRATA_588369) || defined(CONFIG_PL310_ERRATA_727915)
 static void debug_writel(unsigned long val)
 {
-	extern void omap_smc1(u32 fn, u32 arg);
+	extern void omap_smc1(u32 fn, u32 r0, u32 r1);
 
 	/*
 	 * Texas Instrument secure monitor api to modify the
 	 * PL310 Debug Control Register.
 	 */
-	omap_smc1(0x100, val);
+	omap_smc1(0x100, val, 0x00);
 }
 #else
 /* Optimised out for non-errata case */

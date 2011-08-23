@@ -110,7 +110,7 @@ extern bool abe_can_enter_dpll_cascading;
 extern rwlock_t dpll_cascading_lock;
 
 extern void __init gic_init_irq(void);
-extern void omap_smc1(u32 fn, u32 arg);
+extern void omap_smc1(u32 fn, u32 r0, u32 r1);
 extern u32 omap_smc2(u32 id, u32 falg, u32 pargs);
 extern u32 omap4_secure_dispatcher(u32 idx, u32 flag, u32 nargs,
 				u32 arg1, u32 arg2, u32 arg3, u32 arg4);

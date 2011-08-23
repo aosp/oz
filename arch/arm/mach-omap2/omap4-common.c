@@ -250,7 +250,8 @@ static int __init omap_l2_cache_init(void)
 				PPA_SERVICE_PL310_POR, 0x7, 1,
 				l2x0_por, 0, 0, 0);
 	} else if (omap_rev() > OMAP4430_REV_ES2_1)
-			omap_smc1(0x113, l2x0_por);
+			omap_smc1(0x113, l2x0_por, 0x00);
+
 
 	/*
 	 * FIXME : Temporary WA for the OMAP4460 stability
@@ -266,11 +267,11 @@ static int __init omap_l2_cache_init(void)
 	 * Doble Linefill, BRESP enabled, $I and $D prefetch ON,
 	 * Share-override = 1, NS lockdown enabled
 	 */
-	omap_smc1(0x109, l2x0_auxctrl);
+	omap_smc1(0x109, l2x0_auxctrl, 0x00);
 
 skip_auxctlr:
 	/* Enable PL310 L2 Cache controller */
-	omap_smc1(0x102, 0x1);
+	omap_smc1(0x102, 0x01, 0x00);
 
 	/*
 	 * 32KB way size, 16-way associativity,
