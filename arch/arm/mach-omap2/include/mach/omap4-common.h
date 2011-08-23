@@ -78,8 +78,8 @@
  *  FIXME : The L2 prefetch hints seems to break MPU OSWR. Remove them
  * for time being.
  */
-#define OMAP446X_PL310_POR_ES1				0x42000007
-#define OMAP446X_PL310_POR				0x52000007
+#define OMAP446X_PL310_POR_ES1				0x40000007
+#define OMAP446X_PL310_POR				0x50000007
 
 #define A9_ES1_REV					0x410FC091
 
