@@ -92,16 +92,16 @@ int musb_notifier_call(struct notifier_block *nb,
 
 		val = musb_readl(musb->mregs, OTG_INTERFSEL);
 		if (data->interface_type == MUSB_INTERFACE_UTMI) {
+			val &= ~ULPI_12PIN;
+			val |= UTMI_8BIT;
+			musb_writel(musb->mregs, OTG_INTERFSEL, val);
 			otg_init(musb->xceiv);
 			hostmode = 1;
 			musb_enable_vbus(musb);
-			val &= ~ULPI_12PIN;
-			val |= UTMI_8BIT;
 		} else {
 			val |= ULPI_12PIN;
+			musb_writel(musb->mregs, OTG_INTERFSEL, val);
 		}
-
-		musb_writel(musb->mregs, OTG_INTERFSEL, val);
 
 		val = __raw_readl(phymux_base +
 				USBA0_OTG_CE_PAD1_USBA0_OTG_DP);
@@ -128,18 +128,19 @@ int musb_notifier_call(struct notifier_block *nb,
 
 		val = musb_readl(musb->mregs, OTG_INTERFSEL);
 		if (data->interface_type == MUSB_INTERFACE_UTMI) {
+			val &= ~ULPI_12PIN;
+			val |= UTMI_8BIT;
+			musb_writel(musb->mregs, OTG_INTERFSEL, val);
 			otg_init(musb->xceiv);
 			if (!hostmode) {
 				/* Enable VBUS Valid, AValid. Clear SESSEND.*/
 				__raw_writel(IDDIG | AVALID | VBUSVALID,
 					ctrl_base + USBOTGHS_CONTROL);
 			}
-			val &= ~ULPI_12PIN;
-			val |= UTMI_8BIT;
 		} else {
 			val |= ULPI_12PIN;
+			musb_writel(musb->mregs, OTG_INTERFSEL, val);
 		}
-		musb_writel(musb->mregs, OTG_INTERFSEL, val);
 
 		break;
 
@@ -147,11 +148,6 @@ int musb_notifier_call(struct notifier_block *nb,
 		DBG(1, "VBUS Disconnect\n");
 
 		if (data->interface_type == MUSB_INTERFACE_UTMI) {
-			/* Config INFERFSEL for correct charger detection */
-			val = musb_readl(musb->mregs, OTG_INTERFSEL);
-			val |= ULPI_12PIN;
-			musb_writel(musb->mregs, OTG_INTERFSEL, val);
-
 			/* enable this clock because in suspend interrupt
 			 * handler phy clocks are disabled. If phy clocks are
 			 * not enabled then DISCONNECT interrupt will not be
@@ -163,6 +159,11 @@ int musb_notifier_call(struct notifier_block *nb,
 			if (musb->xceiv->set_vbus)
 				otg_set_vbus(musb->xceiv, 0);
 			otg_shutdown(musb->xceiv);
+
+			/* Config INFERFSEL for correct charger detection */
+			val = musb_readl(musb->mregs, OTG_INTERFSEL);
+			val |= ULPI_12PIN;
+			musb_writel(musb->mregs, OTG_INTERFSEL, val);
 		}
 		hostmode = 0;
 		/* configure in force idle/ standby */
