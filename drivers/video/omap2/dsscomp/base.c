@@ -303,11 +303,6 @@ int set_dss_ovl_info(struct dss2_ovl_info *oi)
 	 * Ignore OMAP_DSS_ILACE as there is no real support yet for
 	 * interlaced interleaved vs progressive buffers
 	 */
-	if (ovl->manager &&
-	    ovl->manager->device &&
-	    !strcmp(ovl->manager->device->name, "hdmi") &&
-	    is_hdmi_interlaced())
-		info.field |= OMAP_FLAG_IDEV;
 
 	info.out_wb = 0;
 
