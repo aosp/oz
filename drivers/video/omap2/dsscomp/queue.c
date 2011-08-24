@@ -790,6 +790,7 @@ done_ovl:
 
 	/* apply changes and call update on manual panels */
 	comp->magic = MAGIC_APPLIED;
+	mutex_unlock(&mgrq[comp->ix].mtx);
 
 	if (dssdev_manually_updated(dssdev)) {
 		if (!d->win.w && !d->win.x)
@@ -815,6 +816,7 @@ done_ovl:
 		if (!mgr->info_dirty)
 			r = 0;
 	}
+	mutex_lock(&mgrq[comp->ix].mtx);
 done:
 	if (change)
 		refresh_masks(mgr->id);
