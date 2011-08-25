@@ -70,6 +70,8 @@
 /*
  * SYSCONFIG register masks
  */
+#define AES_SYSCONFIG_AUTOIDLE_BIT		(1 << 0)
+#define AES_SYSCONFIG_SIDLE_BITS		(3 << 2)
 #define AES_SYSCONFIG_DMA_REQ_IN_EN_BIT		(1 << 5)
 #define AES_SYSCONFIG_DMA_REQ_OUT_EN_BIT	(1 << 6)
 
@@ -141,6 +143,9 @@ struct aes_hwa_ctx {
 	struct tasklet_struct	task;
 
 	struct ablkcipher_request	*req;
+	struct crypto_async_request     *next_req;
+	struct crypto_async_request     *backlog;
+
 	size_t				total;
 	struct scatterlist		*in_sg;
 	size_t				in_offset;
@@ -168,6 +173,8 @@ static struct aes_hwa_ctx *aes_ctx;
  *------------------------------------------------------------------------- */
 
 static bool tf_aes_update_dma(u8 *src, u8 *dest, u32 nb_blocks, bool is_kernel);
+
+static void __iomem *omap_dma_base;
 
 /*----------------------------------------------------------------------------
  *Save HWA registers into the specified operation state structure
@@ -244,7 +251,7 @@ static void tf_aes_restore_registers(
 			(INREG32(&paes_reg->AES_CTRL) & 0x1FC))
 		OUTREG32(&paes_reg->AES_CTRL, aes_state->CTRL & 0x1FC);
 
-	/* Set the SYSCONFIG register to 0 */
+	/* Reset the SYSCONFIG register */
 	OUTREG32(&paes_reg->AES_SYSCONFIG, 0);
 }
 
@@ -577,6 +584,8 @@ static bool tf_aes_update_dma(u8 *src, u8 *dest, u32 nb_blocks, bool is_kernel)
  * AES HWA registration into kernel crypto framework
  */
 
+#define CRYPTO_TFM_REQ_DMA_VISIBLE     0x80000000
+
 static void sg_copy_buf(void *buf, struct scatterlist *sg,
 	unsigned int start, unsigned int nbytes, int out)
 {
@@ -630,13 +639,12 @@ static int aes_dma_start(struct aes_hwa_ctx *ctx)
 	struct omap_dma_channel_params dma_params;
 	struct tf_crypto_aes_operation_state *state =
 		crypto_ablkcipher_ctx(crypto_ablkcipher_reqtfm(ctx->req));
+	static size_t last_count;
 
-	if (sg_is_last(ctx->in_sg) && sg_is_last(ctx->out_sg)) {
-		in = IS_ALIGNED((u32)ctx->in_sg->offset, sizeof(u32));
-		out = IS_ALIGNED((u32)ctx->out_sg->offset, sizeof(u32));
+	in = IS_ALIGNED((u32)ctx->in_sg->offset, sizeof(u32));
+	out = IS_ALIGNED((u32)ctx->out_sg->offset, sizeof(u32));
 
-		fast = in && out;
-	}
+	fast = in && out;
 
 	if (fast) {
 		count = min(ctx->total, sg_dma_len(ctx->in_sg));
@@ -645,15 +653,20 @@ static int aes_dma_start(struct aes_hwa_ctx *ctx)
 		if (count != ctx->total)
 			return -EINVAL;
 
-		err = dma_map_sg(NULL, ctx->in_sg, 1, DMA_TO_DEVICE);
-		if (!err)
-			return -EINVAL;
+		/* Only call dma_map_sg if it has not yet been done */
+		if (!(ctx->req->base.flags & CRYPTO_TFM_REQ_DMA_VISIBLE)) {
+			err = dma_map_sg(NULL, ctx->in_sg, 1, DMA_TO_DEVICE);
+			if (!err)
+				return -EINVAL;
 
-		err = dma_map_sg(NULL, ctx->out_sg, 1, DMA_FROM_DEVICE);
-		if (!err) {
-			dma_unmap_sg(NULL, ctx->in_sg, 1, DMA_TO_DEVICE);
-			return -EINVAL;
+			err = dma_map_sg(NULL, ctx->out_sg, 1, DMA_FROM_DEVICE);
+			if (!err) {
+				dma_unmap_sg(NULL, ctx->in_sg, 1,
+					DMA_TO_DEVICE);
+				return -EINVAL;
+			}
 		}
+		ctx->req->base.flags &= ~CRYPTO_TFM_REQ_DMA_VISIBLE;
 
 		addr_in = sg_dma_address(ctx->in_sg);
 		addr_out = sg_dma_address(ctx->out_sg);
@@ -662,7 +675,6 @@ static int aes_dma_start(struct aes_hwa_ctx *ctx)
 	} else {
 		count = sg_copy(&ctx->in_sg, &ctx->in_offset, ctx->buf_in,
 			ctx->buflen, ctx->total, 0);
-
 		addr_in = ctx->dma_addr_in;
 		addr_out = ctx->dma_addr_out;
 
@@ -670,8 +682,6 @@ static int aes_dma_start(struct aes_hwa_ctx *ctx)
 	}
 
 	ctx->total -= count;
-
-	tf_crypto_lock_hwa(PUBLIC_CRYPTO_HWA_AES1, LOCK_HWA);
 
 	/* Configure HWA */
 	tf_crypto_enable_clock(PUBLIC_CRYPTO_AES1_CLOCK_REG);
@@ -704,11 +714,17 @@ static int aes_dma_start(struct aes_hwa_ctx *ctx)
 	dma_params.src_start = addr_in;
 	dma_params.src_amode = OMAP_DMA_AMODE_POST_INC;
 
-	omap_set_dma_params(ctx->dma_lch_in, &dma_params);
+	if (last_count != count)
+		omap_set_dma_transfer_params(ctx->dma_lch_in,
+			dma_params.data_type,
+			dma_params.elem_count, dma_params.frame_count,
+			dma_params.sync_mode, dma_params.trigger,
+			dma_params.src_or_dst_synch);
 
-	omap_set_dma_dest_burst_mode(ctx->dma_lch_in, OMAP_DMA_DATA_BURST_8);
-	omap_set_dma_src_burst_mode(ctx->dma_lch_in, OMAP_DMA_DATA_BURST_8);
-	omap_set_dma_src_data_pack(ctx->dma_lch_in, 1);
+	/* Configure input start address */
+	__raw_writel(dma_params.src_start,
+		omap_dma_base + (0x60 * (ctx->dma_lch_in) + 0x9c));
+
 
 	/* OUT */
 	dma_params.trigger = ctx->dma_out;
@@ -718,11 +734,18 @@ static int aes_dma_start(struct aes_hwa_ctx *ctx)
 	dma_params.dst_start = addr_out;
 	dma_params.dst_amode = OMAP_DMA_AMODE_POST_INC;
 
-	omap_set_dma_params(ctx->dma_lch_out, &dma_params);
+	if (last_count != count) {
+		omap_set_dma_transfer_params(ctx->dma_lch_out,
+			dma_params.data_type,
+			dma_params.elem_count, dma_params.frame_count,
+			dma_params.sync_mode, dma_params.trigger,
+			dma_params.src_or_dst_synch);
+		last_count = count;
+	}
 
-	omap_set_dma_dest_burst_mode(ctx->dma_lch_out, OMAP_DMA_DATA_BURST_8);
-	omap_set_dma_src_burst_mode(ctx->dma_lch_out, OMAP_DMA_DATA_BURST_8);
-	omap_set_dma_dest_data_pack(ctx->dma_lch_out, 1);
+	/* Configure output start address */
+	__raw_writel(dma_params.dst_start,
+		omap_dma_base + (0x60 * (ctx->dma_lch_out) + 0xa0));
 
 	/* Is this really needed? */
 	omap_disable_dma_irq(ctx->dma_lch_in, OMAP_DMA_DROP_IRQ);
@@ -734,6 +757,36 @@ static int aes_dma_start(struct aes_hwa_ctx *ctx)
 
 	omap_start_dma(ctx->dma_lch_in);
 	omap_start_dma(ctx->dma_lch_out);
+
+	if (ctx->next_req) {
+		struct ablkcipher_request *req =
+			ablkcipher_request_cast(ctx->next_req);
+
+		err = dma_map_sg(NULL, req->src, 1, DMA_TO_DEVICE);
+		if (!err)
+			/* Silently fail for now... */
+			return 0;
+
+		err = dma_map_sg(NULL, req->dst, 1, DMA_FROM_DEVICE);
+		if (!err) {
+			dma_unmap_sg(NULL, req->src, 1, DMA_TO_DEVICE);
+			/* Silently fail for now... */
+			return 0;
+		}
+
+		ctx->next_req->flags |= CRYPTO_TFM_REQ_DMA_VISIBLE;
+		ctx->next_req = NULL;
+	}
+
+	if (ctx->backlog) {
+		ctx->backlog->complete(ctx->backlog, -EINPROGRESS);
+		ctx->backlog = NULL;
+	}
+
+	if (fast) {
+		dma_unmap_sg(NULL, ctx->out_sg, 1, DMA_FROM_DEVICE);
+		dma_unmap_sg(NULL, ctx->in_sg, 1, DMA_TO_DEVICE);
+	}
 
 	return 0;
 }
@@ -762,15 +815,10 @@ static int aes_dma_stop(struct aes_hwa_ctx *ctx)
 
 	tf_crypto_disable_clock(PUBLIC_CRYPTO_AES1_CLOCK_REG);
 
-	tf_crypto_lock_hwa(PUBLIC_CRYPTO_HWA_AES1, UNLOCK_HWA);
-
 	omap_stop_dma(ctx->dma_lch_in);
 	omap_stop_dma(ctx->dma_lch_out);
 
-	if (ctx->flags & FLAGS_FAST) {
-		dma_unmap_sg(NULL, ctx->out_sg, 1, DMA_FROM_DEVICE);
-		dma_unmap_sg(NULL, ctx->in_sg, 1, DMA_TO_DEVICE);
-	} else {
+	if (!(ctx->flags & FLAGS_FAST)) {
 		dma_sync_single_for_device(NULL, ctx->dma_addr_out,
 			ctx->dma_size, DMA_FROM_DEVICE);
 
@@ -798,6 +846,7 @@ static void aes_dma_callback(int lch, u16 ch_status, void *data)
 static int aes_dma_init(struct aes_hwa_ctx *ctx)
 {
 	int err = -ENOMEM;
+	struct omap_dma_channel_params dma_params;
 
 	ctx->dma_lch_out = -1;
 	ctx->dma_lch_in = -1;
@@ -839,6 +888,44 @@ static int aes_dma_init(struct aes_hwa_ctx *ctx)
 		goto err_dma_out;
 	}
 
+	dma_params.data_type = OMAP_DMA_DATA_TYPE_S32;
+	dma_params.elem_count = DMA_CEN_Elts_per_Frame_AES;
+	dma_params.src_ei = 0;
+	dma_params.src_fi = 0;
+	dma_params.dst_ei = 0;
+	dma_params.dst_fi = 0;
+	dma_params.sync_mode = OMAP_DMA_SYNC_FRAME;
+
+	/* IN */
+	dma_params.trigger = ctx->dma_in;
+	dma_params.src_or_dst_synch = OMAP_DMA_DST_SYNC;
+	dma_params.dst_start = AES1_REGS_HW_ADDR + 0x60;
+	dma_params.dst_amode = OMAP_DMA_AMODE_CONSTANT;
+	dma_params.src_amode = OMAP_DMA_AMODE_POST_INC;
+
+	omap_set_dma_params(ctx->dma_lch_in, &dma_params);
+	omap_set_dma_dest_burst_mode(ctx->dma_lch_in, OMAP_DMA_DATA_BURST_8);
+	omap_set_dma_src_burst_mode(ctx->dma_lch_in, OMAP_DMA_DATA_BURST_8);
+	omap_set_dma_src_data_pack(ctx->dma_lch_in, 1);
+
+	/* OUT */
+	dma_params.trigger = ctx->dma_out;
+	dma_params.src_or_dst_synch = OMAP_DMA_SRC_SYNC;
+	dma_params.src_start = AES1_REGS_HW_ADDR + 0x60;
+	dma_params.src_amode = OMAP_DMA_AMODE_CONSTANT;
+	dma_params.dst_amode = OMAP_DMA_AMODE_POST_INC;
+
+	omap_set_dma_params(ctx->dma_lch_out, &dma_params);
+	omap_set_dma_dest_burst_mode(ctx->dma_lch_out, OMAP_DMA_DATA_BURST_8);
+	omap_set_dma_src_burst_mode(ctx->dma_lch_out, OMAP_DMA_DATA_BURST_8);
+	omap_set_dma_dest_data_pack(ctx->dma_lch_out, 1);
+
+	omap_dma_base = ioremap(0x4A056000, 0x1000);
+	if (!omap_dma_base) {
+		printk(KERN_ERR "SMC: Unable to ioremap DMA registers\n");
+		goto err_dma_out;
+	}
+
 	dprintk(KERN_INFO "aes_dma_init(%p) configured DMA channels"
 		"(RX = %d, TX = %d)\n", ctx, ctx->dma_lch_in, ctx->dma_lch_out);
 
@@ -859,12 +946,13 @@ static void aes_dma_cleanup(struct aes_hwa_ctx *ctx)
 	omap_free_dma(ctx->dma_lch_in);
 	dma_free_coherent(NULL, ctx->buflen, ctx->buf_in, ctx->dma_addr_in);
 	dma_free_coherent(NULL, ctx->buflen, ctx->buf_out, ctx->dma_addr_out);
+	iounmap(omap_dma_base);
 }
 
 static int aes_handle_req(struct aes_hwa_ctx *ctx)
 {
 	struct tf_crypto_aes_operation_state *state;
-	struct crypto_async_request *async_req, *backlog;
+	struct crypto_async_request *async_req;
 	struct ablkcipher_request *req;
 	unsigned long flags;
 
@@ -872,7 +960,7 @@ static int aes_handle_req(struct aes_hwa_ctx *ctx)
 		goto start;
 
 	spin_lock_irqsave(&ctx->lock, flags);
-	backlog = crypto_get_backlog(&ctx->queue);
+	ctx->backlog = crypto_get_backlog(&ctx->queue);
 	async_req = crypto_dequeue_request(&ctx->queue);
 	if (!async_req)
 		clear_bit(FLAGS_BUSY, &ctx->flags);
@@ -880,9 +968,6 @@ static int aes_handle_req(struct aes_hwa_ctx *ctx)
 
 	if (!async_req)
 		return 0;
-
-	if (backlog)
-		backlog->complete(backlog, -EINPROGRESS);
 
 	req = ablkcipher_request_cast(async_req);
 
@@ -892,6 +977,20 @@ static int aes_handle_req(struct aes_hwa_ctx *ctx)
 	ctx->in_sg = req->src;
 	ctx->out_offset = 0;
 	ctx->out_sg = req->dst;
+
+	/*
+	 * Try to get the next pending request so it can be prepared while the
+	 * first one is being processed.
+	 */
+	if (likely(ctx->queue.qlen)) {
+		struct list_head *next_async_req;
+
+		next_async_req = ctx->queue.list.next;
+		ctx->next_req = list_entry(next_async_req,
+			struct crypto_async_request, list);
+	} else {
+		ctx->next_req = NULL;
+	}
 
 	state = crypto_ablkcipher_ctx(crypto_ablkcipher_reqtfm(req));
 
@@ -959,9 +1058,6 @@ static int aes_operate(struct ablkcipher_request *req)
 	unsigned long flags;
 	int err;
 
-	/* Make sure AES HWA is accessible */
-	tf_delayed_secure_resume();
-
 	spin_lock_irqsave(&aes_ctx->lock, flags);
 	err = ablkcipher_enqueue_request(&aes_ctx->queue, req);
 	spin_unlock_irqrestore(&aes_ctx->lock, flags);
@@ -993,62 +1089,51 @@ static int aes_decrypt(struct ablkcipher_request *req)
 	return aes_operate(req);
 }
 
+
+static void aes_sync_op_complete(
+	struct crypto_async_request *async_req, int err)
+{
+	struct ablkcipher_request *req = ablkcipher_request_cast(async_req);
+
+	/* Notify crypto operation has finished */
+	complete((struct completion *) req->base.data);
+}
+
 static int aes_sync_operate(struct blkcipher_desc *desc,
 	struct scatterlist *dst, struct scatterlist *src,
 	unsigned int nbytes)
 {
-	struct crypto_tfm *tfm = crypto_blkcipher_tfm(desc->tfm);
-	struct tf_crypto_aes_operation_state *state = crypto_tfm_ctx(tfm);
-	struct blkcipher_walk walk;
+	struct ablkcipher_request req;
 	int err;
+	DECLARE_COMPLETION(aes_sync_op_completion);
 
 	if (nbytes % AES_BLOCK_SIZE)
 		return -EINVAL;
 
-	/* Make sure AES HWA is accessible */
-	tf_delayed_secure_resume();
+	req.base.complete = aes_sync_op_complete;
+	req.base.tfm = crypto_blkcipher_tfm(desc->tfm);
+	req.base.flags = desc->flags;
+	req.base.data = &aes_sync_op_completion;
 
-	tf_crypto_lock_hwa(PUBLIC_CRYPTO_HWA_AES1, LOCK_HWA);
-	tf_crypto_enable_clock(PUBLIC_CRYPTO_AES1_CLOCK_REG);
+	req.nbytes = nbytes;
+	req.info = desc->info;
+	req.src = src;
+	req.dst = dst;
 
-	blkcipher_walk_init(&walk, dst, src, nbytes);
-	err = blkcipher_walk_virt(desc, &walk);
+	err = aes_operate(&req);
+	switch (err) {
+	case -EINPROGRESS:
+	case -EBUSY:
+		break;
 
-	if (!AES_CTRL_IS_MODE_ECB(state->CTRL)) {
-		u32 *ptr = (u32 *) walk.iv;
-
-		state->AES_IV_0 = ptr[0];
-		state->AES_IV_1 = ptr[1];
-		state->AES_IV_2 = ptr[2];
-		state->AES_IV_3 = ptr[3];
+	default:
+		return err;
 	}
 
-	while ((nbytes = walk.nbytes)) {
-		if (!tf_aes_update(state, walk.src.virt.addr,
-			walk.dst.virt.addr, nbytes / AES_BLOCK_SIZE)) {
-			err = -EINVAL;
-			break;
-		}
+	/* Wait for crypto operation to be actually finished */
+	wait_for_completion(&aes_sync_op_completion);
 
-		/* tf_aes_update processes all the data */
-		nbytes = 0;
-
-		err = blkcipher_walk_done(desc, &walk, nbytes);
-	}
-
-	if (!AES_CTRL_IS_MODE_ECB(state->CTRL)) {
-		u32 *ptr = (u32 *) walk.iv;
-
-		ptr[0] = state->AES_IV_0;
-		ptr[1] = state->AES_IV_1;
-		ptr[2] = state->AES_IV_2;
-		ptr[3] = state->AES_IV_3;
-	}
-
-	tf_crypto_disable_clock(PUBLIC_CRYPTO_AES1_CLOCK_REG);
-	tf_crypto_lock_hwa(PUBLIC_CRYPTO_HWA_AES1, UNLOCK_HWA);
-
-	return err;
+	return 0;
 }
 
 static int aes_sync_encrypt(struct blkcipher_desc *desc,
@@ -1299,6 +1384,8 @@ static struct crypto_alg smc_aes_ctr_alg = {
 int register_smc_public_crypto_aes(void)
 {
 	int ret;
+
+	OUTREG32(&paes_reg->AES_SYSCONFIG, 0);
 
 	aes_ctx = kzalloc(sizeof(struct aes_hwa_ctx), GFP_KERNEL);
 	if (aes_ctx == NULL)

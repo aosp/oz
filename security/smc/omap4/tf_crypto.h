@@ -257,8 +257,6 @@ void tf_crypto_disable_clock(uint32_t clock_paddr);
 #define LOCK_HWA	true
 #define UNLOCK_HWA	false
 
-void tf_crypto_lock_hwa(u32 hwa_id, bool do_lock);
-
 /*---------------------------------------------------------------------------*/
 /*                               AES operations                              */
 /*---------------------------------------------------------------------------*/
