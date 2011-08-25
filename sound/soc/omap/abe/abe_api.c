@@ -322,13 +322,12 @@ int abe_irq_processing(void)
 		case IRQtag_COUNT:
 			_log(id_irq_processing, IRQ_data.data, 0, 3);
 			abe_irq_check_for_sequences(IRQ_data.data);
+			abe_monitoring();
 			break;
 		default:
 			break;
 		}
 	}
-	abe_monitoring();
-
 	return 0;
 }
 EXPORT_SYMBOL(abe_irq_processing);
