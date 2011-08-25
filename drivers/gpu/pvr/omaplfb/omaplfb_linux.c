@@ -28,21 +28,13 @@
 #include <linux/config.h>
 #endif
 
-#include <linux/version.h>
 #include <linux/fb.h>
 #include <plat/dma.h>
 #include <mach/tiler.h>
-
 #include <video/dsscomp.h>
 #include <plat/dsscomp.h>
-
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,32))
 #include <plat/vrfb.h>
 #include <plat/display.h>
-#else
-#include <mach/vrfb.h>
-#include <mach/display.h>
-#endif
 
 #ifdef RELEASE
 #include <../drivers/video/omap2/omapfb/omapfb.h>
@@ -50,13 +42,6 @@
 #else
 #undef DEBUG
 #include <../drivers/video/omap2/omapfb/omapfb.h>
-#endif
-
-#if defined(CONFIG_OUTER_CACHE)  /* Kernel config option */
-#include <asm/cacheflush.h>
-#define HOST_PAGESIZE			(4096)
-#define HOST_PAGEMASK			(~(HOST_PAGESIZE-1))
-#define HOST_PAGEALIGN(addr)	(((addr)+HOST_PAGESIZE-1)&HOST_PAGEMASK)
 #endif
 
 #include "img_defs.h"
@@ -67,59 +52,6 @@
 static int g_use_dsscomp;
 
 MODULE_SUPPORTED_DEVICE(DEVNAME);
-
-#if defined(CONFIG_OUTER_CACHE)  /* Kernel config option */
-#if defined(__arm__)
-static void per_cpu_cache_flush_arm(void *arg)
-{
-    PVR_UNREFERENCED_PARAMETER(arg);
-    flush_cache_all();
-}
-#endif
-#endif
-
-/*
- * Kernel malloc
- * in: ui32ByteSize
- */
-void *OMAPLFBAllocKernelMem(unsigned long ui32ByteSize)
-{
-	void *p;
-
-#if defined(CONFIG_OUTER_CACHE)  /* Kernel config option */
-	IMG_VOID *pvPageAlignedCPUPAddr;
-	IMG_VOID *pvPageAlignedCPUVAddr;
-	IMG_UINT32 ui32PageOffset;
-	IMG_UINT32 ui32PageCount;
-#endif
-	p = kmalloc(ui32ByteSize, GFP_KERNEL);
-
-	if(!p)
-		return 0;
-
-#if defined(CONFIG_OUTER_CACHE)  /* Kernel config option */
-	ui32PageOffset = (IMG_UINT32) p & (HOST_PAGESIZE - 1);
-	ui32PageCount = HOST_PAGEALIGN(ui32ByteSize + ui32PageOffset) / HOST_PAGESIZE;
-
-	pvPageAlignedCPUVAddr = (IMG_VOID *)((IMG_UINT8 *)p - ui32PageOffset);
-	pvPageAlignedCPUPAddr = (IMG_VOID*) __pa(pvPageAlignedCPUVAddr);
-
-#if defined(__arm__)
-      on_each_cpu(per_cpu_cache_flush_arm, NULL, 1);
-#endif
-	outer_cache.flush_range((unsigned long) pvPageAlignedCPUPAddr, (unsigned long) ((pvPageAlignedCPUPAddr + HOST_PAGESIZE*ui32PageCount) - 1));
-#endif
-	return p;
-}
-
-/*
- * Kernel free
- * in: pvMem
- */
-void OMAPLFBFreeKernelMem(void *pvMem)
-{
-	kfree(pvMem);
-}
 
 /*
  * Here we get the function pointer to get jump table from

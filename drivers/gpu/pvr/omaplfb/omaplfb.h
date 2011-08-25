@@ -76,7 +76,6 @@ typedef struct PVRPDP_SWAPCHAIN_TAG
 	OMAP_BOOL                       bFlushCommands;
 	unsigned long                   ulSetFlushStateRefCount;
 	OMAP_BOOL                       bBlanked;
-	spinlock_t*                     psSwapChainLock;
 	void*                           pvDevInfo;
 
 } OMAPLFB_SWAPCHAIN;
@@ -201,8 +200,6 @@ struct omaplfb_clone_data {
 
 OMAP_ERROR OMAPLFBInit(struct omaplfb_device *omaplfb_dev);
 OMAP_ERROR OMAPLFBDeinit(void);
-void *OMAPLFBAllocKernelMem(unsigned long ulSize);
-void OMAPLFBFreeKernelMem(void *pvMem);
 void OMAPLFBPresentSync(OMAPLFB_DEVINFO *psDevInfo,
 	OMAPLFB_FLIP_ITEM *psFlipItem);
 OMAP_ERROR OMAPLFBGetLibFuncAddr(char *szFunctionName,
