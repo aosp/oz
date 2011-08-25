@@ -206,67 +206,6 @@ static struct tf_shmem_desc *tf_get_shmem_from_block_handle(
 }
 
 /*------------------------------------------------------------------------- */
-/*
- * HWA public lock or unlock one HWA according algo specified by hwa_id
- */
-void tf_crypto_lock_hwa(u32 hwa_id, bool do_lock)
-{
-	struct semaphore *s = NULL;
-	struct tf_device *dev = tf_get_device();
-
-	dprintk(KERN_INFO "[pid=%d] %s: hwa_id=0x%04X do_lock=%d\n",
-		current->pid, __func__, hwa_id, do_lock);
-
-	switch (hwa_id) {
-	case RPC_AES1_CODE:
-		s = &dev->aes1_sema;
-		break;
-	case RPC_DES_CODE:
-		s = &dev->des_sema;
-		break;
-	default:
-	case RPC_SHA_CODE:
-		s = &dev->sha_sema;
-		break;
-	}
-
-	if (do_lock == LOCK_HWA) {
-		dprintk(KERN_INFO "tf_crypto_lock_hwa: "
-			"Wait for HWAID=0x%04X\n", hwa_id);
-		while (down_trylock(s))
-			cpu_relax();
-		dprintk(KERN_INFO "tf_crypto_lock_hwa: "
-			"Locked on HWAID=0x%04X\n", hwa_id);
-	} else {
-		up(s);
-		dprintk(KERN_INFO "tf_crypto_lock_hwa: "
-			"Released for HWAID=0x%04X\n", hwa_id);
-	}
-}
-
-/*------------------------------------------------------------------------- */
-/*
- * HWAs public lock or unlock HWA's specified in the HWA H/A/D fields of RPC
- * command rpc_command
- */
-static void tf_crypto_lock_hwas(u32 rpc_command, bool do_lock)
-{
-	dprintk(KERN_INFO
-		"tf_crypto_lock_hwas: rpc_command=0x%08x do_lock=%d\n",
-		rpc_command, do_lock);
-
-	/* perform the locks */
-	if (rpc_command & RPC_AES1_CODE)
-		tf_crypto_lock_hwa(RPC_AES1_CODE, do_lock);
-
-	if (rpc_command & RPC_DES_CODE)
-		tf_crypto_lock_hwa(RPC_DES_CODE, do_lock);
-
-	if (rpc_command & RPC_SHA_CODE)
-		tf_crypto_lock_hwa(RPC_SHA_CODE, do_lock);
-}
-
-/*------------------------------------------------------------------------- */
 /**
  *Initialize the public crypto DMA channels, global HWA semaphores and handles
  */
@@ -773,11 +712,6 @@ int tf_crypto_try_shortcuted_update(struct tf_connection *connection,
 	if (tf_crypto_is_shortcuted_command(connection,
 			(struct tf_command_invoke_client_command *) command,
 			&cus, false)) {
-		u32 hwa_id = cus->hwa_id;
-
-		/* Lock HWA */
-		tf_crypto_lock_hwa(hwa_id, LOCK_HWA);
-
 		if (tf_crypto_is_shortcuted_command(connection,
 				command,
 				&cus, true)) {
@@ -793,10 +727,6 @@ int tf_crypto_try_shortcuted_update(struct tf_connection *connection,
 				/* Decrement CUS context use count */
 				cus->use_count--;
 
-				/* Release HWA lock */
-				tf_crypto_lock_hwa(cus->hwa_id,
-					UNLOCK_HWA);
-
 				return -1;
 			}
 
@@ -804,10 +734,6 @@ int tf_crypto_try_shortcuted_update(struct tf_connection *connection,
 			if (!tf_crypto_update(cus, &cus_params)) {
 				/* Decrement CUS context use count */
 				cus->use_count--;
-
-				/* Release HWA lock */
-				tf_crypto_lock_hwa(cus->hwa_id,
-					UNLOCK_HWA);
 
 				return -1;
 			}
@@ -825,10 +751,7 @@ int tf_crypto_try_shortcuted_update(struct tf_connection *connection,
 			/* Decrement CUS context use count */
 			cus->use_count--;
 
-			tf_crypto_lock_hwa(cus->hwa_id,
-				UNLOCK_HWA);
 		} else {
-			tf_crypto_lock_hwa(hwa_id, UNLOCK_HWA);
 			return -1;
 		}
 	} else {
@@ -864,33 +787,17 @@ u32 tf_crypto_wait_for_ready_bit(u32 *reg, u32 bit)
 /*------------------------------------------------------------------------- */
 
 static DEFINE_SPINLOCK(clk_lock);
+static atomic_t tf_crypto_clock_enabled = ATOMIC_INIT(0);
 
 void tf_crypto_disable_clock(uint32_t clock_paddr)
 {
-	u32 *clock_reg;
-	u32 val;
-	unsigned long flags;
-
 	dprintk(KERN_INFO "tf_crypto_disable_clock: " \
 		"clock_paddr=0x%08X\n",
 		clock_paddr);
 
-	/* Ensure none concurrent access when changing clock registers */
-	spin_lock_irqsave(&clk_lock, flags);
-
-	clock_reg = (u32 *)IO_ADDRESS(clock_paddr);
-
-	val = __raw_readl(clock_reg);
-	val &= ~(0x3);
-	__raw_writel(val, clock_reg);
-
-	/* Wait for clock to be fully disabled */
-	while ((__raw_readl(clock_reg) & 0x30000) == 0)
-		;
-
-	spin_unlock_irqrestore(&clk_lock, flags);
-
 	tf_l4sec_clkdm_allow_idle(true);
+
+	atomic_dec(&tf_crypto_clock_enabled);
 }
 
 /*------------------------------------------------------------------------- */
@@ -905,14 +812,20 @@ void tf_crypto_enable_clock(uint32_t clock_paddr)
 		"clock_paddr=0x%08X\n",
 		clock_paddr);
 
-	tf_l4sec_clkdm_wakeup(true);
+	tf_l4sec_clkdm_wakeup(true, false);
 
 	/* Ensure none concurrent access when changing clock registers */
 	spin_lock_irqsave(&clk_lock, flags);
 
+	atomic_inc(&tf_crypto_clock_enabled);
+
 	clock_reg = (u32 *)IO_ADDRESS(clock_paddr);
 
 	val = __raw_readl(clock_reg);
+
+	if ((val & 0x30000) == 0)
+		goto end;
+
 	val |= 0x2;
 	__raw_writel(val, clock_reg);
 
@@ -920,7 +833,94 @@ void tf_crypto_enable_clock(uint32_t clock_paddr)
 	while ((__raw_readl(clock_reg) & 0x30000) != 0)
 		;
 
+end:
 	spin_unlock_irqrestore(&clk_lock, flags);
+}
+
+/*
+ * The timeout timer used to power off clocks
+ */
+#define INACTIVITY_TIMER_TIMEOUT 2000 /* ms */
+
+static struct timer_list tf_crypto_clock_timer;
+
+static void tf_crypto_clock_timer_init(void)
+{
+	static bool timer_initialized;
+
+	if (unlikely(!timer_initialized)) {
+		init_timer(&tf_crypto_clock_timer);
+		timer_initialized = true;
+	}
+}
+
+static void tf_crypto_clock_timer_cb(unsigned long data)
+{
+	unsigned long flags;
+	u32 ret;
+
+	dprintk(KERN_INFO "%s called...\n", __func__);
+
+	/* Ensure none concurrent access when changing clock registers */
+	spin_lock_irqsave(&clk_lock, flags);
+
+	/*
+	 * If one of the HWA is used (by secure or public) the timer
+	 * function cuts all the HWA clocks
+	 */
+	if (atomic_read(&tf_crypto_clock_enabled))
+		goto restart;
+
+	ret = tf_try_disabling_secure_hwa_clocks(0xf) & 0xff;
+
+	if (ret == 0xff)
+		panic("Error calling API_HAL_HWATURNOFF_INDEX");
+
+	/*
+	 * From MShield-DK 1.3.3 sources:
+	 *
+	 * Digest: 1 << 0
+	 * DES   : 1 << 1
+	 * AES1  : 1 << 2
+	 * AES2  : 1 << 3
+	 */
+	if (ret & 0xf)
+		goto restart;
+
+	spin_unlock_irqrestore(&clk_lock, flags);
+
+	return;
+
+restart:
+	dprintk("%s: will wait one more time\n", __func__);
+	mod_timer(&tf_crypto_clock_timer,
+		jiffies + msecs_to_jiffies(INACTIVITY_TIMER_TIMEOUT));
+
+	spin_unlock_irqrestore(&clk_lock, flags);
+}
+
+
+void tf_crypto_clock_timer_start(void)
+{
+	struct tf_device *dev = tf_get_device();
+
+	if (!dev->sm.se_initialized)
+		return;
+
+	tf_crypto_clock_timer_init();
+
+	/* Stop the timer if already running */
+	if (timer_pending(&tf_crypto_clock_timer))
+		del_timer(&tf_crypto_clock_timer);
+
+	/* Configure the timer */
+	tf_crypto_clock_timer.expires =
+		 jiffies + msecs_to_jiffies(INACTIVITY_TIMER_TIMEOUT);
+	tf_crypto_clock_timer.data = (unsigned long) dev;
+	tf_crypto_clock_timer.function =
+		 tf_crypto_clock_timer_cb;
+
+	add_timer(&tf_crypto_clock_timer);
 }
 
 /*------------------------------------------------------------------------- */
@@ -1010,11 +1010,10 @@ static int tf_crypto_install_shortcut_lock_hwa(
 	 * to install a key in HWA, once it is done secure world will release
 	 * the lock.  For SHA (activate shortcut is always called without LOCK
 	 * fag):do nothing
+	 * if (rpc_command & RPC_INSTALL_SHORTCUT_LOCK_ACCELERATOR_LOCK) {
+	 *	Lock HWA
+	 * }
 	 */
-	if ((rpc_command & RPC_INSTALL_SHORTCUT_LOCK_ACCELERATOR_LOCK) != 0) {
-		/*Lock the HWA */
-		tf_crypto_lock_hwa(cus->hwa_id, LOCK_HWA);
-	}
 
 	dprintk(KERN_INFO
 		"tf_crypto_install_shortcut_lock_hwa: Done\n");
@@ -1054,9 +1053,6 @@ static int tf_crypto_lock_hwas_suspend_shortcut(
 		suspend_cus_in->shortcut_id, (u32)suspend_cus_in);
 
 	target_shortcut = suspend_cus_in->shortcut_id;
-
-	/*lock HWAs */
-	tf_crypto_lock_hwas(rpc_command, LOCK_HWA);
 
 	/*if suspend_cus_in->shortcut_id != 0 and  if rpc_command.S != 0,
 		then, suspend shortcut */
@@ -1205,9 +1201,6 @@ static int tf_crypto_resume_shortcut_unlock_hwas(
 
 	/* H is never set by the PA: Atomically set sham1_is_public to true */
 	dev->sham1_is_public = true;
-
-	/* Unlock HWAs according rpc_command */
-	tf_crypto_lock_hwas(rpc_command, UNLOCK_HWA);
 
 	return 0;
 }

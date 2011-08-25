@@ -235,9 +235,3 @@ run_data_speed_loop:
 	pop	{pc}
 
 #endif
-
-read_mpidr:
-	.global read_mpidr
-	mrc   p15, 0, r0, c0, c0, 5
-	bx   lr
-

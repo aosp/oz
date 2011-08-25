@@ -74,10 +74,6 @@ int run_data_speed(unsigned int loop, unsigned long va);
 
 int tf_get_current_process_hash(void *hash);
 
-#ifndef CONFIG_ANDROID
-int tf_hash_application_path_and_data(char *buffer, void *data, u32 data_len);
-#endif /* !CONFIG_ANDROID */
-
 /*----------------------------------------------------------------------------
  * Statistic computation
  *----------------------------------------------------------------------------*/

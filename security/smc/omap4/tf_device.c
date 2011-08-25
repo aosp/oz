@@ -27,9 +27,7 @@
 #include <linux/sysdev.h>
 #include <linux/vmalloc.h>
 #include <linux/signal.h>
-#ifdef CONFIG_ANDROID
 #include <linux/device.h>
-#endif
 
 #include "tf_protocol.h"
 #include "tf_defs.h"
@@ -129,9 +127,7 @@ MODULE_PARM_DESC(soft_interrupt,
 	"The softint interrupt line used by the Secure world");
 #endif
 
-#ifdef CONFIG_ANDROID
 static struct class *tf_class;
-#endif
 
 /*
  * Interfaces the system device with the kernel.
@@ -313,12 +309,10 @@ static int __init tf_device_register(void)
 		goto init_failed;
 	}
 
-#ifdef CONFIG_ANDROID
 	tf_class = class_create(THIS_MODULE, TF_DEVICE_BASE_NAME);
 	device_create(tf_class, NULL,
 		dev->dev_number,
 		NULL, TF_DEVICE_BASE_NAME);
-#endif
 
 #ifdef CONFIG_TF_ZEBRA
 	/*
@@ -379,19 +373,6 @@ static int tf_device_open(struct inode *inode, struct file *file)
 			file, error);
 		goto error;
 	}
-
-#ifndef CONFIG_ANDROID
-	/*
-	 * Check file flags. We only autthorize the O_RDWR access
-	 */
-	if (file->f_flags != O_RDWR) {
-		dprintk(KERN_ERR "tf_device_open(%p): "
-			"Invalid access mode %u\n",
-			file, file->f_flags);
-		error = -EACCES;
-		goto error;
-	}
-#endif
 
 	/*
 	 * Open a new connection.
