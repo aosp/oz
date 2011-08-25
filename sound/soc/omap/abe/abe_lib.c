@@ -554,14 +554,26 @@ void abe_ul_src_filters_saturation_monitoring(void)
  */
 void abe_vx_dl_src_filters_saturation_monitoring(void)
 {
-	if (abe_check_filter_is_saturating(S_VX_DL_ADDR, S_VX_DL_sizeof)) {
-		abe_reset_vx_dl_src_filters();
-		abe_reset_dl1_src_filters();
-		abe_reset_dl2_src_filters();
+	if ((abe_port[VX_DL_PORT].status ==
+					OMAP_ABE_PORT_INITIALIZED) ||
+	    (abe_port[VX_DL_PORT].status ==
+					OMAP_ABE_PORT_ACTIVITY_RUNNING)) {
+		if (abe_check_filter_is_saturating(S_VX_DL_ADDR,
+						   S_VX_DL_sizeof)) {
+			abe_reset_vx_dl_src_filters();
+			abe_reset_dl1_src_filters();
+			abe_reset_dl2_src_filters();
+		}
 	}
 
-	if (abe_check_filter_is_saturating(S_BT_DL_ADDR, S_BT_DL_sizeof))
-		abe_reset_bt_dl_src_filters();
+	if ((abe_port[BT_VX_DL_PORT].status ==
+					OMAP_ABE_PORT_INITIALIZED) ||
+	    (abe_port[BT_VX_DL_PORT].status ==
+					OMAP_ABE_PORT_ACTIVITY_RUNNING)) {
+		if (abe_check_filter_is_saturating(S_BT_DL_ADDR,
+						   S_BT_DL_sizeof))
+			abe_reset_bt_dl_src_filters();
+	}
 }
 
 /**
