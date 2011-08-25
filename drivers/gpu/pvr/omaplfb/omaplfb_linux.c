@@ -286,15 +286,30 @@ static void omaplfb_clone_handler(struct work_struct *work)
  * Presents the flip in the display with the DSSComp API
  */
 static void OMAPLFBFlipDSSComp(OMAPLFB_DEVINFO *display_info,
-	unsigned long phy_addr, dsscomp_t comp)
+	unsigned long phy_addr)
 {
+	struct fb_info *framebuffer = display_info->psLINFBInfo;
+	struct omapfb_info *ofbi = FB2OFB(framebuffer);
 	struct dss2_ovl_info dss2_ovl;
 	struct omaplfb_clone_data *clone_data = NULL;
 	struct omaplfb_clone_work *work = NULL;
-	dsscomp_t clone_comp;
+	dsscomp_t comp = NULL, clone_comp = NULL;
 	int queued_clone_work = 0;
 	int mgr_id_dst;
 	int r = 0;
+
+	if (ofbi->num_overlays > 0) {
+		struct omap_overlay *overlay = ofbi->overlays[0];
+		struct omap_overlay_manager *manager = overlay->manager;
+		comp = find_dsscomp_obj(manager);
+	}
+
+	if (!comp) {
+		/* We should not reach this condition */
+		ERROR_PRINTK("Unable to find a composition for "
+			"display %u", display_info->uDeviceID);
+		return;
+	}
 
 	mutex_lock(&display_info->clone_lock);
 
@@ -437,67 +452,31 @@ void OMAPLFBFlip(OMAPLFB_SWAPCHAIN *psSwapChain, unsigned long aPhyAddr)
 	struct fb_info *framebuffer = psDevInfo->psLINFBInfo;
 	struct omapfb_info *ofbi = FB2OFB(framebuffer);
 	struct omapfb2_device *fbdev = ofbi->fbdev;
-	struct omap_overlay_manager *manager;
-	dsscomp_t comp = NULL;
 
 	omapfb_lock(fbdev);
 
-	/* Always get the first overlay for main LCD */
-	if (ofbi->num_overlays > 0) {
-		struct omap_overlay *overlay;
-		overlay = ofbi->overlays[0];
-		manager = overlay->manager;
-		comp = find_dsscomp_obj(manager);
-	}
-
-	if (comp)
-		OMAPLFBFlipDSSComp(psDevInfo, aPhyAddr, comp);
+	if (g_use_dsscomp)
+		OMAPLFBFlipDSSComp(psDevInfo, aPhyAddr);
 	else
 		OMAPLFBFlipDSS(psSwapChain, aPhyAddr);
 
 	omapfb_unlock(fbdev);
 }
 
-/*
- * Present frame and synchronize with the display to prevent tearing
- * On DSI panels the sync function is used to handle FRAMEDONE IRQ
- * On DPI panels the wait_for_vsync is used to handle VSYNC IRQ
- * in: psDevInfo
- */
-void OMAPLFBPresentSync(OMAPLFB_DEVINFO *psDevInfo,
-	OMAPLFB_FLIP_ITEM *psFlipItem)
+
+static void OMAPLFBPresentSyncLegacy(OMAPLFB_DEVINFO *psDevInfo,
+	unsigned long aPhyAddr)
 {
 	struct fb_info *framebuffer = psDevInfo->psLINFBInfo;
-	struct omapfb_info *ofbi = FB2OFB(framebuffer);
-	struct omapfb2_device *fbdev = ofbi->fbdev;
 	struct omap_overlay_manager *manager;
-	dsscomp_t comp = NULL;
-	unsigned long aPhyAddr = (unsigned long)psFlipItem->sSysAddr->uiAddr;
 	struct omap_dss_device *display;
 	struct omap_dss_driver *driver;
 	int err = 1;
 
-	omapfb_lock(fbdev);
-
-	/* DSSComp will do the flip */
-	if (g_use_dsscomp) {
-		/* Always get the first overlay for main display */
-		if (ofbi->num_overlays > 0) {
-			struct omap_overlay *overlay;
-			overlay = ofbi->overlays[0];
-			manager = overlay->manager;
-			comp = find_dsscomp_obj(manager);
-		}
-		if (comp)
-			OMAPLFBFlipDSSComp(psDevInfo, aPhyAddr, comp);
-		goto exit_unlock;
-	}
-
-	/* OMAPLFB will do the flip */
 	display = fb2display(framebuffer);
 	/* The framebuffer doesn't have a display attached, just bail out */
 	if (!display)
-		goto exit_unlock;
+		return;
 
 	driver = display->driver;
 	manager = display->manager;
@@ -519,8 +498,29 @@ void OMAPLFBPresentSync(OMAPLFB_DEVINFO *psDevInfo,
 	if (err)
 		DEBUG_PRINTK("Unable to sync with display %u!",
 			psDevInfo->uDeviceID);
+}
 
-exit_unlock:
+/*
+ * Present frame and synchronize with the display to prevent tearing
+ * On DSI panels the sync function is used to handle FRAMEDONE IRQ
+ * On DPI panels the wait_for_vsync is used to handle VSYNC IRQ
+ * in: psDevInfo
+ */
+void OMAPLFBPresentSync(OMAPLFB_DEVINFO *psDevInfo,
+	OMAPLFB_FLIP_ITEM *psFlipItem)
+{
+	struct fb_info *framebuffer = psDevInfo->psLINFBInfo;
+	struct omapfb_info *ofbi = FB2OFB(framebuffer);
+	struct omapfb2_device *fbdev = ofbi->fbdev;
+	unsigned long aPhyAddr = (unsigned long)psFlipItem->sSysAddr->uiAddr;
+
+	omapfb_lock(fbdev);
+
+	if (g_use_dsscomp)
+		OMAPLFBFlipDSSComp(psDevInfo, aPhyAddr);
+	else
+		OMAPLFBPresentSyncLegacy(psDevInfo, aPhyAddr);
+
 	omapfb_unlock(fbdev);
 }
 
@@ -583,13 +583,11 @@ int omaplfb_enable_cloning(int mgr_id_src, int mgr_id_dst, int buff_num)
 	if (!display_info)
 		return -EINVAL;
 
-	mutex_lock(&display_info->clone_lock);
-
 	if (mgr_id_src == mgr_id_dst ||
-		buff_num <= 0 || buff_num > OMAPLFB_CLONING_BUFFER_NUM) {
-		err = -EINVAL;
-		goto exit_unlock;
-	}
+		buff_num <= 0 || buff_num > OMAPLFB_CLONING_BUFFER_NUM)
+		return -EINVAL;
+
+	mutex_lock(&display_info->clone_lock);
 
 	if (display_info->cloning_enabled) {
 		err = -EBUSY;
@@ -608,7 +606,7 @@ int omaplfb_enable_cloning(int mgr_id_src, int mgr_id_dst, int buff_num)
 	if (!clone_data->workqueue) {
 		WARNING_PRINTK("Unable to create workqueue for UI cloning");
 		err = -EBUSY;
-		goto exit_unlock;
+		goto workqueue_failed;
 	}
 
 	clone_data->mgr_id_src = mgr_id_src;
@@ -632,6 +630,7 @@ int omaplfb_enable_cloning(int mgr_id_src, int mgr_id_dst, int buff_num)
 
 alloc_failed:
 	destroy_workqueue(clone_data->workqueue);
+workqueue_failed:
 	kfree(display_info->clone_data);
 	display_info->clone_data = NULL;
 exit_unlock:
