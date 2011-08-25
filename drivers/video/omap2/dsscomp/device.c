@@ -173,6 +173,8 @@ static long query_display(struct dsscomp_dev *cdev,
 	dis->s3d_info = dev->panel.s3d_info;
 	dis->state = dev->state;
 	dis->timings = dev->panel.timings;
+	if (!strcmp(dev->name, "hdmi"))
+		get_hdmi_mode_code(&dis->timings, &dis->mode, &dis->code);
 
 	/* find all overlays available for/owned by this display */
 	for (i = 0; i < cdev->num_ovls && dis->enabled; i++) {

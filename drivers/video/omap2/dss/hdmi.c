@@ -2563,6 +2563,15 @@ bool is_hdmi_interlaced(void)
 	return hdmi.cfg.interlace;
 }
 
+void get_hdmi_mode_code(struct omap_video_timings *timing, int* mode, int* code)
+{
+	struct hdmi_cm cm;
+	cm = hdmi_get_code(timing);
+	*mode = cm.mode;
+	*code = cm.code;
+}
+
+
 const struct omap_video_timings *hdmi_get_omap_timing(int ix)
 {
 	if (ix < 0 || ix >= ARRAY_SIZE(all_timings_direct))

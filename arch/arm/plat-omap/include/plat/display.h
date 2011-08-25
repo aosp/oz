@@ -1051,5 +1051,7 @@ int omap_rfbi_update(struct omap_dss_device *dssdev,
 
 void change_base_address(int id, u32 p_uv_addr);
 bool is_hdmi_interlaced(void);
+void get_hdmi_mode_code(struct omap_video_timings *timing,
+			int *mode, int *code);
 
 #endif

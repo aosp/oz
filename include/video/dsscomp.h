@@ -514,6 +514,8 @@ struct dsscomp_display_info {
 	enum omap_dss_display_state state;
 	__u8 enabled;			/* bool: resume-state if suspended */
 	struct omap_video_timings timings;
+	int mode;
+	int code;
 	struct s3d_disp_info s3d_info;	/* any S3D specific information */
 	struct dss2_mgr_info mgr;	/* manager information */
 };
