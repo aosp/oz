@@ -59,6 +59,7 @@ static unsigned int cooling_rate = 1008000;
 module_param(cooling_rate, int, 0);
 
 static bool enabled;
+static bool saved_hotplug_enabled;
 static int heating_budget;
 static int t_next_heating_end;
 
@@ -212,7 +213,7 @@ static struct notifier_block omap4_duty_nb = {
 	.notifier_call	= omap4_duty_frequency_change,
 };
 
-static int omap4_duty_cycle_set_enabled(bool val)
+static int omap4_duty_cycle_set_enabled(bool val, bool update)
 {
 	int ret;
 
@@ -246,6 +247,9 @@ static int omap4_duty_cycle_set_enabled(bool val)
 			cancel_work_sync(&work_enter_cool1);
 			omap4_duty_enter_normal();
 		}
+		/* we want to make sure the user gets what is asked */
+		if (num_online_cpus() == 1 && update)
+			saved_hotplug_enabled = enabled;
 	}
 
 unlock:
@@ -255,12 +259,16 @@ unlock:
 
 static void omap4_duty_enable_wq(struct work_struct *work)
 {
-	omap4_duty_cycle_set_enabled(true);
+	omap4_duty_cycle_set_enabled(saved_hotplug_enabled, false);
 }
 
 static void omap4_duty_disable_wq(struct work_struct *work)
 {
-	omap4_duty_cycle_set_enabled(false);
+	/* we don't want to overwrite what the user has requested */
+	mutex_lock(&mutex_duty);
+	saved_hotplug_enabled = enabled;
+	mutex_unlock(&mutex_duty);
+	omap4_duty_cycle_set_enabled(false, false);
 }
 
 static int omap4_duty_cycle_cpu_callback(struct notifier_block *nfb,
@@ -475,7 +483,7 @@ static ssize_t store_enabled(struct device *dev,
 	if (ret)
 		return ret;
 
-	ret = omap4_duty_cycle_set_enabled(!!val);
+	ret = omap4_duty_cycle_set_enabled(!!val, true);
 	if (ret)
 		return ret;
 
@@ -551,9 +559,9 @@ static int __init omap4_duty_module_init(void)
 	heating_budget = NITRO_P(nitro_percentage, nitro_interval);
 
 	if (num_online_cpus() > 1)
-		err = omap4_duty_cycle_set_enabled(true);
+		err = omap4_duty_cycle_set_enabled(true, false);
 	else
-		err = omap4_duty_cycle_set_enabled(false);
+		err = omap4_duty_cycle_set_enabled(false, false);
 	if (err) {
 		pr_err("%s: failed to initialize the duty cycle\n", __func__);
 		goto exit;
@@ -586,7 +594,7 @@ unregister_hotplug:
 	unregister_hotcpu_notifier(&omap4_duty_cycle_cpu_notifier);
 disable:
 	if (enabled)
-		omap4_duty_cycle_set_enabled(false);
+		omap4_duty_cycle_set_enabled(false, false);
 exit:
 	return err;
 }
