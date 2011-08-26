@@ -75,6 +75,8 @@ static enum omap4_duty_state state;
 
 /* protect our data */
 static DEFINE_MUTEX(mutex_duty);
+/* used to protect the enable/disable operations */
+static DEFINE_MUTEX(mutex_enabled);
 
 static void omap4_duty_enter_normal(void)
 {
@@ -227,9 +229,13 @@ static int omap4_duty_cycle_set_enabled(bool val, bool update)
 {
 	int ret;
 
-	ret = mutex_lock_interruptible(&mutex_duty);
+	ret = mutex_lock_interruptible(&mutex_enabled);
 	if (ret)
 		return ret;
+
+	ret = mutex_lock_interruptible(&mutex_duty);
+	if (ret)
+		goto unlock_enabled;
 
 	if (enabled != val) {
 		enabled = val;
@@ -250,11 +256,15 @@ static int omap4_duty_cycle_set_enabled(bool val, bool update)
 		} else {
 			cpufreq_unregister_notifier(&omap4_duty_nb,
 					CPUFREQ_TRANSITION_NOTIFIER);
-			cancel_delayed_work_sync(&work_exit_cool);
-			cancel_delayed_work_sync(&work_exit_heat);
+			mutex_unlock(&mutex_duty);
 			cancel_delayed_work_sync(&work_enter_heat);
+			cancel_delayed_work_sync(&work_exit_heat);
 			cancel_work_sync(&work_enter_cool0);
 			cancel_work_sync(&work_enter_cool1);
+			cancel_delayed_work_sync(&work_exit_cool);
+			ret = mutex_lock_interruptible(&mutex_duty);
+			if (ret)
+				goto unlock_enabled;
 			omap4_duty_enter_normal();
 		}
 		/* we want to make sure the user gets what is asked */
@@ -264,6 +274,8 @@ static int omap4_duty_cycle_set_enabled(bool val, bool update)
 
 unlock:
 	mutex_unlock(&mutex_duty);
+unlock_enabled:
+	mutex_unlock(&mutex_enabled);
 	return ret;
 }
 
