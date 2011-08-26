@@ -297,6 +297,8 @@ void __init tf_allocate_workspace(void)
 {
 	struct tf_device *dev = tf_get_device();
 
+	tf_clock_timer_init();
+
 	if (tf_ctrl_check_omap_type() <= 0)
 		return;
 

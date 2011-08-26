@@ -26,6 +26,8 @@
 #define PUB2SEC_NOCST        0xFF
 #define SMICODEPUB_NEWTASK   0x00
 
+#define NO_CRITICAL_TASK     0xFFFFFFFF
+
 /*
  * RPC status:
  *  - 0: the secure world yielded due to an interrupt
@@ -96,6 +98,20 @@ label_smc:
 	b	service_end
 	nop
 
+	/*
+	 * Directly jump back to secure if a critical section
+	 * needs to be completed prior to executing our service
+	 *
+	 * r5 = current critical task ID, 0xFFFFFFFF if none
+	 * r6 = current task ID
+	 */
+	cmp	r5, #NO_CRITICAL_TASK
+	beq	no_crit_task_override
+	cmp	r5, r6
+	beq	no_crit_task_override
+	mov	r12, #SMICODEPUB_IRQ_END
+	b	label_smc
+
 #ifdef CONFIG_BENCH_SECURE_CYCLE
 	/* Come from Secure: activate counter 0 (write to 0 are ignored) */
 	mov	r4, #0x00000001
@@ -110,6 +126,7 @@ label_smc:
 	mcr	p15, 0x0, r4, c9, c12, 2
 #endif
 
+no_crit_task_override:
 	INVALIDATE_BTB
 	ldr	r8, =g_secure_task_id
 	str	r6, [r8]

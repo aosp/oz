@@ -789,13 +789,34 @@ u32 tf_crypto_wait_for_ready_bit(u32 *reg, u32 bit)
 static DEFINE_SPINLOCK(clk_lock);
 static atomic_t tf_crypto_clock_enabled = ATOMIC_INIT(0);
 
+u32 tf_crypto_turn_off_clocks(void)
+{
+	unsigned long flags;
+	u32 ret = 0xf;
+	/*
+	 * If one of the HWA is used (by secure or public) the timer
+	 * function cuts all the HWA clocks
+	 */
+	if (atomic_read(&tf_crypto_clock_enabled))
+		return ret;
+
+	spin_lock_irqsave(&clk_lock, flags);
+
+	ret = tf_try_disabling_secure_hwa_clocks(0xf) & 0xff;
+
+	spin_unlock_irqrestore(&clk_lock, flags);
+
+	if (ret == 0xff)
+		panic("Error calling API_HAL_HWATURNOFF_INDEX");
+
+	return ret;
+}
+
 void tf_crypto_disable_clock(uint32_t clock_paddr)
 {
 	dprintk(KERN_INFO "tf_crypto_disable_clock: " \
 		"clock_paddr=0x%08X\n",
 		clock_paddr);
-
-	tf_l4sec_clkdm_allow_idle(true);
 
 	atomic_dec(&tf_crypto_clock_enabled);
 }
@@ -812,10 +833,10 @@ void tf_crypto_enable_clock(uint32_t clock_paddr)
 		"clock_paddr=0x%08X\n",
 		clock_paddr);
 
-	tf_l4sec_clkdm_wakeup(true, false);
-
 	/* Ensure none concurrent access when changing clock registers */
 	spin_lock_irqsave(&clk_lock, flags);
+
+	tf_clock_timer_start();
 
 	atomic_inc(&tf_crypto_clock_enabled);
 
@@ -835,92 +856,6 @@ void tf_crypto_enable_clock(uint32_t clock_paddr)
 
 end:
 	spin_unlock_irqrestore(&clk_lock, flags);
-}
-
-/*
- * The timeout timer used to power off clocks
- */
-#define INACTIVITY_TIMER_TIMEOUT 2000 /* ms */
-
-static struct timer_list tf_crypto_clock_timer;
-
-static void tf_crypto_clock_timer_init(void)
-{
-	static bool timer_initialized;
-
-	if (unlikely(!timer_initialized)) {
-		init_timer(&tf_crypto_clock_timer);
-		timer_initialized = true;
-	}
-}
-
-static void tf_crypto_clock_timer_cb(unsigned long data)
-{
-	unsigned long flags;
-	u32 ret;
-
-	dprintk(KERN_INFO "%s called...\n", __func__);
-
-	/* Ensure none concurrent access when changing clock registers */
-	spin_lock_irqsave(&clk_lock, flags);
-
-	/*
-	 * If one of the HWA is used (by secure or public) the timer
-	 * function cuts all the HWA clocks
-	 */
-	if (atomic_read(&tf_crypto_clock_enabled))
-		goto restart;
-
-	ret = tf_try_disabling_secure_hwa_clocks(0xf) & 0xff;
-
-	if (ret == 0xff)
-		panic("Error calling API_HAL_HWATURNOFF_INDEX");
-
-	/*
-	 * From MShield-DK 1.3.3 sources:
-	 *
-	 * Digest: 1 << 0
-	 * DES   : 1 << 1
-	 * AES1  : 1 << 2
-	 * AES2  : 1 << 3
-	 */
-	if (ret & 0xf)
-		goto restart;
-
-	spin_unlock_irqrestore(&clk_lock, flags);
-
-	return;
-
-restart:
-	dprintk("%s: will wait one more time\n", __func__);
-	mod_timer(&tf_crypto_clock_timer,
-		jiffies + msecs_to_jiffies(INACTIVITY_TIMER_TIMEOUT));
-
-	spin_unlock_irqrestore(&clk_lock, flags);
-}
-
-
-void tf_crypto_clock_timer_start(void)
-{
-	struct tf_device *dev = tf_get_device();
-
-	if (!dev->sm.se_initialized)
-		return;
-
-	tf_crypto_clock_timer_init();
-
-	/* Stop the timer if already running */
-	if (timer_pending(&tf_crypto_clock_timer))
-		del_timer(&tf_crypto_clock_timer);
-
-	/* Configure the timer */
-	tf_crypto_clock_timer.expires =
-		 jiffies + msecs_to_jiffies(INACTIVITY_TIMER_TIMEOUT);
-	tf_crypto_clock_timer.data = (unsigned long) dev;
-	tf_crypto_clock_timer.function =
-		 tf_crypto_clock_timer_cb;
-
-	add_timer(&tf_crypto_clock_timer);
 }
 
 /*------------------------------------------------------------------------- */

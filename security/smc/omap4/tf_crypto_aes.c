@@ -1385,7 +1385,9 @@ int register_smc_public_crypto_aes(void)
 {
 	int ret;
 
+	tf_crypto_enable_clock(PUBLIC_CRYPTO_AES1_CLOCK_REG);
 	OUTREG32(&paes_reg->AES_SYSCONFIG, 0);
+	tf_crypto_disable_clock(PUBLIC_CRYPTO_AES1_CLOCK_REG);
 
 	aes_ctx = kzalloc(sizeof(struct aes_hwa_ctx), GFP_KERNEL);
 	if (aes_ctx == NULL)
