@@ -1485,7 +1485,9 @@ void omap_vout_isr(void *arg, unsigned int irqstatus)
 
 	switch (cur_display->type) {
 	case OMAP_DISPLAY_TYPE_DSI:
-		if (!(irqstatus & irq))
+		if (!((irqstatus & irq) ||
+			((cur_display->phy.dsi.xfer_mode == OMAP_DSI_XFER_VIDEO_MODE) &&
+			(irqstatus & (DISPC_IRQ_VSYNC | DISPC_IRQ_VSYNC2)))))
 			goto vout_isr_err;
 
 		/* display 2nd field for interlaced buffers if progressive */
