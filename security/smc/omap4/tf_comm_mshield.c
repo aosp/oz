@@ -33,14 +33,12 @@
 
 #include <asm/cacheflush.h>
 
-#include "s_version.h"
 #include "tf_defs.h"
 #include "tf_comm.h"
 #include "tf_util.h"
 #include "tf_conn.h"
 #include "tf_zebra.h"
 #include "tf_crypto.h"
-#include "mach/omap4-common.h"
 
 /*--------------------------------------------------------------------------
  * Internal constants
@@ -82,8 +80,6 @@ u32 g_service_end;
 #define API_HAL_TASK_MGR_RPCINIT_INDEX          0x08
 #define API_HAL_KM_GETSECUREROMCODECRC_INDEX    0x0B
 #define API_HAL_SEC_L3_RAM_RESIZE_INDEX         0x17
-#define API_HAL_HWATURNOFF_INDEX                0x29
-#define API_HAL_ACTIVATEHWAPWRMGRPATCH_INDEX    0x2A
 
 #define API_HAL_RET_VALUE_OK	0x0
 
@@ -190,10 +186,12 @@ u32 omap4_secure_dispatcher(u32 app_id, u32 flags, u32 nargs,
 	/*
 	 * Put L4 Secure clock domain to SW_WKUP so that modules are accessible
 	 */
-	tf_l4sec_clkdm_wakeup(false, (app_id == API_HAL_HWATURNOFF_INDEX));
+	tf_l4sec_clkdm_wakeup(false);
 
 	local_irq_save(iflags);
-
+#ifdef DEBUG
+	BUG_ON((read_mpidr() & 0x00000003) != 0);
+#endif
 	/* proc_id is always 0 */
 	ret = schedule_secure_world(app_id, 0, flags, __pa(pub2sec_args));
 	local_irq_restore(iflags);
@@ -270,12 +268,6 @@ exit:
 	local_irq_restore(iflags);
 
 	return status;
-}
-
-u32 tf_try_disabling_secure_hwa_clocks(u32 mask)
-{
-	return omap4_secure_dispatcher(API_HAL_HWATURNOFF_INDEX,
-		FLAG_START_HAL_CRITICAL, 1, mask, 0, 0, 0);
 }
 
 /* Initializes the SE (SDP, SRAM resize, RPC handler) */
@@ -355,10 +347,6 @@ static int tf_se_init(struct tf_comm *comm,
 		goto error;
 	}
 
-	/* HWA Clocks Patch init */
-	omap4_secure_dispatcher(API_HAL_ACTIVATEHWAPWRMGRPATCH_INDEX,
-		0, 0, 0, 0, 0, 0);
-
 	comm->se_initialized = true;
 
 	return 0;
@@ -398,6 +386,9 @@ static u32 tf_rpc_init(struct tf_comm *comm)
 
 	spin_unlock(&(comm->lock));
 
+	register_smc_public_crypto_digest();
+	register_smc_public_crypto_aes();
+
 	return rpc_error;
 }
 
@@ -428,8 +419,8 @@ int tf_rpc_execute(struct tf_comm *comm)
 	u32 rpc_command;
 	u32 rpc_error = RPC_NO;
 
-#ifdef CONFIG_TF_DRIVER_DEBUG_SUPPORT
-	BUG_ON((hard_smp_processor_id() & 0x00000003) != 0);
+#ifdef DEBUG
+	BUG_ON((read_mpidr() & 0x00000003) != 0);
 #endif
 
 	/* Lock the RPC */
@@ -480,17 +471,9 @@ int tf_rpc_execute(struct tf_comm *comm)
  * L4 SEC Clock domain handling
  *-------------------------------------------------------------------------- */
 
-static DEFINE_SPINLOCK(clkdm_lock);
-
-void tf_l4sec_clkdm_wakeup(bool wakelock, bool hwalock)
+void tf_l4sec_clkdm_wakeup(bool wakelock)
 {
-	unsigned long flags;
-
-	spin_lock_irqsave(&clkdm_lock, flags);
-
-	if (!hwalock)
-		tf_crypto_clock_timer_start();
-
+	spin_lock(&tf_get_device()->sm.lock);
 #ifdef CONFIG_HAS_WAKELOCK
 	if (wakelock) {
 		atomic_inc(&tf_wake_lock_count);
@@ -499,14 +482,12 @@ void tf_l4sec_clkdm_wakeup(bool wakelock, bool hwalock)
 #endif
 	atomic_inc(&smc_l4_sec_clkdm_use_count);
 	clkdm_wakeup(smc_l4_sec_clkdm);
-	spin_unlock_irqrestore(&clkdm_lock, flags);
+	spin_unlock(&tf_get_device()->sm.lock);
 }
 
 void tf_l4sec_clkdm_allow_idle(bool wakeunlock)
 {
-	unsigned long flags;
-
-	spin_lock_irqsave(&clkdm_lock, flags);
+	spin_lock(&tf_get_device()->sm.lock);
 	if (atomic_dec_return(&smc_l4_sec_clkdm_use_count) == 0)
 		clkdm_allow_idle(smc_l4_sec_clkdm);
 #ifdef CONFIG_HAS_WAKELOCK
@@ -514,7 +495,7 @@ void tf_l4sec_clkdm_allow_idle(bool wakeunlock)
 		if (atomic_dec_return(&tf_wake_lock_count) == 0)
 			wake_unlock(&g_tf_wake_lock);
 #endif
-	spin_unlock_irqrestore(&clkdm_lock, flags);
+	spin_unlock(&tf_get_device()->sm.lock);
 }
 
 /*--------------------------------------------------------------------------
@@ -589,10 +570,101 @@ int tf_pm_hibernate(struct tf_comm *comm)
 	return 0;
 }
 
+#ifdef CONFIG_SMC_KERNEL_CRYPTO
+#define DELAYED_RESUME_NONE	0
+#define DELAYED_RESUME_PENDING	1
+#define DELAYED_RESUME_ONGOING	2
+
+static DEFINE_SPINLOCK(tf_delayed_resume_lock);
+static int tf_need_delayed_resume = DELAYED_RESUME_NONE;
+
+int tf_delayed_secure_resume(void)
+{
+	int ret;
+	union tf_command message;
+	union tf_answer answer;
+	struct tf_device *dev = tf_get_device();
+
+	spin_lock(&tf_delayed_resume_lock);
+	if (likely(tf_need_delayed_resume == DELAYED_RESUME_NONE)) {
+		spin_unlock(&tf_delayed_resume_lock);
+		return 0;
+	}
+
+	if (unlikely(tf_need_delayed_resume == DELAYED_RESUME_ONGOING)) {
+		spin_unlock(&tf_delayed_resume_lock);
+
+		/*
+		 * Wait for the other caller to actually finish the delayed
+		 * resume operation
+		 */
+		while (tf_need_delayed_resume != DELAYED_RESUME_NONE)
+			cpu_relax();
+
+		return 0;
+	}
+
+	tf_need_delayed_resume = DELAYED_RESUME_ONGOING;
+	spin_unlock(&tf_delayed_resume_lock);
+
+	/*
+	 * When the system leaves CORE OFF, HWA are configured as secure.  We
+	 * need them as public for the Linux Crypto API.
+	 */
+	memset(&message, 0, sizeof(message));
+
+	message.header.message_type = TF_MESSAGE_TYPE_MANAGEMENT;
+	message.header.message_size =
+		(sizeof(struct tf_command_management) -
+			sizeof(struct tf_command_header))/sizeof(u32);
+	message.management.command =
+		TF_MANAGEMENT_RESUME_FROM_CORE_OFF;
+
+	ret = tf_send_receive(&dev->sm, &message, &answer, NULL, false);
+	if (ret) {
+		printk(KERN_ERR "tf_pm_resume(%p): "
+			"tf_send_receive failed (error %d)!\n",
+			&dev->sm, ret);
+
+		unregister_smc_public_crypto_digest();
+		unregister_smc_public_crypto_aes();
+		return ret;
+	}
+
+	if (answer.header.error_code) {
+		unregister_smc_public_crypto_digest();
+		unregister_smc_public_crypto_aes();
+	}
+
+	spin_lock(&tf_delayed_resume_lock);
+	tf_need_delayed_resume = DELAYED_RESUME_NONE;
+	spin_unlock(&tf_delayed_resume_lock);
+
+	return answer.header.error_code;
+}
+#endif
+
 int tf_pm_resume(struct tf_comm *comm)
 {
 
 	dprintk(KERN_INFO "tf_pm_resume()\n");
+	#if 0
+	{
+		void *workspace_va;
+		struct tf_device *dev = tf_get_device();
+		workspace_va = ioremap(dev->workspace_addr,
+			dev->workspace_size);
+		printk(KERN_INFO
+		"Read first word of workspace [0x%x]\n",
+		*(uint32_t *)workspace_va);
+	}
+	#endif
+
+#ifdef CONFIG_SMC_KERNEL_CRYPTO
+	spin_lock(&tf_delayed_resume_lock);
+	tf_need_delayed_resume = DELAYED_RESUME_PENDING;
+	spin_unlock(&tf_delayed_resume_lock);
+#endif
 	return 0;
 }
 
@@ -615,10 +687,10 @@ int tf_init(struct tf_comm *comm)
 	if (tf_crypto_init() != PUBLIC_CRYPTO_OPERATION_SUCCESS)
 		return -EFAULT;
 
-	pr_info("%s\n", S_VERSION_STRING);
-
-	register_smc_public_crypto_digest();
-	register_smc_public_crypto_aes();
+	if (omap_type() == OMAP2_DEVICE_TYPE_GP) {
+		register_smc_public_crypto_digest();
+		register_smc_public_crypto_aes();
+	}
 
 	return 0;
 }
@@ -649,7 +721,7 @@ int tf_start(struct tf_comm *comm,
 		dprintk(KERN_ERR "sched_setaffinity #1 -> 0x%lX", ret_affinity);
 #endif
 
-	tf_l4sec_clkdm_wakeup(true, false);
+	tf_l4sec_clkdm_wakeup(true);
 
 	workspace_size -= SZ_1M;
 	sdp_backing_store_addr = workspace_addr + workspace_size;
@@ -868,6 +940,16 @@ loop:
 	set_bit(TF_COMM_FLAG_PA_AVAILABLE, &comm->flags);
 	wake_up(&(comm->wait_queue));
 	ret = 0;
+
+	#if 0
+	{
+		void *workspace_va;
+		workspace_va = ioremap(workspace_addr, workspace_size);
+		printk(KERN_INFO
+		"Read first word of workspace [0x%x]\n",
+		*(uint32_t *)workspace_va);
+	}
+	#endif
 
 	/* Workaround for issue #6081 */
 	if ((omap_rev() && 0xFFF000FF) == OMAP443X_CLASS)

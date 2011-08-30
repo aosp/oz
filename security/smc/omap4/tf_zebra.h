@@ -32,12 +32,13 @@ int tf_start(struct tf_comm *comm,
 /* Assembler entry points to/from secure */
 u32 schedule_secure_world(u32 app_id, u32 proc_id, u32 flags, u32 args);
 u32 rpc_handler(u32 p1, u32 p2, u32 p3, u32 p4);
+u32 read_mpidr(void);
 
 /* L4 SEC clockdomain enabling/disabling */
-void tf_l4sec_clkdm_wakeup(bool wakelock, bool hwalock);
+void tf_l4sec_clkdm_wakeup(bool wakelock);
 void tf_l4sec_clkdm_allow_idle(bool wakeunlock);
 
-u32 tf_try_disabling_secure_hwa_clocks(u32 mask);
-void tf_crypto_clock_timer_start(void);
+/* Delayed secure resume */
+int tf_delayed_secure_resume(void);
 
 #endif /* __TF_ZEBRA_H__ */

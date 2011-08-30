@@ -778,11 +778,18 @@ static int digest_update(struct shash_desc *desc, const u8 *data,
 {
 	struct tf_crypto_sha_operation_state *state = shash_desc_ctx(desc);
 
+	/* Make sure SHA/MD5 HWA is accessible */
+	tf_delayed_secure_resume();
+
+	tf_crypto_lock_hwa(PUBLIC_CRYPTO_HWA_SHA, LOCK_HWA);
+
 	tf_crypto_enable_clock(PUBLIC_CRYPTO_SHA2MD5_CLOCK_REG);
 
 	tf_digest_update(state, (u8 *) data, len);
 
 	tf_crypto_disable_clock(PUBLIC_CRYPTO_SHA2MD5_CLOCK_REG);
+
+	tf_crypto_lock_hwa(PUBLIC_CRYPTO_HWA_SHA, UNLOCK_HWA);
 
 	return 0;
 }
@@ -792,11 +799,18 @@ static int digest_final(struct shash_desc *desc, u8 *out)
 	int ret;
 	struct tf_crypto_sha_operation_state *state = shash_desc_ctx(desc);
 
+	/* Make sure SHA/MD5 HWA is accessible */
+	tf_delayed_secure_resume();
+
+	tf_crypto_lock_hwa(PUBLIC_CRYPTO_HWA_SHA, LOCK_HWA);
+
 	tf_crypto_enable_clock(PUBLIC_CRYPTO_SHA2MD5_CLOCK_REG);
 
 	ret = tf_digest_final(state, out);
 
 	tf_crypto_disable_clock(PUBLIC_CRYPTO_SHA2MD5_CLOCK_REG);
+
+	tf_crypto_lock_hwa(PUBLIC_CRYPTO_HWA_SHA, UNLOCK_HWA);
 
 	return ret;
 }

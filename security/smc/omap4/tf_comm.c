@@ -1350,7 +1350,7 @@ copy_answers:
 #ifdef CONFIG_TF_ZEBRA
 schedule_secure_world:
 	if (*secure_is_idle) {
-		tf_l4sec_clkdm_wakeup(true, false);
+		tf_l4sec_clkdm_wakeup(true);
 		*secure_is_idle = false;
 	}
 #endif
