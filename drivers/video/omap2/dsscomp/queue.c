@@ -81,6 +81,10 @@ static struct {
 	struct mutex mtx;
 	wait_queue_head_t wq_free;
 	bool free_slot;
+	bool suspended; /* Mark this manager as suspended, no more applies */
+	bool busy_applying; /* If manager is busy in apply/sync */
+	/* Wake up any clients waiting for the apply/sync to happen*/
+	wait_queue_head_t wq_busy_apply;
 } mgrq[MAX_MANAGERS];
 
 static struct dsscomp_dev *cdev;
@@ -123,6 +127,7 @@ int dsscomp_queue_init(struct dsscomp_dev *cdev_)
 			INIT_LIST_HEAD(&mgrq[i].free_cis);
 			init_waitqueue_head(&mgrq[i].wq);
 			init_waitqueue_head(&mgrq[i].wq_free);
+			init_waitqueue_head(&mgrq[i].wq_busy_apply);
 
 			for (j = 0; j < QUEUE_SIZE; j++)
 				list_add(&cis[j + QUEUE_SIZE * i].q,
@@ -713,9 +718,15 @@ int dsscomp_apply(dsscomp_t comp)
 		}
 	}
 
+	r = 0;
+	/* If manager is suspended, avoid any DSS interaction */
+	if (mgrq[mgr->id].suspended) {
+		dump_comp_info(cdev, d, "ignored");
+		goto done;
+	}
+
 	dump_comp_info(cdev, d, "apply");
 
-	r = 0;
 	dmask = 0;
 	list_for_each_entry_safe(o, o2, &comp->ois, q) {
 		struct dss2_ovl_info *oi = &o->ovl;
@@ -790,6 +801,8 @@ done_ovl:
 
 	/* apply changes and call update on manual panels */
 	comp->magic = MAGIC_APPLIED;
+	mgrq[comp->ix].busy_applying = 1; /* We are about to apply/sync */
+
 	mutex_unlock(&mgrq[comp->ix].mtx);
 
 	if (dssdev_manually_updated(dssdev)) {
@@ -817,6 +830,7 @@ done_ovl:
 			r = 0;
 	}
 	mutex_lock(&mgrq[comp->ix].mtx);
+
 done:
 	if (change)
 		refresh_masks(mgr->id);
@@ -829,11 +843,45 @@ done:
 		refresh_masks(mgr->id);
 	}
 
+	/* Release anyone waiting for the apply/sync */
+	mgrq[comp->ix].busy_applying = 0;
+	wake_up_interruptible_sync(&mgrq[comp->ix].wq_busy_apply);
+
 	mutex_unlock(&mgrq[comp->ix].mtx);
 
 	return r;
 }
 EXPORT_SYMBOL(dsscomp_apply);
+
+int is_mgr_suspended(int mgr_id)
+{
+	int res;
+	mutex_lock(&mgrq[mgr_id].mtx);
+	res = mgrq[mgr_id].suspended;
+	mutex_unlock(&mgrq[mgr_id].mtx);
+	return res;
+}
+
+void dsscomp_set_suspend_mgrs(int suspend_state)
+{
+	int i, wait_mgr;
+
+	/* Prevent managers from applying more compositions if we are
+	 * suspending, wait if one apply is on going
+	 * If we are resuming we just allow the managers to apply again
+	 */
+	for (i = 0; i < MAX_MANAGERS; i++) {
+		wait_mgr = 0;
+		mutex_lock(&mgrq[i].mtx);
+		mgrq[i].suspended = suspend_state;
+		if (suspend_state && mgrq[i].busy_applying)
+			wait_mgr = 1;
+		mutex_unlock(&mgrq[i].mtx);
+		if (wait_mgr)
+			wait_event_interruptible_timeout(mgrq[i].wq_busy_apply,
+				!mgrq[i].busy_applying, msecs_to_jiffies(25));
+	}
+}
 
 /*
  * ===========================================================================

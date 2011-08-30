@@ -212,6 +212,7 @@ int omaplfb_disable_cloning(int mgr_id_src);
 void omaplfb_disable_cloning_alldisp(void);
 void omaplfb_create_sysfs(struct omaplfb_device *odev);
 void omaplfb_remove_sysfs(struct omaplfb_device *odev);
+void omaplfb_drop_frame(OMAPLFB_DEVINFO *display_info);
 #ifdef LDM_PLATFORM
 void OMAPLFBDriverSuspend(void);
 void OMAPLFBDriverResume(void);

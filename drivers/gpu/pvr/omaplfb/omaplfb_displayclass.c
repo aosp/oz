@@ -1123,6 +1123,7 @@ static IMG_BOOL ProcessFlip(IMG_HANDLE  hCmdCookie,
 
 	if (psDevInfo->bDeviceSuspended)
 	{
+		omaplfb_drop_frame(psDevInfo);
 		/* If is suspended then assume the commands are completed */
 		psSwapChain->psPVRJTable->pfnPVRSRVCmdComplete(
 			hCmdCookie, IMG_TRUE);

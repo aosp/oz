@@ -47,7 +47,7 @@
 #ifdef CONFIG_HAS_EARLYSUSPEND
 #include <linux/earlysuspend.h>
 #endif
-static bool blanked;
+
 static int opencnt;
 
 static u32 hwc_virt_to_phys(u32 arg)
@@ -89,21 +89,16 @@ static long setup_mgr(struct dsscomp_dev *cdev,
 	if (!dev)
 		return -EINVAL;
 
-	/* ignore frames while we are blanked */
-	if (blanked) {
+	mgr = dev->manager;
+	if (!mgr)
+		return -ENODEV;
+
+	/* ignore frames while we are suspended */
+	if (is_mgr_suspended(mgr->id)) {
 		if (debug & DEBUG_PHASES)
 			dev_info(DEV(cdev), "[%08x] ignored\n", d->sync_id);
 		return 0;
 	}
-
-	/* HACK: prevent executing IOCTL when driver in suspend mode to avoid
-		kernel crash */
-	if (dev->state != OMAP_DSS_DISPLAY_ACTIVE)
-		return -EINVAL;
-
-	mgr = dev->manager;
-	if (!mgr)
-		return -ENODEV;
 
 	for (i = 1; i < d->num_ovls; i++) {
 		struct dss2_ovl_info *oi = d->ovls + i;
@@ -381,19 +376,42 @@ static long comp_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 #ifdef CONFIG_EARLYSUSPEND
 static void dsscomp_early_suspend(struct early_suspend *h)
 {
-	blanked = true;
+	struct omap_overlay_manager *mgr;
+	struct omap_overlay *ovl;
+	struct omap_overlay_info info;
+
+	int dss_ovl_num, dss_mgr_num, i;
+
+	/* Suspend managers, prevent any composition apply to happen */
+	dsscomp_set_suspend_mgrs(1);
+
+	/* Shutdown all pipes */
+	dss_ovl_num = omap_dss_get_num_overlays();
+	for (i = 0; i < dss_ovl_num; i++) {
+		ovl = omap_dss_get_overlay(i);
+		ovl->get_overlay_info(ovl, &info);
+		info.enabled = false;
+		ovl->set_overlay_info(ovl, &info);
+	}
+
+	dss_mgr_num = omap_dss_get_num_overlay_managers();
+	for (i = 0; i < dss_mgr_num; i++) {
+		mgr = omap_dss_get_overlay_manager(i);
+		mgr->apply(mgr);
+	}
 }
 
 static void dsscomp_late_resume(struct early_suspend *h)
 {
 	dsscomp_release_active_comps();
-	blanked = false;
+	/* Allow the managers to process composition applies again */
+	dsscomp_set_suspend_mgrs(0);
 }
 
 static struct early_suspend early_suspend_info = {
 	.suspend = dsscomp_early_suspend,
 	.resume = dsscomp_late_resume,
-	.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN,
+	.level = EARLY_SUSPEND_LEVEL_STOP_DRAWING,
 };
 #endif
 

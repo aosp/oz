@@ -205,7 +205,7 @@ static struct platform_driver omaplfb_driver = {
 static struct early_suspend omaplfb_early_suspend = {
 	.suspend = OMAPLFBDriverSuspend_Entry,
 	.resume = OMAPLFBDriverResume_Entry,
-	.level = EARLY_SUSPEND_LEVEL_STOP_DRAWING,
+	.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN,
 };
 
 #else /* defined(SGX_EARLYSUSPEND) && defined(CONFIG_HAS_EARLYSUSPEND) */

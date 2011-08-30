@@ -92,6 +92,30 @@ static dsscomp_t find_dsscomp_obj(struct omap_overlay_manager *manager)
 	return comp;
 }
 
+void omaplfb_drop_frame(OMAPLFB_DEVINFO *display_info)
+{
+	struct fb_info *framebuffer = display_info->psLINFBInfo;
+	struct omapfb_info *ofbi = FB2OFB(framebuffer);
+	struct omapfb2_device *fbdev = ofbi->fbdev;
+	dsscomp_t comp = NULL;
+
+	/* Nothing to do if we are not using DSSComp */
+	if (!g_use_dsscomp)
+		return;
+
+	omapfb_lock(fbdev);
+
+	if (ofbi->num_overlays > 0) {
+		struct omap_overlay *overlay = ofbi->overlays[0];
+		struct omap_overlay_manager *manager = overlay->manager;
+		comp = find_dsscomp_obj(manager);
+		if (comp)
+			dsscomp_drop(comp);
+	}
+
+	omapfb_unlock(fbdev);
+}
+
 static void omaplfb_dma_cb(int channel, u16 status, void *data)
 {
 	struct omaplfb_clone_data *clone_data =
@@ -236,12 +260,12 @@ static void OMAPLFBFlipDSSComp(OMAPLFB_DEVINFO *display_info,
 		comp = find_dsscomp_obj(manager);
 	}
 
-	if (!comp) {
-		/* We should not reach this condition */
-		ERROR_PRINTK("Unable to find a composition for "
-			"display %u", display_info->uDeviceID);
+	/* We can reach this condition on resume, where the DSSComp
+	 * flushes the manager queue ignoring compositions, this
+	 * should not be a problem
+	 */
+	if (!comp)
 		return;
-	}
 
 	mutex_lock(&display_info->clone_lock);
 
