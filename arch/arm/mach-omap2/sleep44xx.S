@@ -567,19 +567,6 @@ ENTRY(DO_WFI)
 	dmb
 	isb
 
-#ifdef CONFIG_CACHE_L2X0
-
-	ldr	r2, =l2cache_base
-	ldr	r2, [r2]
-	mov	r0, #0x0
-	str	r0, [r2, #L2X0_CACHE_SYNC]
-
-loop51:
-	ldr	r0, [r2, #L2X0_CACHE_SYNC]
-	ands	r0, r0, #0x1
-	bne	loop51
-#endif
-
 	ldr	r0, =so_ram_address
 	ldr	r0, [r0]
 	ldr	r2, [r0]
