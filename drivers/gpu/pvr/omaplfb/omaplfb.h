@@ -30,6 +30,7 @@
 #include <linux/miscdevice.h>
 #include <video/dsscomp.h>
 #include <plat/dsscomp.h>
+#include <video/omaplfb-dev.h>
 
 #define OMAPLFB_CLONING_BUFFER_NUM 2
 
@@ -142,11 +143,6 @@ struct omaplfb_device {
 	int display_count;
 };
 
-struct omaplfb_clone_cmd {
-	int mgr_id_src;
-	int mgr_id_dst;
-};
-
 struct omaplfb_clone_work {
 	struct work_struct work;
 	dsscomp_t comp;
@@ -193,11 +189,6 @@ struct omaplfb_clone_data {
 #define	ERROR_PRINTK(format, ...) printk("ERROR " DRIVER_PREFIX \
 	" (%s %i): " format "\n", __func__, __LINE__, ## __VA_ARGS__)
 
-#define OMAPLFB_DEV_NAME "omaplfb"
-
-#define OMAPLFB_CLONING_ENABLE _IOW('O', 128, struct omaplfb_clone_cmd)
-#define OMAPLFB_CLONING_DISABLE _IOW('O', 129, struct omaplfb_clone_cmd)
-
 OMAP_ERROR OMAPLFBInit(struct omaplfb_device *omaplfb_dev);
 OMAP_ERROR OMAPLFBDeinit(void);
 void OMAPLFBPresentSync(OMAPLFB_DEVINFO *psDevInfo,
@@ -213,6 +204,13 @@ void omaplfb_disable_cloning_alldisp(void);
 void omaplfb_create_sysfs(struct omaplfb_device *odev);
 void omaplfb_remove_sysfs(struct omaplfb_device *odev);
 void omaplfb_drop_frame(OMAPLFB_DEVINFO *display_info);
+void omaplfb_dsscomp_init(void);
+int omaplfb_dsscomp_setup(struct omaplfb_dsscomp_info *infop);
+void omaplfb_dsscomp_get(struct dsscomp_setup_mgr_data **datap, int mgr_ix);
+void omaplfb_dsscomp_free(struct dsscomp_setup_mgr_data *datap);
+void omaplfb_dsscomp_enable(void);
+void omaplfb_dsscomp_disable(void);
+bool omaplfb_dsscomp_isempty(void);
 #ifdef LDM_PLATFORM
 void OMAPLFBDriverSuspend(void);
 void OMAPLFBDriverResume(void);

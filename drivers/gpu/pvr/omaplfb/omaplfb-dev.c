@@ -29,16 +29,18 @@
 #include "servicesext.h"
 #include "kerneldisplay.h"
 #include "omaplfb.h"
+#include <video/omaplfb-dev.h>
+#include <video/dsscomp.h>
 
-static int g_omaplfb_dev_open_cnt;
+static int gomaplfb_dev_open_cnt;
 
 static int omaplfb_open(struct inode *inode, struct file *filp)
 {
 	/* HWC in HC is the only one which opens this device, try using the
 	 * DSSComp for every flip
 	 */
-	g_omaplfb_dev_open_cnt++;
-	if (g_omaplfb_dev_open_cnt > 0) {
+	gomaplfb_dev_open_cnt++;
+	if (gomaplfb_dev_open_cnt > 0) {
 		set_use_dsscomp(1);
 		DEBUG_PRINTK("DSSComp will be used for flipping");
 	}
@@ -47,8 +49,8 @@ static int omaplfb_open(struct inode *inode, struct file *filp)
 
 static int omaplfb_release(struct inode *inode, struct file *filp)
 {
-	g_omaplfb_dev_open_cnt--;
-	if (g_omaplfb_dev_open_cnt <= 0) {
+	gomaplfb_dev_open_cnt--;
+	if (gomaplfb_dev_open_cnt <= 0) {
 		set_use_dsscomp(0);
 		omaplfb_disable_cloning_alldisp();
 	}
@@ -81,6 +83,16 @@ static long omaplfb_ioctl(struct file *filp, unsigned int cmd,
 		r = omaplfb_disable_cloning(clone_cmd.mgr_id_src);
 		break;
 	}
+	case OMAPLFB_DSSCOMP_SETUP:
+	{
+		struct omaplfb_dsscomp_info info;
+		r = copy_from_user(&info, ptr, sizeof(info));
+		if (r)
+			break;
+		r = omaplfb_dsscomp_setup(&info);
+		break;
+	}
+
 	default:
 		r = -EINVAL;
 	}
@@ -275,6 +287,7 @@ static int __init OMAPLFB_Init(void)
 	DEBUG_PRINTK("Registered early suspend support");
 #endif
 #endif
+	omaplfb_dsscomp_init();
 	return 0;
 }
 

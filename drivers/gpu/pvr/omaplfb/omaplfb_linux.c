@@ -29,6 +29,7 @@
 #endif
 
 #include <linux/fb.h>
+#include <linux/uaccess.h>
 #include <plat/dma.h>
 #include <mach/tiler.h>
 #include <video/dsscomp.h>
@@ -49,7 +50,17 @@
 #include "kerneldisplay.h"
 #include "omaplfb.h"
 
-static int g_use_dsscomp;
+static int guse_dsscomp;
+
+struct composition {
+	struct dsscomp_setup_mgr_data *data;
+	struct list_head queue;
+};
+
+#define COMPOSITION_MGRS 3
+static struct list_head gcompositions[COMPOSITION_MGRS];
+static int gcomposition_enabled;
+struct mutex gcomposition_lock;
 
 MODULE_SUPPORTED_DEVICE(DEVNAME);
 
@@ -75,7 +86,7 @@ OMAP_ERROR OMAPLFBGetLibFuncAddr (char *szFunctionName,
 
 void set_use_dsscomp(int use)
 {
-	g_use_dsscomp = use;
+	guse_dsscomp = use;
 }
 
 /* Must be called within framebuffer lock to prevent race conditions */
@@ -100,7 +111,7 @@ void omaplfb_drop_frame(OMAPLFB_DEVINFO *display_info)
 	dsscomp_t comp = NULL;
 
 	/* Nothing to do if we are not using DSSComp */
-	if (!g_use_dsscomp)
+	if (!guse_dsscomp)
 		return;
 
 	omapfb_lock(fbdev);
@@ -242,10 +253,8 @@ static void omaplfb_clone_handler(struct work_struct *work)
  * Presents the flip in the display with the DSSComp API
  */
 static void OMAPLFBFlipDSSComp(OMAPLFB_DEVINFO *display_info,
-	unsigned long phy_addr)
+	unsigned long phy_addr, struct omapfb_info *ofbi)
 {
-	struct fb_info *framebuffer = display_info->psLINFBInfo;
-	struct omapfb_info *ofbi = FB2OFB(framebuffer);
 	struct dss2_ovl_info dss2_ovl;
 	struct omaplfb_clone_data *clone_data = NULL;
 	struct omaplfb_clone_work *work = NULL;
@@ -254,29 +263,44 @@ static void OMAPLFBFlipDSSComp(OMAPLFB_DEVINFO *display_info,
 	int mgr_id_dst;
 	int r = 0;
 
-	if (ofbi->num_overlays > 0) {
-		struct omap_overlay *overlay = ofbi->overlays[0];
-		struct omap_overlay_manager *manager = overlay->manager;
-		comp = find_dsscomp_obj(manager);
-	}
+	struct omap_overlay_manager *manager;
+	struct dsscomp_setup_mgr_data *prime_data, *sec_data;
 
-	/* We can reach this condition on resume, where the DSSComp
+	/* We can reach this condition on resume, where the omaplfb
 	 * flushes the manager queue ignoring compositions, this
 	 * should not be a problem
 	 */
-	if (!comp)
+	if (omaplfb_dsscomp_isempty())
 		return;
+	manager = omap_dss_get_overlay_manager(0);
+	omaplfb_dsscomp_get(&prime_data, 0);
+	if (!prime_data) {
+		ERROR_PRINTK("missing comp. data");
+		return;
+	}
+	prime_data->mode &= ~DSSCOMP_SETUP_APPLY;
+	comp = dsscomp_createcomp(manager, prime_data);
+	omaplfb_dsscomp_free(prime_data);
+	if (!comp) {
+		ERROR_PRINTK("failed to get comp");
+		return;
+	}
 
 	mutex_lock(&display_info->clone_lock);
-
 	if (!display_info->cloning_enabled)
 		goto clone_unlock;
 
 	/* Look for compositions in the manager to clone */
 	clone_data = display_info->clone_data;
 	mgr_id_dst = clone_data->mgr_id_dst;
-	clone_comp = find_dsscomp_obj(omap_dss_get_overlay_manager(mgr_id_dst));
+	manager = omap_dss_get_overlay_manager(mgr_id_dst);
+	omaplfb_dsscomp_get(&sec_data, manager->id);
+	if (!sec_data)
+		goto clone_unlock;
 
+	sec_data->mode &= ~DSSCOMP_SETUP_APPLY;
+	clone_comp = dsscomp_createcomp(manager, sec_data);
+	omaplfb_dsscomp_free(sec_data);
 	if (!clone_comp)
 		goto clone_unlock;
 
@@ -286,22 +310,17 @@ static void OMAPLFBFlipDSSComp(OMAPLFB_DEVINFO *display_info,
 	work->src_buf_addr = phy_addr;
 	work->comp = clone_comp;
 	work->transfer_active = 1;
-	r = queue_work(clone_data->workqueue, (struct work_struct *)work);
-	/* If queueing the work failed we need to consume the
-	 * composition
-	 */
-	if (r == 0) {
-		DEBUG_PRINTK("Failed to queue cloning work, "
+	queued_clone_work = queue_work(clone_data->workqueue,
+						(struct work_struct *)work);
+	if (!queued_clone_work) {
+		ERROR_PRINTK("Failed to queue cloning work, "
 			"droppping comp %p error %d", clone_comp, r);
 		dsscomp_drop(clone_comp);
-	} else
-		queued_clone_work = 1;
+	}
 
 clone_unlock:
 	mutex_unlock(&display_info->clone_lock);
-
 	r = dsscomp_get_first_ovl(comp, &dss2_ovl);
-
 	if (r)
 		ERROR_PRINTK("Overlay not found in comp %p", comp);
 	else {
@@ -409,13 +428,13 @@ void OMAPLFBFlip(OMAPLFB_SWAPCHAIN *psSwapChain, unsigned long aPhyAddr)
 	struct omapfb_info *ofbi = FB2OFB(framebuffer);
 	struct omapfb2_device *fbdev = ofbi->fbdev;
 
+
+	if (guse_dsscomp) {
+		OMAPLFBFlipDSSComp(psDevInfo, aPhyAddr, ofbi);
+		return;
+	}
 	omapfb_lock(fbdev);
-
-	if (g_use_dsscomp)
-		OMAPLFBFlipDSSComp(psDevInfo, aPhyAddr);
-	else
-		OMAPLFBFlipDSS(psSwapChain, aPhyAddr);
-
+	OMAPLFBFlipDSS(psSwapChain, aPhyAddr);
 	omapfb_unlock(fbdev);
 }
 
@@ -470,13 +489,12 @@ void OMAPLFBPresentSync(OMAPLFB_DEVINFO *psDevInfo,
 	struct omapfb2_device *fbdev = ofbi->fbdev;
 	unsigned long aPhyAddr = (unsigned long)psFlipItem->sSysAddr->uiAddr;
 
+	if (guse_dsscomp) {
+		OMAPLFBFlipDSSComp(psDevInfo, aPhyAddr, ofbi);
+		return;
+	}
 	omapfb_lock(fbdev);
-
-	if (g_use_dsscomp)
-		OMAPLFBFlipDSSComp(psDevInfo, aPhyAddr);
-	else
-		OMAPLFBPresentSyncLegacy(psDevInfo, aPhyAddr);
-
+	OMAPLFBPresentSyncLegacy(psDevInfo, aPhyAddr);
 	omapfb_unlock(fbdev);
 }
 
@@ -653,3 +671,129 @@ void omaplfb_disable_cloning_alldisp(void)
 			omaplfb_disable_cloning_disp(display_info);
 	}
 }
+
+void omaplfb_dsscomp_init(void)
+{
+	int i;
+	mutex_init(&gcomposition_lock);
+	for (i = 0; i < COMPOSITION_MGRS; i++)
+		INIT_LIST_HEAD(&gcompositions[i]);
+	gcomposition_enabled = 1;
+}
+
+int omaplfb_dsscomp_setup(struct omaplfb_dsscomp_info *infop)
+{
+	void *compbuf;
+	struct composition *comp;
+	struct dss2_mgr_info *mgr;
+	int r = -EINVAL;
+	int throwaway = 0;
+
+	/*
+	 * This check is a kludge but we really don't want to
+	 * parse the dsscomp data structure
+	 */
+	if (infop->length > 1024)
+		goto end;
+	r = -ENOMEM;
+	compbuf = kzalloc(infop->length, GFP_KERNEL);
+	if (!compbuf)
+		goto end;
+	comp = kzalloc(sizeof(*comp), GFP_KERNEL);
+	if (!comp)
+		goto cleanup;
+
+	r = copy_from_user(compbuf, (void __user *)infop->composition,
+					infop->length);
+	if (r)
+		goto cleanup;
+	comp->data = (struct dsscomp_setup_mgr_data *)compbuf;
+	mgr = &comp->data->mgr;
+	if (mgr->ix >= COMPOSITION_MGRS) {
+		r = -EINVAL;
+		goto cleanup;
+	}
+	mutex_lock(&gcomposition_lock);
+	if (!gcomposition_enabled)
+		throwaway = 1;	/* Throw away compositions */
+	else {
+		dsscomp_prepdata(comp->data);
+		list_add_tail(&comp->queue, &gcompositions[mgr->ix]);
+	}
+	mutex_unlock(&gcomposition_lock);
+	if (!throwaway)
+		goto end;
+cleanup:
+	kfree(compbuf);
+	kfree(comp);
+end:
+	return r;
+}
+
+/*
+ * Caller is responsible for free the returned entry
+ */
+void omaplfb_dsscomp_get(struct dsscomp_setup_mgr_data **datap, int mgr_ix)
+{
+	struct list_head *list;
+	struct composition *c;
+	*datap = NULL;
+
+	mutex_lock(&gcomposition_lock);
+	if (list_empty(&gcompositions[mgr_ix])) {
+		mutex_unlock(&gcomposition_lock);
+		return;
+	}
+	list = gcompositions[mgr_ix].next;
+	list_del(list);
+	mutex_unlock(&gcomposition_lock);
+
+	c = list_entry(list, struct composition, queue);
+	*datap = c->data;
+	kfree(c);
+}
+
+void omaplfb_dsscomp_free(struct dsscomp_setup_mgr_data *datap)
+{
+	kfree(datap);
+}
+
+void omaplfb_dsscomp_enable(void)
+{
+	mutex_lock(&gcomposition_lock);
+	gcomposition_enabled = 1;
+	mutex_unlock(&gcomposition_lock);
+}
+
+void omaplfb_dsscomp_disable(void)
+{
+	int mgr_ix;
+	mutex_lock(&gcomposition_lock);
+	gcomposition_enabled = 0;
+	for (mgr_ix = 0; mgr_ix < COMPOSITION_MGRS; mgr_ix++)
+		while (!list_empty(&gcompositions[mgr_ix])) {
+			struct list_head *list;
+			struct composition *c;
+			list = gcompositions[mgr_ix].next;
+			list_del(list);
+			c = list_entry(list, struct composition, queue);
+			dsscomp_prepdata_drop(c->data);
+			kfree(c->data);
+			kfree(c);
+		}
+	mutex_unlock(&gcomposition_lock);
+}
+
+bool omaplfb_dsscomp_isempty(void)
+{
+	int mgr_ix;
+	mutex_lock(&gcomposition_lock);
+	for (mgr_ix = 0; mgr_ix < COMPOSITION_MGRS; mgr_ix++)
+		if (!list_empty(&gcompositions[mgr_ix])) {
+			mutex_unlock(&gcomposition_lock);
+			return false;
+		}
+	mutex_unlock(&gcomposition_lock);
+	return true;
+}
+

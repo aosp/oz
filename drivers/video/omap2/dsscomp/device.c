@@ -73,10 +73,9 @@ static u32 hwc_virt_to_phys(u32 arg)
 static long setup_mgr(struct dsscomp_dev *cdev,
 					struct dsscomp_setup_mgr_data *d)
 {
-	int i, r;
+	int i;
 	struct omap_dss_device *dev;
 	struct omap_overlay_manager *mgr;
-	dsscomp_t comp;
 
 	dump_comp_info(cdev, d, "queue");
 	for (i = 0; i < d->num_ovls; i++)
@@ -99,31 +98,56 @@ static long setup_mgr(struct dsscomp_dev *cdev,
 			dev_info(DEV(cdev), "[%08x] ignored\n", d->sync_id);
 		return 0;
 	}
+	dsscomp_prepdata(d);
+	return dsscomp_createcomp(mgr, d) ? 0 : -EINVAL;
+}
 
-	for (i = 1; i < d->num_ovls; i++) {
-		struct dss2_ovl_info *oi = d->ovls + i;
-		u32 addr = (u32) oi->address;
-		if (oi->cfg.enabled)
-			tiler_set_buf_state(hwc_virt_to_phys(addr),
-						TILBUF_BUSY);
-	}
-	comp = dsscomp_new_sync_id(mgr, d->sync_id);
-	if (IS_ERR(comp))
-		return PTR_ERR(comp);
-
-	r = dsscomp_set_mgr(comp, &d->mgr);
+void dsscomp_prepdata(struct dsscomp_setup_mgr_data *d)
+{
+	int i;
 
 	for (i = 0; i < d->num_ovls; i++) {
 		struct dss2_ovl_info *oi = d->ovls + i;
 		u32 addr = (u32) oi->address;
 		if (oi->cfg.enabled) {
 			/* convert addresses to user space */
-			if (oi->cfg.color_mode == OMAP_DSS_COLOR_NV12)
+			oi->ba = hwc_virt_to_phys(addr);
+			if (oi->cfg.color_mode == OMAP_DSS_COLOR_NV12) {
 				oi->uv = hwc_virt_to_phys(addr +
 					oi->cfg.height * oi->cfg.stride);
-			oi->ba = hwc_virt_to_phys(addr);
+				tiler_set_buf_state(oi->ba, TILBUF_BUSY);
+			}
 		}
+	}
+}
+EXPORT_SYMBOL(dsscomp_prepdata);
 
+void dsscomp_prepdata_drop(struct dsscomp_setup_mgr_data *d)
+{
+	int i;
+	for (i = 0; i < d->num_ovls; i++) {
+		struct dss2_ovl_info *oi = d->ovls + i;
+		if (oi->cfg.enabled)
+			if (oi->cfg.color_mode == OMAP_DSS_COLOR_NV12)
+				tiler_set_buf_state(oi->ba, TILBUF_FREE);
+	}
+}
+EXPORT_SYMBOL(dsscomp_prepdata_drop);
+
+dsscomp_t dsscomp_createcomp(struct omap_overlay_manager *mgr,
+				struct dsscomp_setup_mgr_data *d)
+{
+	int i, r;
+	dsscomp_t comp;
+
+	comp = dsscomp_new_sync_id(mgr, d->sync_id);
+	if (IS_ERR(comp))
+		goto cleanup;
+
+	r = dsscomp_set_mgr(comp, &d->mgr);
+
+	for (i = 0; i < d->num_ovls; i++) {
+		struct dss2_ovl_info *oi = d->ovls + i;
 		r = r ? : dsscomp_set_ovl(comp, oi);
 	}
 
@@ -133,8 +157,20 @@ static long setup_mgr(struct dsscomp_dev *cdev,
 	else if (d->mode & DSSCOMP_SETUP_APPLY)
 		r = dsscomp_apply(comp);
 
-	return r;
+	if (r)
+		goto cleanup;
+
+	return comp;
+cleanup:
+	for (i = 0; i < d->num_ovls; i++) {
+		struct dss2_ovl_info *oi = d->ovls + i;
+		if (oi->cfg.enabled &&
+		    oi->cfg.color_mode == OMAP_DSS_COLOR_NV12)
+			tiler_set_buf_state(oi->ba, TILBUF_FREE);
+	}
+	return NULL;
 }
+EXPORT_SYMBOL(dsscomp_createcomp);
 
 static long query_display(struct dsscomp_dev *cdev,
 					struct dsscomp_display_info *dis)
@@ -336,7 +372,6 @@ static long comp_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 			struct dsscomp_setup_mgr_data set;
 			struct dss2_ovl_info ovl[MAX_OVERLAYS];
 		} p;
-
 		r = copy_from_user(&p.set, ptr, sizeof(p.set)) ? :
 		    p.set.num_ovls >= ARRAY_SIZE(p.ovl) ? -EINVAL :
 		    copy_from_user(&p.ovl, (void __user *)arg + sizeof(p.set),

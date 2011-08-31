@@ -1211,6 +1211,7 @@ void OMAPLFBDriverSuspend(void)
 		}
 
 		psDevInfo->bDeviceSuspended = OMAP_TRUE;
+		omaplfb_dsscomp_disable();
 		SetFlushStateInternalNoLock(psDevInfo, OMAP_TRUE);
 
 		mutex_unlock(&psDevInfo->sSwapChainLockMutex);
@@ -1242,7 +1243,7 @@ void OMAPLFBDriverResume(void)
 
 		SetFlushStateInternalNoLock(psDevInfo, OMAP_FALSE);
 		psDevInfo->bDeviceSuspended = OMAP_FALSE;
-
+		omaplfb_dsscomp_enable();
 		mutex_unlock(&psDevInfo->sSwapChainLockMutex);
 	}
 }

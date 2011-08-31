@@ -35,6 +35,10 @@ int dsscomp_set_ovl(dsscomp_t comp, struct dss2_ovl_info *ovl);
 int dsscomp_get_ovl(dsscomp_t comp, u32 ix, struct dss2_ovl_info *ovl);
 int dsscomp_get_first_ovl(dsscomp_t comp, struct dss2_ovl_info *ovl);
 int dsscomp_set_mgr(dsscomp_t comp, struct dss2_mgr_info *mgr);
+void dsscomp_prepdata(struct dsscomp_setup_mgr_data *d);
+void dsscomp_prepdata_drop(struct dsscomp_setup_mgr_data *d);
+dsscomp_t dsscomp_createcomp(struct omap_overlay_manager *mgr,
+			struct dsscomp_setup_mgr_data *d);
 int dsscomp_get_mgr(dsscomp_t comp, struct dss2_mgr_info *mgr);
 int dsscomp_setup(dsscomp_t comp, enum dsscomp_setup_mode mode,
 			struct dss2_rect_t win);
