@@ -47,6 +47,7 @@
 #include <asm/mach/map.h>
 
 #include <plat/board.h>
+#include <plat/omap_apps_brd_id.h>
 #include <plat/common.h>
 #include <plat/control.h>
 #include <plat/timer-gp.h>
@@ -1842,7 +1843,8 @@ static void __init omap_44xxtablet_init(void)
 
 	omap_emif_setup_device_details(&emif_devices, &emif_devices);
 	omap_init_emif_timings();
-
+	omap_init_board_version(0);
+	omap4_create_board_props();
 	enable_rtc_gpio();
 	omap4_audio_conf();
 	tablet_i2c_init();

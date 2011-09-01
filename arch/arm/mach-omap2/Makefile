@@ -193,9 +193,13 @@ obj-$(CONFIG_MACH_OMAP3_TOUCHBOOK)	+= board-omap3touchbook.o \
 					   hsmmc.o
 obj-$(CONFIG_MACH_OMAP_BLAZE)		+= board-44xxtablet.o \
 					   omap_phy_internal.o \
+					   board-44xx-identity.o \
+					   omap4_apps_brd_id.o \
 					   hsmmc.o
 obj-$(CONFIG_MACH_OMAP_4430SDP)		+= board-4430sdp.o \
 					   omap_phy_internal.o \
+					   board-44xx-identity.o \
+					   omap4_apps_brd_id.o \
 					   hsmmc.o
 obj-$(CONFIG_MACH_OMAP4_PANDA)		+= board-omap4panda.o \
 					   omap_phy_internal.o \
