@@ -287,6 +287,31 @@ void omap4_enter_sleep(unsigned int cpu, unsigned int power_state)
 		if (omap4_sar_save())
 			goto restore_state;
 		omap4_sar_overwrite();
+
+		/* Workaround for IVA AUTO RETENTION issue in OFF mode.
+		Present configuration lets IVA VD to transition from RET->OFF or ON->OFF
+		depending on the selected low power state. Disabling the AUTO_RETENTION
+		control for IVA voltage domain throughout so that PRCM voltage manager
+		state machine will never hit RETENTION state for IVA. During OFF mode
+		entry, IVA voltage domain will directly transition from ON -> OFF state */
+
+		cm_rmw_mod_reg_bits(OMAP4430_CLKTRCTRL_MASK,
+				OMAP34XX_CLKSTCTRL_FORCE_WAKEUP << OMAP4430_CLKTRCTRL_SHIFT,
+				OMAP4430_CM2_IVAHD_MOD,
+				OMAP4_CM_IVAHD_CLKSTCTRL_OFFSET);
+		udelay(100);
+
+		/* disable AUTO RET for IVA */
+		prm_rmw_mod_reg_bits(OMAP4430_AUTO_CTRL_VDD_IVA_L_MASK,
+				0x0 << OMAP4430_AUTO_CTRL_VDD_IVA_L_SHIFT,
+				OMAP4430_PRM_DEVICE_MOD,
+				OMAP4_PRM_VOLTCTRL_OFFSET);
+
+		cm_rmw_mod_reg_bits(OMAP4430_CLKTRCTRL_MASK,
+				OMAP34XX_CLKSTCTRL_FORCE_SLEEP << OMAP4430_CLKTRCTRL_SHIFT,
+				OMAP4430_CM2_IVAHD_MOD,
+				OMAP4_CM_IVAHD_CLKSTCTRL_OFFSET);
+		udelay(100);
 	}
 
 	omap4_enter_lowpower(cpu, power_state);
