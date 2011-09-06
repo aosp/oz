@@ -17,6 +17,7 @@
  * License. See the file "COPYING" in the main directory of this archive
  * for more details.
  */
+#include <linux/workqueue.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/serial_reg.h>
@@ -58,6 +59,7 @@
  */
 
 #define MAX_UART_HWMOD_NAME_LEN		16
+#define MAX_UART_WORK_Q_NAME_LEN	32
 
 struct omap_uart_state {
 	int num;
@@ -89,6 +91,8 @@ struct omap_uart_state {
 	struct omap_hwmod *oh;
 	struct platform_device *pdev;
 	struct notifier_block nb;
+	struct work_struct work;
+	struct workqueue_struct *omap4_serial_timer_wq;
 
 #if defined(CONFIG_PM)
 	int context_valid;
@@ -112,6 +116,8 @@ struct omap_uart_state {
 
 static LIST_HEAD(uart_list);
 static u8 num_uarts;
+static spinlock_t serial_work_lock;
+static void omap4_serial_timer_work(struct work_struct *work);
 
 static bool plat_check_bt_active(struct omap_uart_state *uart);
 static void omap_uart_disable_wakeup(struct omap_uart_state *uart);
@@ -519,21 +525,41 @@ static void omap_uart_allow_sleep(struct omap_uart_state *uart)
 static void omap_uart_idle_timer(unsigned long data)
 {
 	struct omap_uart_state *uart = (struct omap_uart_state *)data;
+
+	if (uart->omap4_serial_timer_wq != NULL) {
+		INIT_WORK(&uart->work, omap4_serial_timer_work);
+		queue_work(uart->omap4_serial_timer_wq, &uart->work);
+	}
+
+	return;
+}
+
+static void omap4_serial_timer_work(struct work_struct *work)
+{
+	struct omap_uart_state *uart =
+			container_of(work, struct omap_uart_state, work);
 	struct uart_omap_port *up = platform_get_drvdata(uart->pdev);
 	/* As the CAllback is done, now timer can be Mdofiied */
 	uart->port_timer_active = 0;
+
+	spin_lock_irq(&serial_work_lock);
+
+	if (unlikely(in_atomic_preempt_off())) {
+		omap_uart_start_inactivity_timer(uart->num);
+		goto omap_spin_lock_unlock_work;
+	}
 
 	/* Check if BT Use case is active */
 	if (plat_check_bt_active(uart)) {
 		omap_uart_block_sleep(uart);
 		omap_uart_smart_idle_enable(uart, 1);
 		omap_uart_start_inactivity_timer(uart->num);
-		return;
+		goto omap_spin_lock_unlock_work;
 	}
 
 	if ((up == NULL) && (uart->timeout)) {
 		omap_uart_start_inactivity_timer(uart->num);
-		return;
+		goto omap_spin_lock_unlock_work;
 	}
 
 #ifdef CONFIG_SERIAL_OMAP
@@ -544,18 +570,21 @@ static void omap_uart_idle_timer(unsigned long data)
 	if (omap_uart_active(uart->num, uart->timeout)) {
 		omap_uart_block_sleep(uart);
 		omap_uart_start_inactivity_timer(uart->num);
-		return;
+		goto omap_spin_lock_unlock_work;
 	}
 #endif
 
 	if ((up->port_tx_active == 0) && (up->port_rx_active == 0) &&
-		(up->port_reg_access_active == 0)) {
+			(up->port_reg_access_active == 0)) {
 		omap_uart_allow_sleep(uart);
-		return;
+		goto omap_spin_lock_unlock_work;
 	} else {
 		omap_uart_block_sleep(uart);
 		omap_uart_start_inactivity_timer(uart->num);
 	}
+
+omap_spin_lock_unlock_work:
+	spin_unlock_irq(&serial_work_lock);
 }
 
 static bool omap_uart_is_wakeup_src(struct omap_uart_state *uart)
@@ -1116,6 +1145,7 @@ void __init omap_serial_init_port(int port,
 	struct plat_serial8250_port *p = &ports[0];
 #else
 	char gpio_name[MAX_UART_HWMOD_NAME_LEN];
+	char work_queue_name[MAX_UART_WORK_Q_NAME_LEN];
 	unsigned int gpio_irq = 0;
 	struct omap_uart_port_info omap_up;
 #endif
@@ -1233,6 +1263,12 @@ void __init omap_serial_init_port(int port,
 		dll_cb_init = 1;
 	}
 
+	/* Initialize the Work Queue for the Serial Inactivity Timer Work */
+	snprintf(work_queue_name, MAX_UART_WORK_Q_NAME_LEN,
+			"omap_uart_wq_%d", uart->num);
+	uart->omap4_serial_timer_wq =
+			create_singlethread_workqueue(work_queue_name);
+
 #ifdef CONFIG_PM_RUNTIME
 	/*
 	 * Because of early UART probing, UART did not get idled
@@ -1294,6 +1330,8 @@ void __init omap_serial_init(struct omap_uart_port_info *platform_data)
 {
 	struct omap_uart_state *uart;
 	unsigned int count = 0;
+
+	spin_lock_init(&serial_work_lock);
 
 	/* The Platform Specific Initialisations come from the baord file
 	 * which would initialise it to the platfrom requirement.
