@@ -1735,6 +1735,14 @@ s32 tiler_set_buf_state(u32 ssptr, enum buf_state state)
 {
 	struct mem_info *mi = NULL;
 	struct tcm_pt pt;
+	unsigned long tiler_alias_view_size =
+			(TILER_ACC_MODE_MASK + 1) << TILER_ACC_MODE_SHIFT;
+
+	/* check for valid tiler system address space */
+	if (ssptr < TILER_ALIAS_BASE ||
+			ssptr >= TILER_ALIAS_BASE+tiler_alias_view_size)
+		return 0;
+
 	if (get_area(ssptr, &pt))
 		return -EFAULT;
 
