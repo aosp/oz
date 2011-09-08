@@ -71,8 +71,6 @@ void dsscomp_queue_exit(void);
 /* basic operation - if not using queues */
 int set_dss_ovl_info(struct dss2_ovl_info *oi);
 int set_dss_mgr_info(struct dss2_mgr_info *mi);
-int is_mgr_suspended(int mgr_id);
-void dsscomp_set_suspend_mgrs(int suspend_state);
 struct omap_overlay_manager *find_dss_mgr(int display_ix);
 
 /*

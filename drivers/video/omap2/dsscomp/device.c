@@ -37,6 +37,7 @@
 #include <linux/sched.h>
 
 #define MODULE_NAME	"dsscomp"
+#define MAX_DISPLAY_CNT 3
 
 #include <plat/display.h>
 #include <video/dsscomp.h>
@@ -49,6 +50,8 @@
 #endif
 
 static int opencnt;
+static bool blanked;
+static struct dsscomp_dev *cdev;
 
 static u32 hwc_virt_to_phys(u32 arg)
 {
@@ -71,7 +74,7 @@ static u32 hwc_virt_to_phys(u32 arg)
 }
 
 static long setup_mgr(struct dsscomp_dev *cdev,
-					struct dsscomp_setup_mgr_data *d)
+	struct dsscomp_setup_mgr_data *d, bool blankpost)
 {
 	int i;
 	struct omap_dss_device *dev;
@@ -93,13 +96,13 @@ static long setup_mgr(struct dsscomp_dev *cdev,
 		return -ENODEV;
 
 	/* ignore frames while we are suspended */
-	if (is_mgr_suspended(mgr->id)) {
+	if ((blanked) && (!blankpost)) {
 		if (debug & DEBUG_PHASES)
 			dev_info(DEV(cdev), "[%08x] ignored\n", d->sync_id);
 		return 0;
 	}
 	dsscomp_prepdata(d);
-	return dsscomp_createcomp(mgr, d) ? 0 : -EINVAL;
+	return dsscomp_createcomp(mgr, d, false) ? 0 : -EINVAL;
 }
 
 void dsscomp_prepdata(struct dsscomp_setup_mgr_data *d)
@@ -135,12 +138,12 @@ void dsscomp_prepdata_drop(struct dsscomp_setup_mgr_data *d)
 EXPORT_SYMBOL(dsscomp_prepdata_drop);
 
 dsscomp_t dsscomp_createcomp(struct omap_overlay_manager *mgr,
-				struct dsscomp_setup_mgr_data *d)
+	struct dsscomp_setup_mgr_data *d, bool blankpost)
 {
 	int i, r;
 	dsscomp_t comp;
 
-	comp = dsscomp_new_sync_id(mgr, d->sync_id);
+	comp = dsscomp_new_sync_id(mgr, d->sync_id, blankpost);
 	if (IS_ERR(comp))
 		goto cleanup;
 
@@ -376,7 +379,7 @@ static long comp_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		    p.set.num_ovls >= ARRAY_SIZE(p.ovl) ? -EINVAL :
 		    copy_from_user(&p.ovl, (void __user *)arg + sizeof(p.set),
 					sizeof(*p.ovl) * p.set.num_ovls) ? :
-		    setup_mgr(cdev, &p.set);
+		    setup_mgr(cdev, &p.set, false);
 		break;
 	}
 	case DSSCOMP_QUERY_DISPLAY:
@@ -411,36 +414,55 @@ static long comp_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 #ifdef CONFIG_EARLYSUSPEND
 static void dsscomp_early_suspend(struct early_suspend *h)
 {
-	struct omap_overlay_manager *mgr;
-	struct omap_overlay *ovl;
-	struct omap_overlay_info info;
+	int d, o;
+	bool isDisplayEn;
+	struct omap_dss_device *dev;
+	struct {
+		struct dsscomp_setup_mgr_data set;
+		struct dss2_ovl_info ovl[MAX_OVERLAYS];
+	} p;
+	blanked = true;
 
-	int dss_ovl_num, dss_mgr_num, i;
+	for (d = 0; d < MAX_DISPLAY_CNT; d++) {
+		dev = cdev->displays[d];
 
-	/* Suspend managers, prevent any composition apply to happen */
-	dsscomp_set_suspend_mgrs(1);
+		/* use smart_disable if present */
+		if (dev->driver->smart_is_enabled)
+			isDisplayEn = dev->driver->smart_is_enabled(dev);
+		/* show resume info for suspended displays */
+		else if (dev->state == OMAP_DSS_DISPLAY_SUSPENDED)
+			isDisplayEn = OMAP_DSS_DISPLAY_DISABLED;
+		else
+			isDisplayEn  = dev->state != OMAP_DSS_DISPLAY_DISABLED;
 
-	/* Shutdown all pipes */
-	dss_ovl_num = omap_dss_get_num_overlays();
-	for (i = 0; i < dss_ovl_num; i++) {
-		ovl = omap_dss_get_overlay(i);
-		ovl->get_overlay_info(ovl, &info);
-		info.enabled = false;
-		ovl->set_overlay_info(ovl, &info);
-	}
+		if (!isDisplayEn)
+			continue;
 
-	dss_mgr_num = omap_dss_get_num_overlay_managers();
-	for (i = 0; i < dss_mgr_num; i++) {
-		mgr = omap_dss_get_overlay_manager(i);
-		mgr->apply(mgr);
+		p.set.num_ovls = 0;
+		/* find all overlays owned by this display,
+		* and disable them except overlay0
+		*/
+		for (o = 0; o < cdev->num_ovls; o++) {
+			if (cdev->ovls[o]->manager == dev->manager) {
+				if ((d == 0) && (o == 0))
+					continue;
+				p.ovl[p.set.num_ovls].cfg.ix = o;
+				p.ovl[p.set.num_ovls].cfg.enabled = false;
+				p.set.num_ovls++;
+			}
+		}
+
+		p.set.mgr.alpha_blending = 1;
+		p.set.mgr.ix = d;
+		p.set.mode = DSSCOMP_SETUP_DISPLAY;
+		setup_mgr(cdev, &p.set, true);
 	}
 }
 
 static void dsscomp_late_resume(struct early_suspend *h)
 {
 	dsscomp_release_active_comps();
-	/* Allow the managers to process composition applies again */
-	dsscomp_set_suspend_mgrs(0);
+	blanked = false;
 }
 
 static struct early_suspend early_suspend_info = {
@@ -482,7 +504,7 @@ static const struct file_operations comp_fops = {
 static int dsscomp_probe(struct platform_device *pdev)
 {
 	int ret;
-	struct dsscomp_dev *cdev = kzalloc(sizeof(*cdev), GFP_KERNEL);
+	cdev = kzalloc(sizeof(*cdev), GFP_KERNEL);
 	if (!cdev) {
 		pr_err("dsscomp: failed to allocate device.\n");
 		return -ENOMEM;

@@ -27,7 +27,8 @@
 /* queuing operations */
 typedef struct dsscomp_data *dsscomp_t;		/* handle */
 
-dsscomp_t dsscomp_new_sync_id(struct omap_overlay_manager *mgr, u32 sync_id);
+dsscomp_t dsscomp_new_sync_id(struct omap_overlay_manager *mgr, u32 sync_id,
+			bool blankpost);
 u32 dsscomp_first_sync_id(struct omap_overlay_manager *mgr);
 dsscomp_t dsscomp_find(struct omap_overlay_manager *mgr, u32 sync_id);
 u32 dsscomp_get_ovls(dsscomp_t comp);
@@ -38,7 +39,7 @@ int dsscomp_set_mgr(dsscomp_t comp, struct dss2_mgr_info *mgr);
 void dsscomp_prepdata(struct dsscomp_setup_mgr_data *d);
 void dsscomp_prepdata_drop(struct dsscomp_setup_mgr_data *d);
 dsscomp_t dsscomp_createcomp(struct omap_overlay_manager *mgr,
-			struct dsscomp_setup_mgr_data *d);
+			struct dsscomp_setup_mgr_data *d, bool blankpost);
 int dsscomp_get_mgr(dsscomp_t comp, struct dss2_mgr_info *mgr);
 int dsscomp_setup(dsscomp_t comp, enum dsscomp_setup_mode mode,
 			struct dss2_rect_t win);

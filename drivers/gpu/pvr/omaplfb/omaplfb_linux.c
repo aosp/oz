@@ -279,7 +279,7 @@ static void OMAPLFBFlipDSSComp(OMAPLFB_DEVINFO *display_info,
 		return;
 	}
 	prime_data->mode &= ~DSSCOMP_SETUP_APPLY;
-	comp = dsscomp_createcomp(manager, prime_data);
+	comp = dsscomp_createcomp(manager, prime_data, false);
 	omaplfb_dsscomp_free(prime_data);
 	if (!comp) {
 		ERROR_PRINTK("failed to get comp");
@@ -299,7 +299,7 @@ static void OMAPLFBFlipDSSComp(OMAPLFB_DEVINFO *display_info,
 		goto clone_unlock;
 
 	sec_data->mode &= ~DSSCOMP_SETUP_APPLY;
-	clone_comp = dsscomp_createcomp(manager, sec_data);
+	clone_comp = dsscomp_createcomp(manager, sec_data, false);
 	omaplfb_dsscomp_free(sec_data);
 	if (!clone_comp)
 		goto clone_unlock;
