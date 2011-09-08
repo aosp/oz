@@ -318,12 +318,21 @@ static int omap3_noncore_dpll_program(struct clk *clk, u16 m, u8 n, u16 freqsel,
 	 */
 	if (cpu_is_omap4460() && !strcmp(clk->name, "dpll_mpu_ck")) {
 		/* DCC control */
+#ifdef CONFIG_OMAP4460_MPUDPLLDCC_ERRATA
+		/*
+		 * We need to update MPU DPLL trim value for
+		 * increase maximum working frequency
+		 * For this we using some magic numbers
+		 */
+		__raw_writel(0x28, OMAP2_L4_IO_ADDRESS(0x4A002330));
+#endif
 		v = __raw_readl(dd->mult_div1_reg);
 		if ((orig_rate <= 1000000000) && (v & OMAP4460_DCC_EN_MASK)) {
 			v &= ~OMAP4460_DCC_EN_MASK; /* Disable DCC */
 			__raw_writel(v, dd->mult_div1_reg);
 		}
 	}
+
 
 	/* 3430 ES2 TRM: 4.7.6.9 DPLL Programming Sequence */
 	_omap3_noncore_dpll_bypass(clk);
@@ -367,6 +376,7 @@ static int omap3_noncore_dpll_program(struct clk *clk, u16 m, u8 n, u16 freqsel,
 
 	if (cpu_is_omap4460() && !strcmp(clk->name, "dpll_mpu_ck")) {
 		/* DCC control */
+#ifndef CONFIG_OMAP4460_MPUDPLLDCC_ERRATA
 		if (orig_rate > 1000000000) {
 			v &= ~OMAP4460_DCC_COUNT_MAX_MASK;
 			v |= (5 << OMAP4460_DCC_COUNT_MAX_SHIFT);
@@ -374,7 +384,7 @@ static int omap3_noncore_dpll_program(struct clk *clk, u16 m, u8 n, u16 freqsel,
 			v |= OMAP4460_DCC_EN_MASK; /* Enable DCC */
 			__raw_writel(v, dd->mult_div1_reg);
 		}
-
+#endif
 		/* EMIF/ABE clock rate control */
 		v = __raw_readl(OMAP4430_CM_MPU_MPU_CLKCTRL);
 		if (orig_rate > 920000000)
@@ -517,7 +527,13 @@ int omap3_noncore_dpll_set_rate(struct clk *clk, unsigned long rate)
 		if (cpu_is_omap4460() && !strcmp(clk->name, "dpll_mpu_ck")
 					&& (rate > 1000000000)) {
 			orig_rate = rate;
+		/*
+		 * In MPU DPLL errata case we prevent use DCC for form
+		 * output frequency
+		 */
+#ifndef CONFIG_OMAP4460_MPUDPLLDCC_ERRATA
 			rate = rate/2;
+#endif
 		}
 		if (dd->last_rounded_rate != rate)
 			rate = clk->round_rate(clk, rate);

@@ -520,8 +520,10 @@ int __init omap4_pm_init_opp_table(void)
 	}
 
 	if (cpu_is_omap446x()) {
+#ifndef	CONFIG_OMAP4460_MPUDPLLDCC_ERRATA
 		if (omap4_has_mpu_1_5ghz())
 			omap4_opp_enable(1500000000);
+#endif
 		if (omap4_has_mpu_1_2ghz())
 			omap4_opp_enable(1200000000);
 	}
