@@ -828,7 +828,9 @@ static int __init hsi_platform_device_probe(struct platform_device *pd)
 		goto rollback1;
 	}
 
+#ifdef USE_PM_RUNTIME_FOR_HSI
 	pm_runtime_enable(hsi_ctrl->dev);
+#endif
 	hsi_clocks_enable(hsi_ctrl->dev, __func__);
 
 	/* Non critical SW Reset */
@@ -904,8 +906,9 @@ static int __exit hsi_platform_device_remove(struct platform_device *pd)
 	unregister_hsi_devices(hsi_ctrl);
 
 	/* From here no need for HSI HW access */
+#ifdef USE_PM_RUNTIME_FOR_HSI
 	pm_runtime_disable(hsi_ctrl->dev);
-
+#endif
 	hsi_debug_remove_ctrl(hsi_ctrl);
 	hsi_controller_exit(hsi_ctrl);
 

@@ -349,8 +349,13 @@ int hsi_write(struct hsi_device *dev, u32 *addr, unsigned int size)
 	}
 
 	spin_lock_bh(&ch->hsi_port->hsi_controller->lock);
+
+#ifdef USE_PM_RUNTIME_FOR_HSI
 	if (pm_runtime_suspended(dev->device.parent) ||
 		!ch->hsi_port->hsi_controller->clock_enabled)
+#else
+	if (!ch->hsi_port->hsi_controller->clock_enabled)
+#endif
 		dev_dbg(dev->device.parent,
 			"hsi_write with HSI clocks OFF, clock_enabled = %d\n",
 			ch->hsi_port->hsi_controller->clock_enabled);
@@ -419,8 +424,12 @@ int hsi_read(struct hsi_device *dev, u32 *addr, unsigned int size)
 	ch = dev->ch;
 
 	spin_lock_bh(&ch->hsi_port->hsi_controller->lock);
+#ifdef USE_PM_RUNTIME_FOR_HSI
 	if (pm_runtime_suspended(dev->device.parent) ||
 		!ch->hsi_port->hsi_controller->clock_enabled)
+#else
+	if (!ch->hsi_port->hsi_controller->clock_enabled)
+#endif
 		dev_dbg(dev->device.parent,
 			"hsi_read with HSI clocks OFF, clock_enabled = %d\n",
 			ch->hsi_port->hsi_controller->clock_enabled);
