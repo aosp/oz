@@ -59,6 +59,7 @@ struct cpuidle_params {
 	u32 sleep_latency;
 	u32 wake_latency;
 	u32 threshold;
+	u32 hrtimer_timeout;
 };
 
 #if defined(CONFIG_PM) && defined(CONFIG_CPU_IDLE)
