@@ -16,6 +16,7 @@
 #include <linux/module.h>
 #include <linux/kobject.h>
 #include <linux/completion.h>
+#include <linux/hrtimer.h>
 
 #define CPUIDLE_STATE_MAX	8
 #define CPUIDLE_NAME_LEN	16
@@ -37,6 +38,7 @@ struct cpuidle_state {
 	unsigned int	exit_latency; /* in US */
 	unsigned int	power_usage; /* in mW */
 	unsigned int	target_residency; /* in US */
+	unsigned int	hrtimer_timeout; /* in US */
 
 	unsigned long long	usage;
 	unsigned long long	time; /* in US */
@@ -98,6 +100,8 @@ struct cpuidle_device {
 	struct completion	kobj_unregister;
 	void			*governor_data;
 	struct cpuidle_state	*safe_state;
+	struct hrtimer          cstate_timer;
+	unsigned int            hrtimer_expired;
 };
 
 DECLARE_PER_CPU(struct cpuidle_device *, cpuidle_devices);
