@@ -994,7 +994,10 @@ int omapfb_setup_overlay(struct fb_info *fbi, struct omap_overlay *ovl,
 	info.width = xres;
 	}
 	info.height = yres;
-	info.color_mode = mode;
+	if (!info.enabled) {
+		/* preserve color mode for active overlay */
+		info.color_mode = mode;
+	}
 	info.rotation_type = ofbi->rotation_type;
 	info.rotation = rotation;
 	info.mirror = mirror;
