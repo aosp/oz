@@ -851,7 +851,7 @@ static void _m_free_process_info(struct process_info *pi)
 	struct mem_info *mi, *mi_;
 	struct gid_info *gi, *gi_;
 	struct __buf_info *_b = NULL, *_b_ = NULL;
-	bool ai_autofreed, need2free;
+	bool ai_autofreed, need2free, onedim_empty;
 
 	if (!list_empty(&pi->bufs))
 		tiler_notify_event(TILER_DEVICE_CLOSE, (void *)pi->pid);
@@ -870,6 +870,7 @@ static void _m_free_process_info(struct process_info *pi)
 		 * However, if the group info is already empty, we need to
 		 * remove it manually
 		 */
+		onedim_empty = list_empty(&gi->onedim);
 		need2free = list_empty(&gi->areas) && list_empty(&gi->onedim);
 		list_for_each_entry_safe(ai, ai_, &gi->areas, by_gid) {
 			ai_autofreed = true;
@@ -884,12 +885,15 @@ static void _m_free_process_info(struct process_info *pi)
 			}
 		}
 
-		list_for_each_entry_safe(mi, mi_, &gi->onedim, by_area) {
-			if (!_m_try_free(mi)) {
-				need2free = true;
-				/* save orphaned 1D blocks */
-				mi->parent = NULL;
-				list_move(&mi->by_area, &orphan_onedim);
+		if (!onedim_empty) {
+			list_for_each_entry_safe(mi, mi_, &gi->onedim,
+						by_area) {
+				if (!_m_try_free(mi)) {
+					need2free = true;
+					/* save orphaned 1D blocks */
+					mi->parent = NULL;
+					list_move(&mi->by_area, &orphan_onedim);
+				}
 			}
 		}
 
