@@ -300,16 +300,3 @@ config OMAP4_TPS62361
 	help
 	  This driver supports TPS62361 PMIC chip. TPS62361 provides
 	  one scalable VDD. This TPS driver has a dependency on the TWL PMIC.
-
-comment "OMAP ERRATAS"
-
-config OMAP4460_MPUDPLLDCC_ERRATA
-	bool "OMAP4460 MPU_DPLL DCC workaround"
-	depends on ARCH_OMAP4
-	default n
-	help
-	  This workaround needed for prevent 4460 CPU random crashing during
-	  recalibration of MPU DPLL from frequencies above 1GHz to lowest. Also
-	  this WA valid only for 1.2GHz frequency, so OPP1.5GHz has disabled.
-	  Please ensure before enable.
-
