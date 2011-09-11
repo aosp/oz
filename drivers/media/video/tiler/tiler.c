@@ -1124,6 +1124,9 @@ static s32 refill_pat(struct tmm *tmm, struct tcm_area *area, u32 *ptr)
 	return res;
 }
 
+/*
+ * Must hold mmap_sem to make a call into this function
+*/
 static u32 virt2phys(u32 usr)
 {
 	pmd_t *pmd;
@@ -1145,15 +1148,15 @@ static u32 virt2phys(u32 usr)
 static s32 map_block(enum tiler_fmt fmt, u32 width, u32 height, u32 gid,
 			struct process_info *pi, u32 *sys_addr, u32 usr_addr)
 {
-	u32 i = 0, tmp = -1, *mem = NULL, use_gp = 1;
+	u32 i = 0, tmp = -1, *mem = NULL;
 	u8 write = 0;
 	s32 res = -ENOMEM;
 	struct mem_info *mi = NULL;
-	struct page *page = NULL;
-	struct task_struct *curr_task = current;
+	struct page **pages;
 	struct mm_struct *mm = current->mm;
 	struct vm_area_struct *vma = NULL;
 	struct gid_info *gi = NULL;
+	int usr_count;
 
 	/* we only support mapping a user buffer in page mode */
 	if (fmt != TILFMT_PAGE)
@@ -1186,15 +1189,17 @@ static s32 map_block(enum tiler_fmt fmt, u32 width, u32 height, u32 gid,
 	/* allocate pages */
 	mi->num_pg = tcm_sizeof(mi->area);
 
-	mem = kmalloc(mi->num_pg * sizeof(*mem), GFP_KERNEL);
+	pages = kmalloc(mi->num_pg * sizeof(*pages), GFP_KERNEL);
+	if (!pages)
+		goto done;
+
+	mem = kzalloc(mi->num_pg * sizeof(*mem), GFP_KERNEL);
 	if (!mem)
 		goto done;
-	memset(mem, 0x0, sizeof(*mem) * mi->num_pg);
 
-	mi->pg_ptr = kmalloc(mi->num_pg * sizeof(*mi->pg_ptr), GFP_KERNEL);
+	mi->pg_ptr = kzalloc(mi->num_pg * sizeof(*mi->pg_ptr), GFP_KERNEL);
 	if (!mi->pg_ptr)
 		goto done;
-	memset(mi->pg_ptr, 0x0, sizeof(*mi->pg_ptr) * mi->num_pg);
 
 	/*
 	 * Important Note: usr_addr is mapped from user
@@ -1206,18 +1211,21 @@ static s32 map_block(enum tiler_fmt fmt, u32 width, u32 height, u32 gid,
 	vma = find_vma(mm, mi->usr);
 	res = -EFAULT;
 
-	/*
-	 * It is observed that under some circumstances, the user
-	 * buffer is spread across several vmas, so loop through
-	 * and check if the entire user buffer is covered.
-	 */
-	while ((vma) && (mi->usr + width > vma->vm_end)) {
-		/* jump to the next VMA region */
-		vma = find_vma(mm, vma->vm_end + 1);
-	}
 	if (!vma) {
 		printk(KERN_ERR "Failed to get the vma region for "
-			"user buffer.\n");
+			"user buffer: %08x\n", usr_addr);
+		goto fault;
+	}
+
+	/*
+	 * make sure the vma we found actually contains the whole user
+	 * address
+	 */
+	if ((mi->usr < vma->vm_start) || (mi->usr + width > vma->vm_end)) {
+		printk(KERN_ERR "Address is outside VMA: vma start = %08lx, "
+				"vm end = %08lx, address start = %08x, "
+				"address end = %08x\n", vma->vm_start,
+				vma->vm_end, usr_addr, usr_addr + width);
 		goto fault;
 	}
 
@@ -1225,41 +1233,64 @@ static s32 map_block(enum tiler_fmt fmt, u32 width, u32 height, u32 gid,
 		write = 1;
 
 	tmp = mi->usr;
-	for (i = 0; i < mi->num_pg; i++) {
-		/*
-		 * At first use get_user_pages which works best for
-		 * userspace buffers.  If it fails (e.g. for kernel
-		 * allocated buffers), fall back to using the page
-		 * table directly.
-		 */
-		if (use_gp && get_user_pages(curr_task, mm, tmp, 1, write, 1,
-							&page, NULL) && page) {
-			if (page_count(page) < 1) {
-				printk(KERN_ERR "Bad page count from"
-							"get_user_pages()\n");
-			}
-			mi->pg_ptr[i] = (u32)page;
-			mem[i] = page_to_phys(page);
+
+	usr_count = get_user_pages(current, current->mm, usr_addr, mi->num_pg,
+					write, 1, pages, NULL);
+
+	if (usr_count > 0) {
+		/* we got some number of pages from the user vma that pertain
+		   to the usr_addr */
+		if (usr_count != mi->num_pg) {
+			printk(KERN_ERR "failed to get all user pages: "
+				"got %d of %d pages @ %08x\n", usr_count,
+				mi->num_pg, usr_addr);
+
+			/* clear out the pages we did get */
+			for (i = 0; i < usr_count; i++)
+				page_cache_release(pages[i]);
+
+			goto fault;
 		} else {
-			use_gp = mi->pg_ptr[i] = 0;
-			mem[i] = virt2phys(tmp);
-			if (!mem[i]) {
-				printk(KERN_ERR "get_user_pages() failed and virtual address is not in page table\n");
-				goto fault;
+			/* fill in bookkeeping information for each page */
+			for (i = 0; i < usr_count; i++) {
+				mi->pg_ptr[i] = (u32)pages[i];
+				mem[i] = page_to_phys(pages[i]);
+
+				BUG_ON(mem[i] < PHYS_OFFSET);
+				BUG_ON(pages[i] != phys_to_page(mem[i]));
 			}
 		}
-		tmp += PAGE_SIZE;
+	} else {
+		/* fallback to looking for the pages in the kernel space */
+		for (i = 0; i < mi->num_pg; i++) {
+			mem[i] = virt2phys(tmp);
+			if (!mem[i]) {
+				printk(KERN_ERR "Address not in page table: "
+					"vma start = %08lx, vma end = %08lx "
+					"usr_addr start = %08x, "
+					"current = %08x\n", vma->vm_start,
+					vma->vm_end, usr_addr, tmp);
+				goto fault;
+			} else if (mem[i] < PHYS_OFFSET) {
+				printk(KERN_ERR "address %08x not in physical "
+					" memory\n", mem[i]);
+				goto fault;
+			}
+			tmp += PAGE_SIZE;
+		}
 	}
+
 	up_read(&mm->mmap_sem);
 
 	/* Ensure the data reaches to main memory before PAT refill */
 	wmb();
 
 	if (refill_pat(TMM(fmt), &mi->area, mem))
-		goto fault;
+		goto done;
 
 	res = 0;
 	goto done;
+
 fault:
 	up_read(&mm->mmap_sem);
 done:
@@ -1269,6 +1300,7 @@ done:
 		mutex_unlock(&mtx);
 	}
 	kfree(mem);
+	kfree(pages);
 	return res;
 }
 
@@ -1420,7 +1452,7 @@ static s32 tiler_ioctl(struct inode *ip, struct file *filp, u32 cmd,
 			unsigned long arg)
 {
 	s32 r = -1;
-	u32 til_addr = 0x0;
+	u32 til_addr = 0x0, phys_addr;
 	struct process_info *pi = filp->private_data;
 
 	struct __buf_info *_b = NULL;
@@ -1473,7 +1505,10 @@ static s32 tiler_ioctl(struct inode *ip, struct file *filp, u32 cmd,
 		break;
 
 	case TILIOC_GSSP:
-		return virt2phys(arg);
+		down_read(&current->mm->mmap_sem);
+		phys_addr = virt2phys(arg);
+		up_read(&current->mm->mmap_sem);
+		return phys_addr;
 		break;
 	case TILIOC_MBUF:
 		if (copy_from_user(&block_info, (void __user *)arg,
