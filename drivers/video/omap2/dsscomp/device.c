@@ -37,7 +37,6 @@
 #include <linux/sched.h>
 
 #define MODULE_NAME	"dsscomp"
-#define MAX_DISPLAY_CNT 3
 
 #include <plat/display.h>
 #include <video/dsscomp.h>
@@ -423,7 +422,7 @@ static void dsscomp_early_suspend(struct early_suspend *h)
 	} p;
 	blanked = true;
 
-	for (d = 0; d < MAX_DISPLAY_CNT; d++) {
+	for (d = 0; d < cdev->num_displays; d++) {
 		dev = cdev->displays[d];
 
 		/* use smart_disable if present */
