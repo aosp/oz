@@ -852,6 +852,43 @@ int omap4_dpll_low_power_cascade_enter()
 
 	omap2_clkdm_allow_idle(emu_sys_44xx_clkdm);*/
 
+	/* PRCM requires target clockdomain to be woken up before
+	 * changing its Static Dependencies settings
+	 */
+
+	/* Note: Domains not built with SW_WKUP capability like
+	 * L3_1, L3_2, L4_CFG and L4_WKUP may stall idle transition
+	 * during 1 idle cycle if SD is changed while domain is OFF
+	 */
+
+	if (cpu_is_omap446x()) {
+		/* Disable SD for MPU towards L3_2 and L4CFG */
+		mask = OMAP4430_L3_2_STATDEP_MASK | OMAP4430_L4CFG_STATDEP_MASK;
+
+		cm_rmw_mod_reg_bits(mask, 0, OMAP4430_CM1_MPU_MOD,
+			OMAP4_CM_MPU_STATICDEP_OFFSET);
+
+		/* MPU towards EMIF Static dependencies is kept disabled
+		 * since Asynchronous Bridge is safe on OMAP4460
+		 */
+	} else {
+		/* Configures MEMIF clockdomain in SW_WKUP */
+		omap2_clkdm_wakeup(l3_emif_clkdm);
+
+		/* Wait for CORE PD transition */
+		pwrdm_clkdm_state_switch(l3_emif_clkdm);
+
+		/* Disable SD for MPU towards EMIF, L3_2 and L4CFG */
+		mask = OMAP4430_MEMIF_STATDEP_MASK | OMAP4430_L3_2_STATDEP_MASK
+			| OMAP4430_L4CFG_STATDEP_MASK;
+
+		cm_rmw_mod_reg_bits(mask, 0, OMAP4430_CM1_MPU_MOD,
+			OMAP4_CM_MPU_STATICDEP_OFFSET);
+
+		/* Configures MEMIF clockdomain back to HW_AUTO */
+		omap2_clkdm_allow_idle(l3_emif_clkdm);
+	}
+
 	recalculate_root_clocks();
 
 	goto out;
@@ -953,6 +990,46 @@ int omap4_dpll_low_power_cascade_exit()
 		pr_warn("%s: failed to get all necessary clocks\n", __func__);
 		ret = -ENODEV;
 		goto out;
+	}
+
+	/* PRCM requires target clockdomain to be woken up before
+	 * changing its Static Dependencies settings
+	 */
+
+	/* Note: Domains not built with SW_WKUP capability like
+	 * L3_1, L3_2, L4_CFG and L4_WKUP may stall idle transition
+	 * during 1 idle cycle if SD is changed while domain is OFF
+	 */
+
+	if (cpu_is_omap446x()) {
+		/* Enable SD for MPU towards L3_2 and L4CFG */
+		reg = 1 << OMAP4430_L3_2_STATDEP_SHIFT |
+			1 << OMAP4430_L4CFG_STATDEP_SHIFT;
+		mask = OMAP4430_L3_2_STATDEP_MASK | OMAP4430_L4CFG_STATDEP_MASK;
+		cm_rmw_mod_reg_bits(mask, reg, OMAP4430_CM1_MPU_MOD,
+			OMAP4_CM_MPU_STATICDEP_OFFSET);
+
+		/* MPU towards EMIF Static dependencies is kept disabled
+		 * since Asynchronous Bridge is safe on OMAP4460
+		 */
+	} else {
+		/* Configures MEMIF clockdomain in SW_WKUP */
+		omap2_clkdm_wakeup(l3_emif_clkdm);
+
+		/* Wait for CORE PD transition */
+		pwrdm_clkdm_state_switch(l3_emif_clkdm);
+
+		/* Enable SD for MPU towards EMIF, L3_2 and L4CFG */
+		reg = 1 << OMAP4430_MEMIF_STATDEP_SHIFT |
+			1 << OMAP4430_L3_2_STATDEP_SHIFT |
+			1 << OMAP4430_L4CFG_STATDEP_SHIFT;
+		mask = OMAP4430_MEMIF_STATDEP_MASK | OMAP4430_L3_2_STATDEP_MASK
+			| OMAP4430_L4CFG_STATDEP_MASK;
+		cm_rmw_mod_reg_bits(mask, reg, OMAP4430_CM1_MPU_MOD,
+			OMAP4_CM_MPU_STATICDEP_OFFSET);
+
+		/* Configures MEMIF clockdomain back to HW_AUTO */
+		omap2_clkdm_allow_idle(l3_emif_clkdm);
 	}
 
 	if (delayed_work_pending(&lpmode_work))

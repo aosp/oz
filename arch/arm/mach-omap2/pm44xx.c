@@ -807,6 +807,21 @@ static void __init prcm_clear_statdep_regs(void)
 	omap2_clkdm_wakeup(l4_per_clkdm);
 	pwrdm_clkdm_state_switch(l4_per_clkdm);
 
+	/* Disable MPU and Ducati Static dependencies since
+	 * Asynchronous Bridge is safe on OMAP4460
+	 */
+	if (cpu_is_omap446x()) {
+		/* MPU towards EMIF clockdomain */
+		reg = OMAP4430_MEMIF_STATDEP_MASK;
+		cm_rmw_mod_reg_bits(reg, 0, OMAP4430_CM1_MPU_MOD,
+			OMAP4_CM_MPU_STATICDEP_OFFSET);
+
+		/* Ducati towards EMIF clockdomain */
+		reg = OMAP4430_MEMIF_STATDEP_MASK;
+		cm_rmw_mod_reg_bits(reg, 0, OMAP4430_CM2_CORE_MOD,
+			OMAP4_CM_DUCATI_STATICDEP_OFFSET);
+	}
+
 	/* SDMA towards EMIF, L3_1, L4CFG, L4WKUP, L3INIT and
 	 * L4PER clockdomains
 	 */
