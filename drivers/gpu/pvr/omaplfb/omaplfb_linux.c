@@ -64,6 +64,8 @@ struct mutex gcomposition_lock;
 
 MODULE_SUPPORTED_DEVICE(DEVNAME);
 
+static void omaplfb_dsscomp_disable_mgr(int mgr_ix);
+
 /*
  * Here we get the function pointer to get jump table from
  * services using an external function.
@@ -625,7 +627,7 @@ static int omaplfb_disable_cloning_disp(OMAPLFB_DEVINFO *display_info)
 		goto exit_unlock;
 	}
 
-	err = omaplfb_free_buf_cloning(display_info);
+	omaplfb_dsscomp_disable_mgr(clone_data->mgr_id_dst);
 
 	/* Wait for any pending DMA transfers and apply calls to the
 	 * destination manager
@@ -642,6 +644,8 @@ static int omaplfb_disable_cloning_disp(OMAPLFB_DEVINFO *display_info)
 		else
 			break;
 	} while (true);
+
+	err = omaplfb_free_buf_cloning(display_info);
 
 	display_info->cloning_enabled = 0;
 	kfree(display_info->clone_data);
@@ -765,22 +769,34 @@ void omaplfb_dsscomp_enable(void)
 	mutex_unlock(&gcomposition_lock);
 }
 
+static void omaplfb_dsscomp_disable_lk(int mgr_ix)
+{
+	while (!list_empty(&gcompositions[mgr_ix])) {
+		struct list_head *list;
+		struct composition *c;
+		list = gcompositions[mgr_ix].next;
+		list_del(list);
+		c = list_entry(list, struct composition, queue);
+		dsscomp_prepdata_drop(c->data);
+		kfree(c->data);
+		kfree(c);
+	}
+}
+
+static void omaplfb_dsscomp_disable_mgr(int mgr_ix)
+{
+	mutex_lock(&gcomposition_lock);
+	omaplfb_dsscomp_disable_lk(mgr_ix);
+	mutex_unlock(&gcomposition_lock);
+}
+
 void omaplfb_dsscomp_disable(void)
 {
 	int mgr_ix;
 	mutex_lock(&gcomposition_lock);
 	gcomposition_enabled = 0;
 	for (mgr_ix = 0; mgr_ix < COMPOSITION_MGRS; mgr_ix++)
-		while (!list_empty(&gcompositions[mgr_ix])) {
-			struct list_head *list;
-			struct composition *c;
-			list = gcompositions[mgr_ix].next;
-			list_del(list);
-			c = list_entry(list, struct composition, queue);
-			dsscomp_prepdata_drop(c->data);
-			kfree(c->data);
-			kfree(c);
-		}
+		omaplfb_dsscomp_disable_lk(mgr_ix);
 	mutex_unlock(&gcomposition_lock);
 }
 
