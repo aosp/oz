@@ -190,14 +190,26 @@ void __init omap3_check_features(void)
 
 static void __init omap4_check_features(void)
 {
+	u32 val;
 	u32 si_type = 0;
-
 	omap4_features = 0;
 
 	if (omap_revision >= OMAP4430_REV_ES2_0)
 		omap4_features |= OMAP4_HAS_MPU_1GHZ;
 
-	if (omap_revision >= OMAP4460_REV_ES1_0) {
+	/* Enable 1.2Gz OPP for 4430 silicon that supports it
+	 * TODO: determine if FUSE_OPP_VDD_MPU_3 is a reliable source to
+	 * determine 1.2Gz availability.
+	 */
+	if (is_omap443x()) {
+		val = __raw_readl(OMAP2_L4_IO_ADDRESS(CTRL_FUSE_OPP_VDD_MPU_3));
+		val &= 0xFFFFFF;
+
+		if (val)
+			omap4_features |= OMAP4_HAS_MPU_1_2GHZ;
+	}
+
+	if (is_omap446x()) {
 		si_type =
 			read_tap_reg(OMAP4_CTRL_MODULE_CORE_STD_FUSE_PROD_ID_1_OFFSET);
 		switch ((si_type & (3 << 16)) >> 16) {

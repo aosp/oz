@@ -39,7 +39,6 @@ static struct clk *core_m3_clk, *core_m6_clk, *core_m7_clk;
 static struct clk *per_m3_clk, *per_m6_clk;
 static struct clk *abe_clk, *sgx_clk, *fdif_clk, *hsi_clk;
 
-#define TNT_FREQ 1200000000
 /*
  * Separate OPP table is needed for pre ES2.1 chips as emif cannot be scaled.
  * This table needs to be maintained only temporarily till everybody
@@ -108,7 +107,7 @@ static struct omap_opp_def __initdata omap443x_opp_def_list[] = {
 	/* MPU OPP4 - OPP-SB */
 	OMAP_OPP_DEF("mpu", true, 1008000000, 1374000),
 	/* MPU OPP4 - OPP-TNT */
-	OMAP_OPP_DEF("mpu", false, TNT_FREQ, 1375000),
+	OMAP_OPP_DEF("mpu", false, 1200000000, 1375000),
 
 	/* IVA OPPLP - DPLL cascading */
 	OMAP_OPP_DEF("iva", true,  98304000, 1011000),
@@ -483,12 +482,10 @@ err:
 int __init omap4_pm_init_opp_table(void)
 {
 	struct omap_opp_def *opp_def;
-	struct omap_opp *tnt_opp;
 	struct device *dev;
 	struct clk *gpu_fclk;
 	static u32 omap44xx_opp_def_size;
 	int i, r;
-	int has_tnt_opp = 0;
 
 	/*
 	 * Allow multiple calls, but initialize only if not already initalized
@@ -519,12 +516,10 @@ int __init omap4_pm_init_opp_table(void)
 		opp_def++;
 	}
 
-	if (cpu_is_omap446x()) {
-		if (omap4_has_mpu_1_5ghz())
-			omap4_opp_enable(1500000000);
-		if (omap4_has_mpu_1_2ghz())
-			omap4_opp_enable(1200000000);
-	}
+	if (omap4_has_mpu_1_5ghz())
+		omap4_opp_enable(1500000000);
+	if (omap4_has_mpu_1_2ghz())
+		omap4_opp_enable(1200000000);
 
 	dpll_mpu_clk = clk_get(NULL, "dpll_mpu_ck");
 	iva_clk = clk_get(NULL, "dpll_iva_m5x2_ck");
@@ -551,21 +546,6 @@ int __init omap4_pm_init_opp_table(void)
 	if (dev)
 		opp_populate_rate_fns(dev, omap4_mpu_set_rate,
 				omap4_mpu_get_rate);
-
-	/* Enable 1.2Gz OPP for silicon that supports it
-	 * TODO: determine if FUSE_OPP_VDD_MPU_3 is a reliable source to
-	 * determine 1.2Gz availability.
-	 */
-	has_tnt_opp = __raw_readl(OMAP2_L4_IO_ADDRESS(CTRL_FUSE_OPP_VDD_MPU_3));
-	has_tnt_opp &= 0xFFFFFF;
-
-	if (has_tnt_opp) {
-		tnt_opp = opp_find_freq_exact(dev, TNT_FREQ, false);
-		if (IS_ERR(tnt_opp))
-			pr_err("unable to find OPP for 1.2Gz\n");
-		else
-			opp_enable(tnt_opp);
-	}
 
 	dev = omap2_get_iva_device();
 	if (dev)
