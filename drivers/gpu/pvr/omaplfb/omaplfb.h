@@ -161,7 +161,6 @@ struct omaplfb_clone_data {
 	wait_queue_head_t transfer_waitq;
 	wait_queue_head_t dma_waitq;
 	int dma_transfer_done;
-	struct omaplfb_clone_work work;
 };
 
 #define	OMAPLFB_PAGE_SIZE 4096
@@ -207,7 +206,7 @@ void omaplfb_drop_frame(OMAPLFB_DEVINFO *display_info);
 void omaplfb_dsscomp_init(void);
 int omaplfb_dsscomp_setup(struct omaplfb_dsscomp_info *infop);
 void omaplfb_dsscomp_get(struct dsscomp_setup_mgr_data **datap, int mgr_ix);
-void omaplfb_dsscomp_free(struct dsscomp_setup_mgr_data *datap);
+void omaplfb_dsscomp_free(struct dsscomp_setup_mgr_data *datap, dsscomp_t comp);
 void omaplfb_dsscomp_enable(void);
 void omaplfb_dsscomp_disable(void);
 bool omaplfb_dsscomp_isempty(void);

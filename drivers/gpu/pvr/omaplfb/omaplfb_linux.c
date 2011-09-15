@@ -60,7 +60,7 @@ struct composition {
 #define COMPOSITION_MGRS 3
 static struct list_head gcompositions[COMPOSITION_MGRS];
 static int gcomposition_enabled;
-struct mutex gcomposition_lock;
+static struct mutex gcomposition_lock;
 
 MODULE_SUPPORTED_DEVICE(DEVNAME);
 
@@ -240,8 +240,11 @@ static void omaplfb_clone_handler(struct work_struct *work)
 
 	/* Apply the composition */
 	err = dsscomp_get_first_ovl(comp, &dss2_ovl);
-	if (err)
+	if (err) {
 		ERROR_PRINTK("Overlay not found in comp %p", comp);
+		dsscomp_drop(comp);
+		goto exit;
+	}
 	else {
 		dss2_ovl.ba = dst_paddr;
 		dsscomp_set_ovl(comp, &dss2_ovl);
@@ -249,6 +252,9 @@ static void omaplfb_clone_handler(struct work_struct *work)
 
 	if (dsscomp_apply(comp))
 		ERROR_PRINTK("DSSComp apply failed %p", comp);
+
+exit:
+	kfree(clone_work);
 }
 
 /*
@@ -264,7 +270,6 @@ static void OMAPLFBFlipDSSComp(OMAPLFB_DEVINFO *display_info,
 	int queued_clone_work = 0;
 	int mgr_id_dst;
 	int r = 0;
-
 	struct omap_overlay_manager *manager;
 	struct dsscomp_setup_mgr_data *prime_data, *sec_data;
 
@@ -282,7 +287,7 @@ static void OMAPLFBFlipDSSComp(OMAPLFB_DEVINFO *display_info,
 	}
 	prime_data->mode &= ~DSSCOMP_SETUP_APPLY;
 	comp = dsscomp_createcomp(manager, prime_data, false);
-	omaplfb_dsscomp_free(prime_data);
+	omaplfb_dsscomp_free(prime_data, comp);
 	if (!comp) {
 		ERROR_PRINTK("failed to get comp");
 		return;
@@ -302,11 +307,13 @@ static void OMAPLFBFlipDSSComp(OMAPLFB_DEVINFO *display_info,
 
 	sec_data->mode &= ~DSSCOMP_SETUP_APPLY;
 	clone_comp = dsscomp_createcomp(manager, sec_data, false);
-	omaplfb_dsscomp_free(sec_data);
+	omaplfb_dsscomp_free(sec_data, clone_comp);
 	if (!clone_comp)
 		goto clone_unlock;
 
-	work = &clone_data->work;
+	work = kmalloc(sizeof(struct omaplfb_clone_work), GFP_KERNEL);
+	if (!work)
+		goto clone_unlock;
 	INIT_WORK((struct work_struct *)work, omaplfb_clone_handler);
 	work->display_info = display_info;
 	work->src_buf_addr = phy_addr;
@@ -318,21 +325,23 @@ static void OMAPLFBFlipDSSComp(OMAPLFB_DEVINFO *display_info,
 		ERROR_PRINTK("Failed to queue cloning work, "
 			"droppping comp %p error %d", clone_comp, r);
 		dsscomp_drop(clone_comp);
+		kfree(work);
 	}
 
 clone_unlock:
 	mutex_unlock(&display_info->clone_lock);
 	r = dsscomp_get_first_ovl(comp, &dss2_ovl);
-	if (r)
-		ERROR_PRINTK("Overlay not found in comp %p", comp);
-	else {
+	if (r) {
+		ERROR_PRINTK("Overlay not found in comp %p (%d)", comp, r);
+		dsscomp_drop(clone_comp);
+		return;
+	} else {
 		dss2_ovl.ba = phy_addr;
 		dsscomp_set_ovl(comp, &dss2_ovl);
 	}
 
 	if (dsscomp_apply(comp))
 		ERROR_PRINTK("DSSComp apply failed %p", comp);
-
 	/* We need to wait here until the transfer to the buffer used for
 	 * cloning ends
 	 */
@@ -757,8 +766,16 @@ void omaplfb_dsscomp_get(struct dsscomp_setup_mgr_data **datap, int mgr_ix)
 	kfree(c);
 }
 
-void omaplfb_dsscomp_free(struct dsscomp_setup_mgr_data *datap)
+void omaplfb_dsscomp_free(struct dsscomp_setup_mgr_data *datap, dsscomp_t comp)
 {
+	/*
+	 * We generally call this function after trying to create a
+	 * composition, if the composition creation fails, do a prepdata_drop
+	 * in order to release video buffers. If there is a composition some
+	 * one will be expected to apply or drop the composition later.
+	 */
+	if (!comp)
+		dsscomp_prepdata_drop(datap);
 	kfree(datap);
 }
 
