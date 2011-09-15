@@ -482,6 +482,11 @@ int __hsi_write_cancel(struct hsi_channel *ch)
 		dev_dbg(ch->dev->device.parent, "%s : Nothing to cancel %d\n",
 			__func__, ch->write_data.size);
 
+	/* Trash any frame still in the FIFO */
+	hsi_hst_fifo_flush_channel(ch->hsi_port->hsi_controller,
+				   ch->hsi_port->port_number,
+				   ch->channel_number);
+
 	dev_dbg(ch->dev->device.parent, "%s : %d\n", __func__, err);
 
 	return err;
@@ -540,6 +545,11 @@ int __hsi_read_cancel(struct hsi_channel *ch)
 	else
 		dev_dbg(ch->dev->device.parent, "%s : Nothing to cancel %d\n",
 			__func__, ch->read_data.size);
+
+	/* Trash any frame still in the FIFO */
+	hsi_hsr_fifo_flush_channel(ch->hsi_port->hsi_controller,
+				   ch->hsi_port->port_number,
+				   ch->channel_number);
 
 	dev_dbg(ch->dev->device.parent, "%s : %d\n", __func__, err);
 
