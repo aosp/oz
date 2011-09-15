@@ -355,7 +355,7 @@ int omap_hsi_io_wakeup_check(void)
 	int hsi_port, ret = -1;
 
 	/* Modem HSI wakeup */
-	if (omap_hsi_is_io_wakeup_from_hsi(&hsi_port))
+	if (omap_hsi_is_io_wakeup_from_hsi(&hsi_port) > 0)
 		ret = omap_hsi_wakeup(hsi_port);
 
 	return ret;
