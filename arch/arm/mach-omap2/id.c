@@ -27,6 +27,7 @@
 
 static struct omap_chip_id omap_chip;
 static unsigned int omap_revision;
+static bool omap4_sb_off;
 
 u32 omap3_features;
 u32 omap4_features;
@@ -211,7 +212,19 @@ static void __init omap4_check_features(void)
 			break;
 		}
 	}
+
+	if (omap4_sb_off)
+		omap4_features &= ~(is_omap446x() ? OMAP4_HAS_MPU_1_5GHZ :
+							OMAP4_HAS_MPU_1_2GHZ);
 }
+
+static int __init omap4_opp_sb_off_switch(char *val)
+{
+	omap4_sb_off = true;
+	return 0;
+}
+
+early_param("opp_sb_off", omap4_opp_sb_off_switch);
 
 void __init omap3_check_revision(void)
 {
