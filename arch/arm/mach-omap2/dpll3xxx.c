@@ -45,6 +45,12 @@
 
 #define MAX_DPLL_WAIT_TRIES		1000000
 
+#define omap4460_dcc_needed(rate) ((rate > 1200000000 && \
+					omap4_has_dcc_1_5ghz()) || \
+				   (rate > 1000000000 && \
+					omap4_has_dcc_1_2ghz()))
+
+
 /* Private functions */
 
 /* _omap3_dpll_write_clken - write clken_bits arg to a DPLL's enable bits */
@@ -367,7 +373,7 @@ static int omap3_noncore_dpll_program(struct clk *clk, u16 m, u8 n, u16 freqsel,
 
 	if (cpu_is_omap4460() && !strcmp(clk->name, "dpll_mpu_ck")) {
 		/* DCC control */
-		if (orig_rate > 1000000000) {
+		if (omap4460_dcc_needed(orig_rate)) {
 			v &= ~OMAP4460_DCC_COUNT_MAX_MASK;
 			v |= (5 << OMAP4460_DCC_COUNT_MAX_SHIFT);
 			__raw_writel(v, dd->mult_div1_reg);
@@ -515,7 +521,7 @@ int omap3_noncore_dpll_set_rate(struct clk *clk, unsigned long rate)
 		 * CLKOUTX2_M3 then matches the requested rate.
 		 */
 		if (cpu_is_omap4460() && !strcmp(clk->name, "dpll_mpu_ck")
-					&& (rate > 1000000000)) {
+					&& omap4460_dcc_needed(rate)) {
 			orig_rate = rate;
 			rate = rate/2;
 		}
@@ -540,7 +546,7 @@ int omap3_noncore_dpll_set_rate(struct clk *clk, unsigned long rate)
 			 clk->name, rate);
 
 		ret = omap3_noncore_dpll_program(clk, dd->last_rounded_m,
-				 dd->last_rounded_n, freqsel, orig_rate);
+				 dd->last_rounded_n, freqsel, rate);
 		if (!ret)
 			new_parent = dd->clk_ref;
 	}

@@ -25,6 +25,9 @@
 #include <plat/control.h>
 #include <plat/cpu.h>
 
+#define FUSE_MPU_DPLL_BITMASK	0xC0000
+#define FUSE_MPU_DPLL_BITOFFSET 18
+
 static struct omap_chip_id omap_chip;
 static unsigned int omap_revision;
 static bool omap4_sb_off;
@@ -223,6 +226,24 @@ static void __init omap4_check_features(void)
 			omap4_features |= OMAP4_HAS_MPU_1_2GHZ;
 			break;
 		}
+		/*
+		 * Check MPU_DPLL trimming bits in CONTROL_STD_FUSE_OPP_DPLL_1
+		 * register. According to trim value we should use DCC chain on
+		 * target frequencies higher than 1GHz.
+		 * Used bit[18:19] in OPP_DPLL1 reg for detect this feature
+		 * [Bit18] [Bit19] [max MPU_DPLL freq] [DCC@1.2GHz] [DCC@1.5GHz]
+		 *    0        0         2.0GHz		   +		+
+		 *    1        0         2.4GHz		   -		+
+		 *    1        1         3.0GHz		   -		-
+		 */
+		val = omap_ctrl_readl(
+			OMAP4_CTRL_MODULE_CORE_STD_FUSE_OPP_DPLL_1_OFFSET);
+
+		val = (val & FUSE_MPU_DPLL_BITMASK) >> FUSE_MPU_DPLL_BITOFFSET;
+		omap4_features |= (OMAP4_HAS_DCC_1_5GHZ | OMAP4_HAS_DCC_1_2GHZ);
+		omap4_features &= ~((val == 3) ? (OMAP4_HAS_DCC_1_2GHZ |
+						 OMAP4_HAS_DCC_1_5GHZ) :
+				    (val == 2) ? OMAP4_HAS_DCC_1_2GHZ : 0);
 	}
 
 	if (omap4_sb_off)
