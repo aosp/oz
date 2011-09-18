@@ -21,6 +21,7 @@
 #include <linux/platform_device.h>
 #include <linux/slab.h>
 #include <linux/notifier.h>
+#include <linux/reboot.h>
 
 #include <plat/omap_hwmod.h>
 #include <plat/omap_device.h>
@@ -797,6 +798,13 @@ static irqreturn_t emif_threaded_isr(int irq, void *dev_id)
 		emif_notify_pending &= ~(1 << emif_nr);
 	}
 
+	if (emif_temperature_level[emif_nr] >=
+			SDRAM_TEMP_VERY_HIGH_SHUTDOWN) {
+		pr_emerg("EMIF %d: SDRAM temperature exceeds operating"
+			 "limit.. Shutdown system...\n", emif_nr + 1);
+		kernel_power_off();
+	}
+
 	return IRQ_HANDLED;
 }
 
@@ -1118,9 +1126,11 @@ int do_setup_device_details(u32 emif_nr,
 				   &dev_attr_temperature));
 	kobject_uevent(&(emif[emif_nr].pdev->dev.kobj), KOBJ_ADD);
 
-	if (emif_temperature_level[emif_nr] == SDRAM_TEMP_VERY_HIGH_SHUTDOWN)
+	if (emif_temperature_level[emif_nr] >= SDRAM_TEMP_VERY_HIGH_SHUTDOWN) {
 		pr_emerg("EMIF %d: SDRAM temperature exceeds operating"
-			 "limit.. Needs shut down!!!", emif_nr + 1);
+			 "limit.. Needs shutdown...\n", emif_nr + 1);
+	}
+
 	return 0;
 }
 
@@ -1203,6 +1213,15 @@ static int __init omap_emif_late_init(void)
 	struct voltagedomain *voltdm = omap_voltage_domain_get("core");
 
 	omap_voltage_register_notifier(voltdm, &emif_volt_notifier_block);
+
+	if ((emif_temperature_level[EMIF1] >= SDRAM_TEMP_VERY_HIGH_SHUTDOWN) ||
+		(emif_temperature_level[EMIF2] >= SDRAM_TEMP_VERY_HIGH_SHUTDOWN)) {
+		pr_emerg("SDRAM BOOT temperature exceeds operating"
+			"limit.. Shutdown system...\n");
+
+		kernel_power_off();
+	}
+
 	return 0;
 }
 late_initcall(omap_emif_late_init);
