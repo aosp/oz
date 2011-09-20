@@ -1667,6 +1667,10 @@ static irqreturn_t hdmi_irq_handler(int irq, void *arg)
 	unsigned long flags;
 	int r = 0;
 
+	/* don't let work with HDMI regs when clocks are off */
+	if (!dss_get_mainclk_state())
+		return IRQ_HANDLED;
+
 	/* process interrupt in critical section to handle conflicts */
 	spin_lock_irqsave(&irqstatus_lock, flags);
 
