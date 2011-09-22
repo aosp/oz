@@ -701,6 +701,7 @@ int omaplfb_dsscomp_setup(struct omaplfb_dsscomp_info *infop)
 	struct dss2_mgr_info *mgr;
 	int r = -EINVAL;
 	int throwaway = 0;
+	int apply_now = 0;
 
 	/*
 	 * This check is a kludge but we really don't want to
@@ -726,8 +727,13 @@ int omaplfb_dsscomp_setup(struct omaplfb_dsscomp_info *infop)
 		r = -EINVAL;
 		goto cleanup;
 	}
+
+	/* Check if we need to apply the composition immediately */
+	if (comp->data->mode & DSSCOMP_SETUP_APPLY)
+		apply_now = 1;
+
 	mutex_lock(&gcomposition_lock);
-	if (!gcomposition_enabled)
+	if (!gcomposition_enabled || apply_now)
 		throwaway = 1;	/* Throw away compositions */
 	else {
 		dsscomp_prepdata(comp->data);
@@ -736,6 +742,14 @@ int omaplfb_dsscomp_setup(struct omaplfb_dsscomp_info *infop)
 	mutex_unlock(&gcomposition_lock);
 	if (!throwaway)
 		goto end;
+
+	if (apply_now) {
+		struct omap_overlay_manager *manager;
+		manager = omap_dss_get_overlay_manager(mgr->ix);
+		/* Error handling is managed by dsscomp */
+		dsscomp_prepdata(comp->data);
+		dsscomp_createcomp(manager, comp->data, false);
+	}
 cleanup:
 	kfree(compbuf);
 	kfree(comp);
