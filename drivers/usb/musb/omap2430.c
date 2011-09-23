@@ -294,9 +294,17 @@ void musb_platform_try_idle(struct musb *musb, unsigned long timeout)
 void musb_platform_enable(struct musb *musb)
 {
 }
+
 void musb_platform_disable(struct musb *musb)
 {
+	struct musb_hdrc_platform_data *pdata = musb->controller->platform_data;
+	struct omap_musb_board_data *data = pdata->board_data;
+
+	/* Reset USBOTGHS_CONTROL to default value */
+	if (data->interface_type == MUSB_INTERFACE_UTMI)
+		__raw_writel(IDDIG | SESSEND, ctrl_base + USBOTGHS_CONTROL);
 }
+
 static void omap_set_vbus(struct musb *musb, int is_on)
 {
 	u8		devctl;
