@@ -115,11 +115,12 @@
  * latency is greater than the requested maximum wakeup latency, step
  * backwards in the omap_device_pm_latency table to ensure the
  * device's maximum wakeup latency is less than or equal to the
- * requested maximum wakeup latency.  Returns 0.
+ * requested maximum wakeup latency.  Returns ->activate_func() return value.
  */
 static int _omap_device_activate(struct omap_device *od, u8 ignore_lat)
 {
 	struct timespec a, b, c;
+	int ret = 0;
 
 	pr_debug("omap_device: %s: activating\n", od->pdev.name);
 
@@ -138,7 +139,7 @@ static int _omap_device_activate(struct omap_device *od, u8 ignore_lat)
 		read_persistent_clock(&a);
 
 		/* XXX check return code */
-		odpl->activate_func(od);
+		ret = odpl->activate_func(od);
 
 		read_persistent_clock(&b);
 
@@ -169,7 +170,7 @@ static int _omap_device_activate(struct omap_device *od, u8 ignore_lat)
 		od->dev_wakeup_lat -= odpl->activate_lat;
 	}
 
-	return 0;
+	return ret;
 }
 
 /**
@@ -189,6 +190,7 @@ static int _omap_device_activate(struct omap_device *od, u8 ignore_lat)
 static int _omap_device_deactivate(struct omap_device *od, u8 ignore_lat)
 {
 	struct timespec a, b, c;
+	int ret = 0;
 
 	pr_debug("omap_device: %s: deactivating\n", od->pdev.name);
 
@@ -206,7 +208,7 @@ static int _omap_device_deactivate(struct omap_device *od, u8 ignore_lat)
 		read_persistent_clock(&a);
 
 		/* XXX check return code */
-		odpl->deactivate_func(od);
+		ret = odpl->deactivate_func(od);
 
 		read_persistent_clock(&b);
 
@@ -240,7 +242,7 @@ static int _omap_device_deactivate(struct omap_device *od, u8 ignore_lat)
 		od->pm_lat_level++;
 	}
 
-	return 0;
+	return ret;
 }
 
 static inline struct omap_device *_find_by_pdev(struct platform_device *pdev)
