@@ -32,8 +32,11 @@ static int hsi_debug_show(struct seq_file *m, void *p)
 {
 	struct hsi_dev *hsi_ctrl = m->private;
 	struct platform_device *pdev = to_platform_device(hsi_ctrl->dev);
+	int err;
 
-	hsi_clocks_enable(hsi_ctrl->dev, __func__);
+	err = hsi_clocks_enable(hsi_ctrl->dev, __func__);
+	if (err < 0)
+		return err;
 
 	seq_printf(m, "REVISION\t: 0x%08x\n",
 		   hsi_inl(hsi_ctrl->base, HSI_SYS_REVISION_REG));
@@ -59,8 +62,11 @@ static int hsi_debug_port_show(struct seq_file *m, void *p)
 	int ch, fifo;
 	long buff_offset;
 	struct platform_device *pdev = to_platform_device(hsi_ctrl->dev);
+	int err;
 
-	hsi_clocks_enable(hsi_ctrl->dev, __func__);
+	err = hsi_clocks_enable(hsi_ctrl->dev, __func__);
+	if (err < 0)
+		return err;
 
 	if (hsi_port->cawake_gpio >= 0)
 		seq_printf(m, "CAWAKE\t\t: %d\n", hsi_get_cawake(hsi_port));
@@ -177,8 +183,11 @@ static int hsi_debug_gdd_show(struct seq_file *m, void *p)
 	void __iomem *base = hsi_ctrl->base;
 	int lch;
 	struct platform_device *pdev = to_platform_device(hsi_ctrl->dev);
+	int err;
 
-	hsi_clocks_enable(hsi_ctrl->dev, __func__);
+	err = hsi_clocks_enable(hsi_ctrl->dev, __func__);
+	if (err < 0)
+		return err;
 
 	seq_printf(m, "GDD_MPU_STATUS\t: 0x%08x\n",
 		   hsi_inl(base, HSI_SYS_GDD_MPU_IRQ_STATUS_REG));
@@ -256,13 +265,16 @@ static ssize_t hsi_port_counters_read(struct file *filep, char __user * buff,
 	struct platform_device *pdev = to_platform_device(hsi_ctrl->dev);
 	char str[50];
 	unsigned long reg;
+	int err;
 
 	if (*offp > 0) {
 		ret = 0;
 		goto hsi_cnt_rd_bk;
 	}
 
-	hsi_clocks_enable(hsi_ctrl->dev, __func__);
+	err = hsi_clocks_enable(hsi_ctrl->dev, __func__);
+	if (err < 0)
+		return err;
 
 	reg = hsi_inl(base, HSI_HSR_COUNTERS_REG(port));
 
@@ -339,6 +351,7 @@ static ssize_t hsi_port_counters_write(struct file *filep,
 	char *words[MAXWORDS];
 	char tmpbuf[256];
 	unsigned long reg, ft, tb, fb;
+	int err;
 
 	if (count == 0)
 		return 0;
@@ -357,7 +370,9 @@ static ssize_t hsi_port_counters_write(struct file *filep,
 		return -EINVAL;
 	}
 
-	hsi_clocks_enable(hsi_ctrl->dev, __func__);
+	err = hsi_clocks_enable(hsi_ctrl->dev, __func__);
+	if (err < 0)
+		return err;
 
 	if (hsi_driver_device_is_hsi(pdev)) {
 		if (nwords != 3) {

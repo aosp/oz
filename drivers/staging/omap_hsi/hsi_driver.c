@@ -639,6 +639,7 @@ void hsi_clocks_disable_channel(struct device *dev, u8 channel_number,
 {
 	struct platform_device *pd = to_platform_device(dev);
 	struct hsi_dev *hsi_ctrl = platform_get_drvdata(pd);
+	int ret;
 
 	if (channel_number != HSI_CH_NUMBER_NONE)
 		dev_dbg(dev, "CLK: hsi_clocks_disable for "
@@ -666,7 +667,9 @@ void hsi_clocks_disable_channel(struct device *dev, u8 channel_number,
 
 #ifndef USE_PM_RUNTIME_FOR_HSI
 	hsi_runtime_suspend(dev);
-	omap_device_idle(pd);
+	ret = omap_device_idle(pd);
+	if (ret)
+		dev_err(dev, "Failed to disable device: %s %d\n", s, ret);
 #else
 	/* HSI_TODO : this can probably be changed
 	 * to return pm_runtime_put(dev);
@@ -682,8 +685,9 @@ void hsi_clocks_disable_channel(struct device *dev, u8 channel_number,
 * @channel_number - channel number which requests clock to be enabled
 *		    0xFF means no particular channel
 *
-* Returns: -EEXIST if clocks were already active
+* Returns: 1 if clocks were already active
 *	   0 if clocks were previously inactive
+*	   < 0 if failed to activate clocks
 *
 * Note : there is no real HW clock management per HSI channel, this is only
 * virtual to keep track of active channels and ease debug
@@ -695,6 +699,7 @@ int hsi_clocks_enable_channel(struct device *dev, u8 channel_number,
 {
 	struct platform_device *pd = to_platform_device(dev);
 	struct hsi_dev *hsi_ctrl = platform_get_drvdata(pd);
+	int ret;
 
 	if (channel_number != HSI_CH_NUMBER_NONE)
 		dev_dbg(dev, "CLK: hsi_clocks_enable for "
@@ -704,7 +709,7 @@ int hsi_clocks_enable_channel(struct device *dev, u8 channel_number,
 
 	if (hsi_ctrl->clock_enabled) {
 		dev_dbg(dev, "Clocks already enabled, skipping...\n");
-		return -EEXIST;
+		return 1;
 	}
 #ifdef CONFIG_PM
 	/* Prevent Fclk change */
@@ -713,7 +718,11 @@ int hsi_clocks_enable_channel(struct device *dev, u8 channel_number,
 #endif /* CONFIG_PM */
 
 #ifndef USE_PM_RUNTIME_FOR_HSI
-	omap_device_enable(pd);
+	ret = omap_device_enable(pd);
+	if (ret < 0) {
+		dev_err(dev, "Failed to enable device: %s %d\n", s, ret);
+		return ret;
+	}
 	hsi_runtime_resume(dev);
 	return 0;
 #else
@@ -832,7 +841,11 @@ static int __init hsi_platform_device_probe(struct platform_device *pd)
 #ifdef USE_PM_RUNTIME_FOR_HSI
 	pm_runtime_enable(hsi_ctrl->dev);
 #endif
-	hsi_clocks_enable(hsi_ctrl->dev, __func__);
+	err = hsi_clocks_enable(hsi_ctrl->dev, __func__);
+	if (err < 0) {
+		dev_err(&pd->dev, "Could not enable clocks for hsi: %d\n", err);
+		goto rollback1;
+	}
 
 	/* Non critical SW Reset */
 	err = hsi_softreset(hsi_ctrl);

@@ -585,12 +585,18 @@ static u32 hsi_process_dma_event(struct hsi_dev *hsi_ctrl)
 static void do_hsi_gdd_tasklet(unsigned long device)
 {
 	struct hsi_dev *hsi_ctrl = (struct hsi_dev *)device;
+	int err;
 
 	dev_dbg(hsi_ctrl->dev, "DMA Tasklet : clock_enabled=%d\n",
 		hsi_ctrl->clock_enabled);
 
 	spin_lock(&hsi_ctrl->lock);
-	hsi_clocks_enable(hsi_ctrl->dev, __func__);
+	err = hsi_clocks_enable(hsi_ctrl->dev, __func__);
+	if (err < 0) {
+		spin_unlock(&hsi_ctrl->lock);
+		return;
+	}
+
 	hsi_ctrl->in_dma_tasklet = true;
 
 	hsi_process_dma_event(hsi_ctrl);
