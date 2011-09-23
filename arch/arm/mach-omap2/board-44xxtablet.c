@@ -1652,49 +1652,49 @@ static struct omap_volt_pmic_info omap_pmic_iva = {
 	.vp_vlimitto_vddmax = 0x2B,
 };
 
+static struct omap_volt_vc_data vc443x_config = {
+	.vdd0_on	= 1388000,	/* 1.388v */
+	.vdd0_onlp	= 1025000,	/* 1.025v */
+	.vdd0_ret	=  750000,	/* 0.75v  */
+	.vdd0_off	=	0,	/* 0 v    */
+	.vdd1_on	= 1291000,	/* 1.291v */
+	.vdd1_onlp	=  950000,	/* 0.95v  */
+	.vdd1_ret	=  750000,	/* 0.75v  */
+	.vdd1_off	=	0,	/* 0 v    */
+	.vdd2_on	= 1127000,	/* 1.127v */
+	.vdd2_onlp	=  962000,	/* 0.962v */
+	.vdd2_ret	=  750000,	/* 0.75v  */
+	.vdd2_off	=	0,	/* 0 v    */
+};
+
+static struct omap_volt_vc_data vc443x_config_old = {
+	.vdd0_on	= 1350000,	/* 1.35v   */
+	.vdd0_onlp	= 1350000,	/* 1.35v   */
+	.vdd0_ret	=  837500,	/* 0.8375v */
+	.vdd0_off	=	0,	/* 0 v     */
+	.vdd1_on	= 1100000,	/* 1.1v    */
+	.vdd1_onlp	= 1100000,	/* 1.1v    */
+	.vdd1_ret	=  837500,	/* 0.8375v */
+	.vdd1_off	=	0,	/* 0 v     */
+	.vdd2_on	= 1100000,	/* 1.1v    */
+	.vdd2_onlp	= 1100000,	/* 1.1v    */
+	.vdd2_ret	=  837500,	/* 0.8375v */
+	.vdd2_off	=	0,	/* 0 v     */
+};
+
 static struct omap_volt_vc_data vc446x_config = {
-	.vdd0_on = 1350000,	/* 1.35v */
-	.vdd0_onlp = 1350000,	/* 1.35v */
-	.vdd0_ret = 750000,	/* 0.75v */
-	.vdd0_off = 0,		/* 0 v */
-	.vdd1_on = 1350000,	/* 1.35v */
-	.vdd1_onlp = 1350000,	/* 1.35v */
-	.vdd1_ret = 750000,	/* 0.75v */
-	.vdd1_off = 0,		/* 0 v */
-	.vdd2_on = 1350000,	/* 1.35v */
-	.vdd2_onlp = 1350000,	/* 1.35v */
-	.vdd2_ret = 750000,	/* .75v */
-	.vdd2_off = 0,		/* 0 v */
-};
-
-static struct omap_volt_vc_data vc_config = {
-	.vdd0_on = 1350000,	/* 1.35v */
-	.vdd0_onlp = 1350000,	/* 1.35v */
-	.vdd0_ret = 750000,	/* 0.75v */
-	.vdd0_off = 0,		/* 0 v */
-	.vdd1_on = 1100000,	/* 1.1v */
-	.vdd1_onlp = 1100000,	/* 1.1v */
-	.vdd1_ret = 750000,	/* 0.75v */
-	.vdd1_off = 0,		/* 0 v */
-	.vdd2_on = 1100000,	/* 1.1v */
-	.vdd2_onlp = 1100000,	/* 1.1v */
-	.vdd2_ret = 750000,	/* .75v */
-	.vdd2_off = 0,		/* 0 v */
-};
-
-static struct omap_volt_vc_data vc_config_old = {
-	.vdd0_on = 1350000,	/* 1.35v */
-	.vdd0_onlp = 1350000,	/* 1.35v */
-	.vdd0_ret = 837500,	/* 0.837500v */
-	.vdd0_off = 0,		/* 0 v */
-	.vdd1_on = 1100000,	/* 1.1v */
-	.vdd1_onlp = 1100000,	/* 1.1v */
-	.vdd1_ret = 837500,	/* 0.837500v */
-	.vdd1_off = 0,		/* 0 v */
-	.vdd2_on = 1100000,	/* 1.1v */
-	.vdd2_onlp = 1100000,	/* 1.1v */
-	.vdd2_ret = 837500,	/* .837500v */
-	.vdd2_off = 0,		/* 0 v */
+	.vdd0_on	= 1380000,	/* 1.38v  */
+	.vdd0_onlp	= 1025000,	/* 1.025v */
+	.vdd0_ret	=  750000,	/* 0.75v  */
+	.vdd0_off	=	0,	/* 0 v    */
+	.vdd1_on	= 1375000,	/* 1.375v */
+	.vdd1_onlp	=  950000,	/* 0.95v  */
+	.vdd1_ret	=  750000,	/* 0.75v  */
+	.vdd1_off	=	0,	/* 0 v    */
+	.vdd2_on	= 1127000,	/* 1.127v */
+	.vdd2_onlp	=  962000,	/* 0.962v */
+	.vdd2_ret	=  750000,	/* 0.75v  */
+	.vdd2_off	=	0,	/* 0 v    */
 };
 
 static void plat_hold_wakelock(void *up, int flag)
@@ -2039,11 +2039,10 @@ static void __init omap_44xxtablet_init(void)
 	if (cpu_is_omap446x())
 		omap_voltage_init_vc(&vc446x_config);
 	else {
-		if (omap_rev() <= OMAP4430_REV_ES2_1) {
-			omap_voltage_init_vc(&vc_config_old);
-		} else {
-			omap_voltage_init_vc(&vc_config);
-		}
+		if (omap_rev() <= OMAP4430_REV_ES2_1)
+			omap_voltage_init_vc(&vc443x_config_old);
+		else
+			omap_voltage_init_vc(&vc443x_config);
 	}
 }
 
