@@ -293,6 +293,24 @@ config OMAP4_KEEP_STATIC_DEPENDENCIES
 	help
 	  Select this option to keep the static dependency mapping for OMAP4.
 
+config OMAP4_HSOTG_ED_CORRECTION
+	bool "OMAP 44XX HSOTG Eye diagram correction"
+	depends on ARCH_OMAP4
+	default y
+	help
+	  Select this option to overrive HSOTG PHY settings in
+	  order to improve Eye Diagramm. On 4430 CPUs this should
+	  improve Eye Diagram at least 8%.
+
+config OMAP4_HSOTG_ED_SW2_4460
+	bool "Override SWCAP value for 4460 CPUs"
+	depends on OMAP4_HSOTG_ED_CORRECTION
+	default n
+	help
+	  Select this option for override SWCAP trim code in USBPHY_USB2PHYCM_TRIM
+	  register HSOTG PHY. Override value: 0x24. This should be done on boadrs
+	  with high parasitics in order to improve Eye Diagram.
+
 config OMAP4_TPS62361
 	bool "OMAP4460 MPU power supply PMIC"
 	depends on I2C && ARCH_OMAP4 && TWL4030_CORE
