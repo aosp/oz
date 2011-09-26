@@ -688,7 +688,8 @@ int omap4_dpll_low_power_cascade_enter()
 		!l4_wkup_clk_mux_ck || !lp_clk_div_ck || !pmd_stm_clock_mux_ck
 		|| !pmd_trace_clk_mux_ck || !dpll_core_m6x2_ck ||
 		!dpll_core_ck || !dpll_per_ck || !func_48m_fclk
-		|| !per_hsd_byp_clk_mux_ck || !per_hs_clk_div_ck) {
+		|| !per_hsd_byp_clk_mux_ck || !per_hs_clk_div_ck
+		|| !l3_emif_clkdm) {
 
 		pr_warn("%s: failed to get all necessary clocks\n", __func__);
 		ret = -ENODEV;
@@ -988,7 +989,7 @@ int omap4_dpll_low_power_cascade_exit()
 		|| !pmd_trace_clk_mux_ck || !dpll_core_m6x2_ck
 		|| !sys_clkin_ck || !dpll_core_ck || !l3_div_ck || !l4_div_ck
 		|| !dpll_per_ck || !func_48m_fclk || !per_hsd_byp_clk_mux_ck
-		|| !per_hs_clk_div_ck) {
+		|| !per_hs_clk_div_ck || !l3_emif_clkdm) {
 		pr_warn("%s: failed to get all necessary clocks\n", __func__);
 		ret = -ENODEV;
 		goto out;
