@@ -638,6 +638,7 @@ EXPORT_SYMBOL(dpll_cascading_blocker_release);
 int omap4_dpll_low_power_cascade_enter()
 {
 	int ret = 0;
+	u32 mask;
 	struct clk *dpll_abe_ck, *dpll_abe_m3x2_ck;
 	struct clk *dpll_mpu_ck, *div_mpu_hs_clk;
 	struct clk *dpll_iva_ck, *div_iva_hs_clk, *iva_hsd_byp_clk_mux_ck;
@@ -934,6 +935,7 @@ out:
 int omap4_dpll_low_power_cascade_exit()
 {
 	int ret = 0;
+	u32 reg, mask;
 	struct clk *sys_clkin_ck;
 	struct clk *dpll_abe_ck, *dpll_abe_m3x2_ck;
 	struct clk *dpll_mpu_ck, *div_mpu_hs_clk;
