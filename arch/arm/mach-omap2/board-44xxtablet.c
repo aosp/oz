@@ -87,6 +87,7 @@
 #define OMAP4_TSL2771_INT_GPIO		184
 #define OMAP4_TSL2771_PWR_GPIO		188
 #define OMAP4SDP_MDM_PWR_EN_GPIO	157
+#define OMAP_UART_GPIO_MUX_MODE_143	143
 
 #define LED_PWM2ON		0x03
 #define LED_PWM2OFF		0x04
@@ -1687,6 +1688,7 @@ static struct omap_uart_port_info omap_serial_platform_data[] = {
 		.padconf	= OMAP4_CTRL_MODULE_PAD_SDMMC1_CMD_OFFSET,
 		.padconf_wake_ev = 0,
 		.wk_mask	= 0,
+		.omap_uart_gpio_mux_mode = -1,
 	},
 	{
 		.use_dma	= 0,
@@ -1706,6 +1708,7 @@ static struct omap_uart_port_info omap_serial_platform_data[] = {
 			OMAP4_UART2_RX_DUPLICATEWAKEUPEVENT_MASK |
 			OMAP4_UART2_RTS_DUPLICATEWAKEUPEVENT_MASK |
 			OMAP4_UART2_CTS_DUPLICATEWAKEUPEVENT_MASK,
+		.omap_uart_gpio_mux_mode = -1,
 	},
 	{
 		.use_dma	= 0,
@@ -1725,6 +1728,7 @@ static struct omap_uart_port_info omap_serial_platform_data[] = {
 			OMAP4_UART3_RX_IRRX_DUPLICATEWAKEUPEVENT_MASK |
 			OMAP4_UART3_RTS_SD_DUPLICATEWAKEUPEVENT_MASK |
 			OMAP4_UART3_CTS_RCTX_DUPLICATEWAKEUPEVENT_MASK,
+		.omap_uart_gpio_mux_mode = OMAP_UART_GPIO_MUX_MODE_143,
 	},
 	{
 		.use_dma	= 0,
@@ -1742,6 +1746,7 @@ static struct omap_uart_port_info omap_serial_platform_data[] = {
 		.wk_mask	=
 			OMAP4_UART4_TX_DUPLICATEWAKEUPEVENT_MASK |
 			OMAP4_UART4_RX_DUPLICATEWAKEUPEVENT_MASK,
+		.omap_uart_gpio_mux_mode = -1,
 	},
 	{
 		.flags		= 0
