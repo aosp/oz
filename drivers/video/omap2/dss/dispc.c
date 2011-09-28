@@ -3017,8 +3017,12 @@ int dispc_scaling_decision(u16 width, u16 height,
 		else if (omap_rev() == OMAP4430_REV_ES1_0)
 			*three_tap = in_width > 1280;
 
-		/* Also use 3-tap if downscaling by 2 or less */
-		*three_tap |= out_height * 2 >= in_height;
+		/*
+		 * For OMAP4 use 5-tap instead of 3-tap
+		 * for better SD video quality on HDMI
+		 */
+		if (!cpu_is_omap44xx())
+			*three_tap |= out_height * 2 >= in_height;
 
 		/*
 		 * Predecimation on OMAP4 still fetches the whole lines
