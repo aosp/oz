@@ -101,7 +101,7 @@ static long setup_mgr(struct dsscomp_dev *cdev,
 		return 0;
 	}
 	dsscomp_prepdata(d);
-	return dsscomp_createcomp(mgr, d, false) ? 0 : -EINVAL;
+	return dsscomp_createcomp(mgr, d, blankpost) ? 0 : -EINVAL;
 }
 
 void dsscomp_prepdata(struct dsscomp_setup_mgr_data *d)
