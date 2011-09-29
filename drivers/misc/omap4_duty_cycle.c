@@ -61,7 +61,7 @@ module_param(cooling_rate, int, 0);
 static bool enabled;
 static bool saved_hotplug_enabled;
 static int heating_budget;
-static int t_next_heating_end;
+static unsigned long t_heating_start;
 
 static struct workqueue_struct *duty_wq;
 static struct delayed_work work_exit_cool;
@@ -156,9 +156,8 @@ static void omap4_duty_enter_heating(void)
 	pr_debug("%s enter at ()\n", __func__);
 	state = OMAP4_DUTY_HEATING;
 
-	t_next_heating_end = msecs_to_jiffies(heating_budget);
-	queue_delayed_work(duty_wq, &work_exit_heat, t_next_heating_end);
-	t_next_heating_end += jiffies;
+	queue_delayed_work(duty_wq, &work_exit_heat,
+					msecs_to_jiffies(heating_budget));
 }
 
 static void omap4_duty_enter_heat_wq(struct work_struct *work)
@@ -184,24 +183,35 @@ static int omap4_duty_frequency_change(struct notifier_block *nb,
 							freqs->new, state);
 	switch (state) {
 	case OMAP4_DUTY_NORMAL:
-		if (freqs->new == nitro_rate)
-			queue_delayed_work(duty_wq, &work_enter_heat,
-						msecs_to_jiffies(1));
+		if (freqs->new == nitro_rate) {
+			t_heating_start = jiffies;
+			queue_work(duty_wq, &work_enter_heat.work);
+		}
 		break;
 	case OMAP4_DUTY_HEATING:
 		if (freqs->new < nitro_rate) {
-			heating_budget -= (t_next_heating_end - jiffies);
-			if (heating_budget <= 0)
-				queue_work(duty_wq, &work_enter_cool0);
+			int diff = jiffies_to_msecs(jiffies) -
+				jiffies_to_msecs(t_heating_start);
+			if (diff < 0)
+				heating_budget = 0;
 			else
+				heating_budget -= diff;
+			if (heating_budget <= 0) {
+				queue_work(duty_wq, &work_enter_cool0);
+			} else {
+				cancel_delayed_work_sync(&work_exit_heat);
 				queue_work(duty_wq, &work_enter_cool1);
+			}
 		}
 		break;
 	case OMAP4_DUTY_COOLING_0:
 		break;
 	case OMAP4_DUTY_COOLING_1:
-		if (freqs->new == nitro_rate)
+		if (freqs->new == nitro_rate) {
+			t_heating_start = jiffies;
+			cancel_delayed_work_sync(&work_exit_cool);
 			queue_work(duty_wq, &work_enter_heat.work);
+		}
 		break;
 	}
 
