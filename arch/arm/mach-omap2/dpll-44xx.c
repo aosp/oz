@@ -681,6 +681,10 @@ int omap4_dpll_low_power_cascade_enter()
 	emu_sys_44xx_clkdm = clkdm_lookup("emu_sys_44xx_clkdm");
 	abe_44xx_clkdm = clkdm_lookup("abe_clkdm");
 
+	/* Just to avoid look-up on every call to speed up */
+	if (!l3_emif_clkdm)
+		l3_emif_clkdm = clkdm_lookup("l3_emif_clkdm");
+
 	if (!dpll_abe_ck || !dpll_mpu_ck || !div_mpu_hs_clk || !dpll_iva_ck ||
 		!div_iva_hs_clk || !iva_hsd_byp_clk_mux_ck || !dpll_core_m2_ck
 		|| !dpll_abe_m3x2_ck || !div_core_ck || !dpll_core_x2_ck ||
@@ -980,6 +984,10 @@ int omap4_dpll_low_power_cascade_exit()
 
 	emu_sys_44xx_clkdm = clkdm_lookup("emu_sys_44xx_clkdm");
 	abe_44xx_clkdm = clkdm_lookup("abe_clkdm");
+
+	/* Just to avoid look-up on every call to speed up */
+	if (!l3_emif_clkdm)
+		l3_emif_clkdm = clkdm_lookup("l3_emif_clkdm");
 
 	if (!dpll_abe_ck || !dpll_mpu_ck || !div_mpu_hs_clk || !dpll_iva_ck ||
 		!div_iva_hs_clk || !iva_hsd_byp_clk_mux_ck || !dpll_core_m2_ck
