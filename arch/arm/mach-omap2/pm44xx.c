@@ -797,20 +797,17 @@ static void __init prcm_clear_statdep_regs(void)
 
 	/* Configures MEMIF clockdomain in SW_WKUP */
 	omap2_clkdm_wakeup(l3_emif_clkdm);
-	pwrdm_clkdm_state_switch(l3_emif_clkdm);
 
 	/* Configures L3INIT clockdomain in SW_WKUP */
 	omap2_clkdm_wakeup(l3_init_clkdm);
-	pwrdm_clkdm_state_switch(l3_init_clkdm);
 
 	/* Configures L4_PER clockdomain in SW_WKUP */
 	omap2_clkdm_wakeup(l4_per_clkdm);
-	pwrdm_clkdm_state_switch(l4_per_clkdm);
 
 	/* Disable MPU and Ducati Static dependencies since
 	 * Asynchronous Bridge is safe on OMAP4460
 	 */
-	if (cpu_is_omap446x()) {
+	if (!cpu_is_omap443x()) {
 		/* MPU towards EMIF clockdomain */
 		reg = OMAP4430_MEMIF_STATDEP_MASK;
 		cm_rmw_mod_reg_bits(reg, 0, OMAP4430_CM1_MPU_MOD,
