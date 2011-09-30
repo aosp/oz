@@ -866,6 +866,14 @@ int omap2_clkdm_wakeup(struct clockdomain *clkdm)
 		v |= bits;
 		__raw_writel(v, clkdm->clkstctrl_reg);
 
+		/*
+		 * Must wait for pertaining pwrdm to switch ON.
+		 * pwrdm may hang in "in transition" state until next
+		 * clkdm wakeup, if clkdm idled back before pwrdm
+		 * transition completed.
+		 */
+		pwrdm_clkdm_state_switch(clkdm);
+
 	} else {
 		BUG();
 	};
