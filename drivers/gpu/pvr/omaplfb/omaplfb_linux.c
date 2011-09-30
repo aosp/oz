@@ -105,30 +105,6 @@ static dsscomp_t find_dsscomp_obj(struct omap_overlay_manager *manager)
 	return comp;
 }
 
-void omaplfb_drop_frame(OMAPLFB_DEVINFO *display_info)
-{
-	struct fb_info *framebuffer = display_info->psLINFBInfo;
-	struct omapfb_info *ofbi = FB2OFB(framebuffer);
-	struct omapfb2_device *fbdev = ofbi->fbdev;
-	dsscomp_t comp = NULL;
-
-	/* Nothing to do if we are not using DSSComp */
-	if (!guse_dsscomp)
-		return;
-
-	omapfb_lock(fbdev);
-
-	if (ofbi->num_overlays > 0) {
-		struct omap_overlay *overlay = ofbi->overlays[0];
-		struct omap_overlay_manager *manager = overlay->manager;
-		comp = find_dsscomp_obj(manager);
-		if (comp)
-			dsscomp_drop(comp);
-	}
-
-	omapfb_unlock(fbdev);
-}
-
 static void omaplfb_dma_cb(int channel, u16 status, void *data)
 {
 	struct omaplfb_clone_data *clone_data =
@@ -273,12 +249,6 @@ static void OMAPLFBFlipDSSComp(OMAPLFB_DEVINFO *display_info,
 	struct omap_overlay_manager *manager;
 	struct dsscomp_setup_mgr_data *prime_data, *sec_data;
 
-	/* We can reach this condition on resume, where the omaplfb
-	 * flushes the manager queue ignoring compositions, this
-	 * should not be a problem
-	 */
-	if (omaplfb_dsscomp_isempty())
-		return;
 	manager = omap_dss_get_overlay_manager(0);
 	omaplfb_dsscomp_get(&prime_data, 0);
 	if (!prime_data) {
@@ -408,7 +378,8 @@ static void OMAPLFBFlipDSS(OMAPLFB_SWAPCHAIN *psSwapChain,
 		if (manager) {
 			display = manager->device;
 			/* No display attached to this overlay, don't update */
-			if (!display)
+			if (!display ||
+				display->state == OMAP_DSS_DISPLAY_SUSPENDED)
 				continue;
 			driver = display->driver;
 			manager->apply(manager);
@@ -439,8 +410,7 @@ void OMAPLFBFlip(OMAPLFB_SWAPCHAIN *psSwapChain, unsigned long aPhyAddr)
 	struct omapfb_info *ofbi = FB2OFB(framebuffer);
 	struct omapfb2_device *fbdev = ofbi->fbdev;
 
-
-	if (guse_dsscomp) {
+	if (guse_dsscomp && !omaplfb_dsscomp_isempty()) {
 		OMAPLFBFlipDSSComp(psDevInfo, aPhyAddr, ofbi);
 		return;
 	}
@@ -500,7 +470,7 @@ void OMAPLFBPresentSync(OMAPLFB_DEVINFO *psDevInfo,
 	struct omapfb2_device *fbdev = ofbi->fbdev;
 	unsigned long aPhyAddr = (unsigned long)psFlipItem->sSysAddr->uiAddr;
 
-	if (guse_dsscomp) {
+	if (guse_dsscomp && !omaplfb_dsscomp_isempty()) {
 		OMAPLFBFlipDSSComp(psDevInfo, aPhyAddr, ofbi);
 		return;
 	}

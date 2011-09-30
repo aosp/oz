@@ -202,7 +202,6 @@ int omaplfb_disable_cloning(int mgr_id_src);
 void omaplfb_disable_cloning_alldisp(void);
 void omaplfb_create_sysfs(struct omaplfb_device *odev);
 void omaplfb_remove_sysfs(struct omaplfb_device *odev);
-void omaplfb_drop_frame(OMAPLFB_DEVINFO *display_info);
 void omaplfb_dsscomp_init(void);
 int omaplfb_dsscomp_setup(struct omaplfb_dsscomp_info *infop);
 void omaplfb_dsscomp_get(struct dsscomp_setup_mgr_data **datap, int mgr_ix);

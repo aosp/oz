@@ -1121,19 +1121,11 @@ static IMG_BOOL ProcessFlip(IMG_HANDLE  hCmdCookie,
 
 	mutex_lock(&psDevInfo->sSwapChainLockMutex);
 
-	if (psDevInfo->bDeviceSuspended)
-	{
-		omaplfb_drop_frame(psDevInfo);
-		/* If is suspended then assume the commands are completed */
-		psSwapChain->psPVRJTable->pfnPVRSRVCmdComplete(
-			hCmdCookie, IMG_TRUE);
-		goto ExitTrueUnlock;
-	}
-
 #if defined(SYS_USING_INTERRUPTS)
 
 	if( psFlipCmd->ui32SwapInterval == 0 ||
 		psDevInfo->ignore_sync ||
+		psDevInfo->bDeviceSuspended ||
 		psSwapChain->bFlushCommands == OMAP_TRUE)
 	{
 #endif
