@@ -419,7 +419,9 @@ static void dsscomp_early_suspend(struct early_suspend *h)
 	struct {
 		struct dsscomp_setup_mgr_data set;
 		struct dss2_ovl_info ovl[MAX_OVERLAYS];
-	} p;
+	} p = {
+		.set.mgr.alpha_blending = 1
+		};
 	blanked = true;
 
 	for (d = 0; d < cdev->num_displays; d++) {
@@ -451,7 +453,6 @@ static void dsscomp_early_suspend(struct early_suspend *h)
 			}
 		}
 
-		p.set.mgr.alpha_blending = 1;
 		p.set.mgr.ix = d;
 		p.set.mode = DSSCOMP_SETUP_DISPLAY;
 		setup_mgr(cdev, &p.set, true);
