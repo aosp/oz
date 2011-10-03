@@ -914,12 +914,10 @@ int omap4_dpll_low_power_cascade_enter()
 		/* Configures L4_PER clockdomain in SW_WKUP */
 		omap2_clkdm_wakeup(l4_per_clkdm);
 
-		/* Disable SD for MPU towards L3_1, L3_2, L3INIT, L4WKUP,
-		 *  L4CFG and L4PER clockdomains (all MPU SD kept disabled)
+		/* Disable SD for MPU towards L3_1, L3_2, L3INIT
+		 *  and L4PER clockdomains (all MPU SD kept disabled)
 		 */
 		mask = OMAP4430_L3_2_STATDEP_MASK |
-			OMAP4430_L4CFG_STATDEP_MASK |
-			OMAP4430_L4WKUP_STATDEP_MASK |
 			OMAP4430_L3_1_STATDEP_MASK |
 			OMAP4430_L3INIT_STATDEP_MASK |
 			OMAP4430_L4PER_STATDEP_MASK;
@@ -1110,18 +1108,14 @@ int omap4_dpll_low_power_cascade_exit()
 		/* Configures L4_PER clockdomain in SW_WKUP */
 		omap2_clkdm_wakeup(l4_per_clkdm);
 
-		/* Enable SD for MPU towards L3_1, L3_2, L3INIT, L4WKUP,
-		 * L4CFG and L4PER clockdomains
+		/* Enable SD for MPU towards L3_1, L3_2, L3INIT,
+		 * and L4PER clockdomains
 		 */
 		reg = 1 << OMAP4430_L3_2_STATDEP_SHIFT |
-			1 << OMAP4430_L4CFG_STATDEP_SHIFT |
-			1 << OMAP4430_L4WKUP_STATDEP_SHIFT |
 			1 << OMAP4430_L3_1_STATDEP_SHIFT |
 			1 << OMAP4430_L3INIT_STATDEP_SHIFT |
 			1 << OMAP4430_L4PER_STATDEP_SHIFT;
 		mask = OMAP4430_L3_2_STATDEP_MASK |
-			OMAP4430_L4CFG_STATDEP_MASK |
-			OMAP4430_L4WKUP_STATDEP_MASK |
 			OMAP4430_L3_1_STATDEP_MASK |
 			OMAP4430_L3INIT_STATDEP_MASK |
 			OMAP4430_L4PER_STATDEP_MASK;

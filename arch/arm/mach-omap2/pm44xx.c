@@ -819,6 +819,24 @@ static void __init prcm_clear_statdep_regs(void)
 			OMAP4_CM_DUCATI_STATICDEP_OFFSET);
 	}
 
+	/* Disable MPU and Ducati Static dependencies
+	 * towards L4CFG and L4WKUP on OMAP4460
+	 */
+	if (!cpu_is_omap443x()) {
+
+		/* MPU towards L4CFG and L4WKUP clockdomains */
+		reg = OMAP4430_L4CFG_STATDEP_MASK |
+			OMAP4430_L4WKUP_STATDEP_MASK;
+		cm_rmw_mod_reg_bits(reg, 0, OMAP4430_CM1_MPU_MOD,
+			OMAP4_CM_MPU_STATICDEP_OFFSET);
+
+		/* Ducati towards L4CFG and L4WKUP clockdomains */
+		reg = OMAP4430_L4CFG_STATDEP_MASK |
+			OMAP4430_L4WKUP_STATDEP_MASK;
+		cm_rmw_mod_reg_bits(reg, 0, OMAP4430_CM2_CORE_MOD,
+			OMAP4_CM_DUCATI_STATICDEP_OFFSET);
+	}
+
 	/* SDMA towards EMIF, L3_1, L4CFG, L4WKUP, L3INIT and
 	 * L4PER clockdomains
 	 */
