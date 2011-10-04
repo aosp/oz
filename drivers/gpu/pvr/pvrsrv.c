@@ -1095,7 +1095,7 @@ PVRSRV_ERROR IMG_CALLCONV PVRSRVGetMiscInfoKM(PVRSRV_MISC_INFO *psMiscInfo)
 						uPageCount * sizeof(IMG_SYS_PHYADDR),
 						psIntSysPAddr, IMG_NULL);
 
-					kfree(hOSWrapMem);
+					OSReleasePhysPageAddr(hOSWrapMem);
 
 				}
 #else
@@ -1146,7 +1146,7 @@ PVRSRV_ERROR IMG_CALLCONV PVRSRVGetMiscInfoKM(PVRSRV_MISC_INFO *psMiscInfo)
 						uPageCount * sizeof(IMG_SYS_PHYADDR),
 						psIntSysPAddr, IMG_NULL);
 
-					kfree(hOSWrapMem);
+					OSReleasePhysPageAddr(hOSWrapMem);
 
 				}
 
