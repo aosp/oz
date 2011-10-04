@@ -54,6 +54,7 @@
 /* Bitfield OPP_SEL.PRM_LDO_ABB_CTRL */
 #define FAST_OPP		0x1
 #define NOMINAL_OPP		0x0
+#define SLOW_OPP		0x3
 
 #ifdef CONFIG_PM_DEBUG
 #include <linux/seq_file.h>
@@ -419,14 +420,15 @@ static struct omap_volt_data omap44xx_vdd_core_volt_data[] = {
 	{.volt_nominal = 1200000, .sr_errminlimit = 0xF9, .vp_errgain = 0x16},
 };
 
-
-
 static struct omap_volt_data omap446x_vdd_mpu_volt_data[] = {
 	{.volt_nominal = 1025000, .sr_errminlimit = 0xF4, .vp_errgain = 0x0C, .abb_type = NOMINAL_OPP},
 	{.volt_nominal = 1025000, .sr_errminlimit = 0xF4, .vp_errgain = 0x0C, .abb_type = NOMINAL_OPP},
 	{.volt_nominal = 1200000, .sr_errminlimit = 0xF4, .vp_errgain = 0x0C, .abb_type = NOMINAL_OPP},
-	{.volt_nominal = 1313000, .sr_errminlimit = 0xF9, .vp_errgain = 0x16, .abb_type = NOMINAL_OPP},
-	{.volt_nominal = 1375000, .sr_errminlimit = 0xFA, .vp_errgain = 0x23, .abb_type = NOMINAL_OPP},
+	{.volt_nominal = 1313000, .sr_errminlimit = 0xF9, .vp_errgain = 0x16, .abb_type = NOMINAL_OPP,
+		.abb_trim = {.fbb_trim_mask = OMAP4_STD_FUSE_OPP_DPLL_1_MPU_FBB_TB_MASK,
+			.rbb_trim_mask = OMAP4_STD_FUSE_OPP_DPLL_1_MPU_RBB_TB_MASK} },
+	{.volt_nominal = 1375000, .sr_errminlimit = 0xFA, .vp_errgain = 0x23, .abb_type = NOMINAL_OPP,
+		.abb_trim = {.fbb_trim_mask = OMAP4_STD_FUSE_OPP_DPLL_1_MPU_FBB_TB_MASK} },
 	{.volt_nominal = 1376000, .sr_errminlimit = 0xFA, .vp_errgain = 0x27, .abb_type = FAST_OPP},
 };
 
@@ -437,7 +439,8 @@ static struct omap_volt_data omap446x_vdd_iva_volt_data[] = {
 #ifdef CONFIG_OMAP_ABB_DEFAULT_IVA_FBB
 	{.volt_nominal = 1313000, .sr_errminlimit = 0xFA, .vp_errgain = 0x23, .abb_type = FAST_OPP},
 #else
-	{.volt_nominal = 1313000, .sr_errminlimit = 0xFA, .vp_errgain = 0x23, .abb_type = NOMINAL_OPP},
+	{.volt_nominal = 1313000, .sr_errminlimit = 0xFA, .vp_errgain = 0x23, .abb_type = NOMINAL_OPP,
+		.abb_trim = {.rbb_trim_mask = OMAP4_STD_FUSE_OPP_DPLL_1_IVA_RBB_TB_MASK} },
 #endif
 };
 
@@ -742,10 +745,11 @@ static void vp_latch_vsel(struct omap_vdd_info *vdd)
  * @val	 : VOLTAGE_PRECHANGE or VOLTAGE_POSTCHANGE
  * @data : struct omap_volt_change_info for a given voltage domain
  *
- * Sets ABB ldo to either bypass or Forward Body-Bias whenever a voltage
- * change notification is generated.  Voltages marked as FAST will result in
- * FBB operation of ABB ldo and voltages marked as NOMINAL will bypass the
- * ldo.  Returns 0 upon success, negative error code otherwise.
+ * Sets ABB LDO to either bypass, Forward Body-Bias or Reverse Body-Bias
+ * whenever a voltage change notification is generated.
+ * Voltages marked as FAST/SLOW will result in FBB/RBB operation
+ * of ABB LDO respectively. Voltages marked as NOMINAL will bypass the LDO.
+ * Returns 0 upon success, negative error code otherwise.
  */
 static int omap_abb_notify_voltage(struct notifier_block *nb,
 		unsigned long val, void *data)
@@ -772,31 +776,43 @@ static int omap_abb_notify_voltage(struct notifier_block *nb,
 			v_info->vdd_info->omap_abb_reg_val.prm_abb_ldo_setup_idx);
 			ret = omap3_abb_change_opp(v_info->vdd_info);
 		} else { /* cpu_is_omap44xx() */
+			prm_clear_mod_reg_bits(OMAP4430_ACTIVE_FBB_SEL_MASK |
+					OMAP4430_ACTIVE_RBB_SEL_MASK,
+				OMAP4430_PRM_DEVICE_MOD,
+				vdd_info->omap_abb_reg_val.prm_abb_ldo_setup_idx);
 			prm_rmw_mod_reg_bits(OMAP4430_OPP_SEL_MASK,
-			(NOMINAL_OPP << OMAP4430_OPP_SEL_SHIFT),
-			OMAP4430_PRM_DEVICE_MOD,
-			v_info->vdd_info->omap_abb_reg_val.prm_abb_ldo_ctrl_idx);
+				(NOMINAL_OPP << OMAP4430_OPP_SEL_SHIFT),
+				OMAP4430_PRM_DEVICE_MOD,
+				v_info->vdd_info->omap_abb_reg_val.prm_abb_ldo_ctrl_idx);
 			ret = omap4_abb_change_opp(v_info->vdd_info);
 		}
-	} else if (val == VOLTAGE_POSTCHANGE &&
-			target_volt_data->abb_type == FAST_OPP) {
+	} else if (val == VOLTAGE_POSTCHANGE) {
 		/* enable Forward Body-Bias before raising voltage */
-		if (cpu_is_omap3630()) {
+		if (cpu_is_omap3630() &&
+				target_volt_data->abb_type == FAST_OPP) {
 			prm_rmw_mod_reg_bits(OMAP3630_OPP_SEL_MASK,
 			(FAST_OPP << OMAP3630_OPP_SEL_SHIFT),
 			OMAP3430_GR_MOD,
 			v_info->vdd_info->omap_abb_reg_val.prm_abb_ldo_setup_idx);
 			ret = omap3_abb_change_opp(v_info->vdd_info);
-		} else { /* cpu_is_omap44xx() */
+		} else if (cpu_is_omap44xx() &&
+				(target_volt_data->abb_type == FAST_OPP ||
+				target_volt_data->abb_type == SLOW_OPP)) {
+			prm_rmw_mod_reg_bits(OMAP4430_ACTIVE_FBB_SEL_MASK |
+					OMAP4430_ACTIVE_RBB_SEL_MASK,
+				(target_volt_data->abb_type == FAST_OPP) ?
+					OMAP4430_ACTIVE_FBB_SEL_MASK :
+					OMAP4430_ACTIVE_RBB_SEL_MASK,
+				OMAP4430_PRM_DEVICE_MOD,
+				vdd_info->omap_abb_reg_val.prm_abb_ldo_setup_idx);
 			prm_rmw_mod_reg_bits(OMAP4430_OPP_SEL_MASK,
-			(FAST_OPP << OMAP4430_OPP_SEL_SHIFT),
-			OMAP4430_PRM_DEVICE_MOD,
-			v_info->vdd_info->omap_abb_reg_val.prm_abb_ldo_ctrl_idx);
+				(target_volt_data->abb_type << OMAP4430_OPP_SEL_SHIFT),
+				OMAP4430_PRM_DEVICE_MOD,
+				v_info->vdd_info->omap_abb_reg_val.prm_abb_ldo_ctrl_idx);
 			ret = omap4_abb_change_opp(v_info->vdd_info);
 		}
 	} else
 		ret = -EINVAL;
-
 out:
 	return ret;
 }
@@ -813,18 +829,17 @@ static struct notifier_block abb_iva_volt_notifier_block = {
  * omap_abb_init - initialize Adaptive Body-Bias LDO
  * @vdd_info : pointer to the voltage domain we are initializing
  *
- * Currently only supports OMAP4.  Enables active Forward Body-Bias by default
- * on VDD_MPU only, not on VDD_IVA.  Disables sleep Reverse Body-Bias and
- * active Reverse Body-Bias for both voltage domains.  Registers voltage
- * notifiers for affected voltage domains.  Returns 0 on success, negative
- * integers otherwise.
+ * Currently only supports OMAP4. Disables sleep Reverse Body-Bias.
+ * active Reverse Body-Bias and active Forward Body-Bias
+ * for both voltage domains by default.
+ * Registers voltage notifiers for affected voltage domains.
+ * Returns 0 on success, negative integers otherwise.
  */
 static int omap_abb_init(struct omap_vdd_info *vdd_info)
 {
 	int ret = 0;
 	struct clk *sys_ck;
 	u32 sr2_wt_cnt_val;
-
 	if (!cpu_is_omap3630() && !cpu_is_omap44xx()) {
 		pr_info("%s: CPU does not support ABB feature.\n", __func__);
 		ret = -EINVAL;
@@ -868,20 +883,28 @@ static int omap_abb_init(struct omap_vdd_info *vdd_info)
 				OMAP4430_PRM_DEVICE_MOD,
 				vdd_info->omap_abb_reg_val.prm_abb_ldo_setup_idx);
 
-		/* enable fbb by default */
-		prm_set_mod_reg_bits(OMAP4430_ACTIVE_FBB_SEL_MASK,
+		/* disable ABB by default */
+		prm_clear_mod_reg_bits(OMAP4430_ACTIVE_FBB_SEL_MASK |
+					OMAP4430_ACTIVE_RBB_SEL_MASK |
+					OMAP4430_SLEEP_RBB_SEL_MASK,
 				OMAP4430_PRM_DEVICE_MOD,
 				vdd_info->omap_abb_reg_val.prm_abb_ldo_setup_idx);
 
-		/* do not enable active rbb by default */
-		prm_clear_mod_reg_bits(OMAP4430_ACTIVE_RBB_SEL_MASK,
-				OMAP4430_PRM_DEVICE_MOD,
-				vdd_info->omap_abb_reg_val.prm_abb_ldo_setup_idx);
+		if (cpu_is_omap446x()) {
+			int i;
+			u32 val = omap_ctrl_readl(
+					OMAP4_CTRL_MODULE_CORE_STD_FUSE_OPP_DPLL_1_OFFSET);
 
-		/* do not enable sleep rbb by default */
-		prm_clear_mod_reg_bits(OMAP4430_SLEEP_RBB_SEL_MASK,
-				OMAP4430_PRM_DEVICE_MOD,
-				vdd_info->omap_abb_reg_val.prm_abb_ldo_setup_idx);
+			for (i = 0; i < vdd_info->volt_data_count; i++) {
+				struct omap_abb_trim_data *abb_trim_data;
+				abb_trim_data = &vdd_info->volt_data[i].abb_trim;
+
+				if (val & abb_trim_data->rbb_trim_mask) {
+					vdd_info->volt_data[i].abb_type = SLOW_OPP;
+				} else if (val & abb_trim_data->fbb_trim_mask)
+					vdd_info->volt_data[i].abb_type = FAST_OPP;
+			}
+		}
 	}
 
 	if(!strcmp("mpu", vdd_info->voltdm.name)) {
@@ -894,7 +917,6 @@ static int omap_abb_init(struct omap_vdd_info *vdd_info)
 		pr_warning("%s: Invalid VDD specified\n", __func__);
 		ret = -EINVAL;
 	}
-
 out:
 	return ret;
 }

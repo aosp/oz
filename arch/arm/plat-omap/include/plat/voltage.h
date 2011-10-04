@@ -74,6 +74,11 @@ struct voltagedomain {
  *			  field also differs according to the voltage/opp.
  * @abb_type		: Bitfield OPP_SEL.PRM_LDO_ABB_CTRL.
  */
+struct omap_abb_trim_data {
+	u32 rbb_trim_mask;
+	u32 fbb_trim_mask;
+};
+
 struct omap_volt_data {
 	u32	volt_nominal;
 	u32	volt_calibrated;
@@ -82,8 +87,8 @@ struct omap_volt_data {
 	u8	sr_errminlimit;
 	u8	vp_errgain;
 	u8	abb_type;
+	struct omap_abb_trim_data abb_trim;
 };
-
 
 /* Various voltage controller related info */
 struct omap_volt_vc_data {
