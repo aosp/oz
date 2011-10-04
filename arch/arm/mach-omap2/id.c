@@ -27,6 +27,8 @@
 
 #define FUSE_MPU_DPLL_BITMASK	0xC0000
 #define FUSE_MPU_DPLL_BITOFFSET 18
+#define DCC_1_2G		0x01
+#define DCC_1_5G		0x03
 
 static struct omap_chip_id omap_chip;
 static unsigned int omap_revision;
@@ -241,9 +243,9 @@ static void __init omap4_check_features(void)
 
 		val = (val & FUSE_MPU_DPLL_BITMASK) >> FUSE_MPU_DPLL_BITOFFSET;
 		omap4_features |= (OMAP4_HAS_DCC_1_5GHZ | OMAP4_HAS_DCC_1_2GHZ);
-		omap4_features &= ~((val == 3) ? (OMAP4_HAS_DCC_1_2GHZ |
+		omap4_features &= ~((val == DCC_1_5G) ? (OMAP4_HAS_DCC_1_2GHZ |
 						 OMAP4_HAS_DCC_1_5GHZ) :
-				    (val == 2) ? OMAP4_HAS_DCC_1_2GHZ : 0);
+				    (val == DCC_1_2G) ? OMAP4_HAS_DCC_1_2GHZ : 0);
 	}
 
 	if (omap4_sb_off)
