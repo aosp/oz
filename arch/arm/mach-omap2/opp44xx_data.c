@@ -39,6 +39,9 @@ static struct clk *core_m3_clk, *core_m6_clk, *core_m7_clk;
 static struct clk *per_m3_clk, *per_m6_clk;
 static struct clk *abe_clk, *sgx_clk, *fdif_clk, *hsi_clk;
 
+static unsigned long cur_rate;
+static unsigned long rev_lpg;
+
 /*
  * Separate OPP table is needed for pre ES2.1 chips as emif cannot be scaled.
  * This table needs to be maintained only temporarily till everybody
@@ -280,7 +283,7 @@ static struct omap_opp_def __initdata omap446x_opp_def_list[] = {
 
 static unsigned long omap4_mpu_get_rate(struct device *dev);
 
-#ifndef CONFIG_CPU_FREQ
+#ifdef CONFIG_CPU_FREQ
 static unsigned long compute_lpj(unsigned long ref, u_int div, u_int mult)
 {
 	unsigned long new_jiffy_l, new_jiffy_h;
@@ -312,6 +315,8 @@ static int omap4_mpu_set_rate(struct device *dev, unsigned long rate)
 			__func__, rate);
 		return ret;
 	}
+
+	loops_per_jiffy = compute_lpj(rev_lpg, cur_rate / 1000, rate / 1000);
 
 	return 0;
 }
@@ -538,6 +543,9 @@ int __init omap4_pm_init_opp_table(void)
 	abe_clk = clk_get(NULL, "abe_clk");
 	fdif_clk = clk_get(NULL, "fdif_fck");
 	hsi_clk = clk_get(NULL, "hsi_fck");
+
+	cur_rate = clk_get_rate(dpll_mpu_clk);
+	rev_lpg = loops_per_jiffy;
 
 	/* Set SGX parent to PER DPLL */
 	clk_set_parent(gpu_fclk, sgx_clk);
