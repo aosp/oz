@@ -823,10 +823,16 @@ static void __init prcm_clear_statdep_regs(void)
 	 * towards L4CFG and L4WKUP on OMAP4460
 	 */
 	if (!cpu_is_omap443x()) {
-
+#if 0
 		/* MPU towards L4CFG and L4WKUP clockdomains */
 		reg = OMAP4430_L4CFG_STATDEP_MASK |
 			OMAP4430_L4WKUP_STATDEP_MASK;
+#else
+		/* MPU towards L4CFG clockdomains */
+		reg = OMAP4430_L4CFG_STATDEP_MASK;
+
+		/* Note: MPU towards L4WKUP needed for OFF mode */
+#endif
 		cm_rmw_mod_reg_bits(reg, 0, OMAP4430_CM1_MPU_MOD,
 			OMAP4_CM_MPU_STATICDEP_OFFSET);
 
