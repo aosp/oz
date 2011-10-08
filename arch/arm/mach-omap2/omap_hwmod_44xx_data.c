@@ -4336,11 +4336,11 @@ static struct omap_hwmod_ocp_if *omap44xx_smartreflex_core_slaves[] = {
 
 static u32 omap44xx_sr_core_efuse_offs[] = {
 	OMAP44XX_CONTROL_FUSE_CORE_OPP50, OMAP44XX_CONTROL_FUSE_CORE_OPP50,
-	OMAP44XX_CONTROL_FUSE_CORE_OPP100,
+	OMAP44XX_CONTROL_FUSE_CORE_OPP100, OMAP44XX_CONTROL_FUSE_CORE_OPP119
 };
 
 static u32 omap44xx_sr_core_test_nvalues[] = {
-	0x0, 0x0, 0x0
+	0x0, 0x0, 0x0, 0x0
 };
 
 static struct omap_sr_dev_data omap44xx_sr_core_dev_attr = {
