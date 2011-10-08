@@ -1369,6 +1369,10 @@ static int __init tablet_i2c_init(void)
 		tablet_i2c_3_boardinfo, ARRAY_SIZE(tablet_i2c_3_boardinfo));
 	omap_register_i2c_bus(4, 400, &tablet_i2c_4_bus_pdata,
 		tablet_i2c_4_boardinfo, ARRAY_SIZE(tablet_i2c_4_boardinfo));
+
+	/* Setup pull-up resistor for I2C-3 */
+	omap2_i2c_pullup(3, I2C_PULLUP_STD_860_OM_FAST_500_OM);
+
 	return 0;
 }
 
