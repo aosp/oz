@@ -821,8 +821,10 @@ done_ovl:
 					d->win.y, d->win.w, d->win.h);
 		}
 	} else {
-		/* wait for sync to avoid tear */
-		r = mgr->apply(mgr) ? : mgr->wait_for_vsync(mgr);
+		/* wait until the changes done to the manager cache are
+		 * applied in the HW rather than just one vsync
+		 */
+		r = mgr->apply(mgr) ? : mgr->wait_for_go(mgr);
 		if (r)
 			dev_err(DEV(cdev), "failed while applying %d", r);
 
