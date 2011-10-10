@@ -30,7 +30,8 @@
 /*
  * GIC distibutor disable flag (omap4460)
  */
-u32 disable_gd = 1;
+u32 disable_gd;
+
 /* SCU base address */
 void __iomem *scu_base;
 /*
