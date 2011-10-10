@@ -572,25 +572,31 @@ static int dss_mgr_wait_for_go(struct omap_overlay_manager *mgr)
 	if (!dssdev || dssdev->state != OMAP_DSS_DISPLAY_ACTIVE)
 		return 0;
 	channel = mgr->device->channel;
-	if (dssdev->type == OMAP_DISPLAY_TYPE_VENC
-		|| dssdev->type == OMAP_DISPLAY_TYPE_HDMI) {
-		irq = DISPC_IRQ_EVSYNC_ODD | DISPC_IRQ_EVSYNC_EVEN;
-	} else {
-		if (dssdev->caps & OMAP_DSS_DISPLAY_CAP_MANUAL_UPDATE) {
-			enum omap_dss_update_mode mode;
-			mode = dssdev->driver->get_update_mode(dssdev);
-			if (mode != OMAP_DSS_UPDATE_AUTO)
-				return 0;
 
-			irq = (channel == OMAP_DSS_CHANNEL_LCD) ?
-				DISPC_IRQ_FRAMEDONE
-				: DISPC_IRQ_FRAMEDONE2;
-		} else {
-			irq = (channel == OMAP_DSS_CHANNEL_LCD) ?
-				DISPC_IRQ_VSYNC
-				: DISPC_IRQ_VSYNC2;
-		}
-	}
+	/* For DSI, determine IRQ based on xfer_mode */
+	if (dssdev->type == OMAP_DISPLAY_TYPE_VENC
+		|| dssdev->type == OMAP_DISPLAY_TYPE_HDMI)
+		irq = DISPC_IRQ_EVSYNC_ODD | DISPC_IRQ_EVSYNC_EVEN;
+	else if ((dssdev->type == OMAP_DISPLAY_TYPE_DSI) &&
+			(dssdev->channel == OMAP_DSS_CHANNEL_LCD)) {
+		if (dssdev->phy.dsi.xfer_mode == OMAP_DSI_XFER_VIDEO_MODE)
+			irq = DISPC_IRQ_VSYNC;
+		else
+			irq = DISPC_IRQ_FRAMEDONE;
+	} else if ((dssdev->type == OMAP_DISPLAY_TYPE_DSI) &&
+			(dssdev->channel == OMAP_DSS_CHANNEL_LCD2)) {
+		if (dssdev->phy.dsi.xfer_mode == OMAP_DSI_XFER_VIDEO_MODE)
+			irq = DISPC_IRQ_VSYNC2;
+		else
+			irq = DISPC_IRQ_FRAMEDONE2;
+	} else if ((dssdev->type == OMAP_DISPLAY_TYPE_DPI)
+			&& (dssdev->channel == OMAP_DSS_CHANNEL_LCD))
+			irq = DISPC_IRQ_VSYNC;
+	else if ((dssdev->type == OMAP_DISPLAY_TYPE_DPI)
+			&& (dssdev->channel == OMAP_DSS_CHANNEL_LCD2))
+			irq = DISPC_IRQ_VSYNC2;
+	else
+		return 0;
 
 	mc = &dss_cache.manager_cache[mgr->id];
 	i = 0;
