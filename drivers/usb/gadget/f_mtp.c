@@ -629,9 +629,20 @@ static int mtp_send_file(struct mtp_dev *dev, struct file *filp,
 	struct usb_request *req = 0;
 	int r = count, xfer, ret;
 
+	int need_zlp = 0;
+
 	DBG(cdev, "mtp_send_file(%lld %d)\n", offset, count);
 
-	while (count > 0) {
+	/* Send 'Zero Length Packet' at end of the transfer if it's size
+	 * is a multiple of the bulk max packet size
+	 */
+	if ((dev->thread_file_length & (dev->ep_in->maxpacket - 1)) == 0)
+		need_zlp = 1;
+
+	while (count > 0 || need_zlp) {
+		if (count == 0)
+			need_zlp = 0;
+
 		/* get an idle tx request to use */
 		req = 0;
 		ret = wait_event_interruptible(dev->write_wq,
