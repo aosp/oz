@@ -45,7 +45,7 @@
 
 void hsi_save_ctx(struct hsi_dev *hsi_ctrl)
 {
-	struct hsi_platform_data *pdata = hsi_ctrl->dev->platform_data;
+	struct hsi_platform_data *pdata = dev_get_platdata(hsi_ctrl->dev);
 	struct platform_device *pdev = to_platform_device(hsi_ctrl->dev);
 	void __iomem *base = hsi_ctrl->base;
 	struct hsi_port_ctx *p;
@@ -86,7 +86,7 @@ void hsi_save_ctx(struct hsi_dev *hsi_ctrl)
 
 void hsi_restore_ctx(struct hsi_dev *hsi_ctrl)
 {
-	struct hsi_platform_data *pdata = hsi_ctrl->dev->platform_data;
+	struct hsi_platform_data *pdata = dev_get_platdata(hsi_ctrl->dev);
 	struct platform_device *pdev = to_platform_device(hsi_ctrl->dev);
 	void __iomem *base = hsi_ctrl->base;
 	struct hsi_port_ctx *p;
@@ -337,10 +337,10 @@ static void hsi_set_ports_default(struct hsi_dev *hsi_ctrl,
 					    struct platform_device *pd)
 {
 	struct hsi_port_ctx *cfg;
-	struct hsi_platform_data *pdata = pd->dev.platform_data;
+	struct hsi_platform_data *pdata = dev_get_platdata(hsi_ctrl->dev);
+	struct platform_device *pdev = to_platform_device(hsi_ctrl->dev);
 	unsigned int port = 0;
 	void __iomem *base = hsi_ctrl->base;
-	struct platform_device *pdev = to_platform_device(hsi_ctrl->dev);
 
 	for (port = 1; port <= pdata->num_ports; port++) {
 		cfg = &pdata->ctx->pctx[port - 1];
@@ -430,7 +430,7 @@ static int hsi_port_channels_reset(struct hsi_port *port)
 void hsi_softreset_driver(struct hsi_dev *hsi_ctrl)
 {
 	struct platform_device *pd = to_platform_device(hsi_ctrl->dev);
-	struct hsi_platform_data *pdata = pd->dev.platform_data;
+	struct hsi_platform_data *pdata = dev_get_platdata(hsi_ctrl->dev);
 	struct hsi_port *hsi_p;
 	unsigned int port;
 	u32 revision;
@@ -528,7 +528,7 @@ static void hsi_ports_exit(struct hsi_dev *hsi_ctrl, unsigned int max_ports)
 static int __init hsi_ports_init(struct hsi_dev *hsi_ctrl)
 {
 	struct platform_device *pd = to_platform_device(hsi_ctrl->dev);
-	struct hsi_platform_data *pdata = pd->dev.platform_data;
+	struct hsi_platform_data *pdata = dev_get_platdata(hsi_ctrl->dev);
 	struct hsi_port *hsi_p;
 	unsigned int port;
 	int err;
@@ -589,10 +589,8 @@ static int __init hsi_request_gdd_irq(struct hsi_dev *hsi_ctrl)
 
 static int __init hsi_init_gdd_chan_count(struct hsi_dev *hsi_ctrl)
 {
-	struct platform_device *pd = to_platform_device(hsi_ctrl->dev);
+	struct hsi_platform_data *pdata = dev_get_platdata(hsi_ctrl->dev);
 	u8 gdd_chan_count;
-	struct hsi_platform_data *pdata =
-			(struct hsi_platform_data *)pd->dev.platform_data;
 	int i;
 
 	if (!pdata) {
@@ -733,7 +731,7 @@ int hsi_clocks_enable_channel(struct device *dev, u8 channel_number,
 static int __init hsi_controller_init(struct hsi_dev *hsi_ctrl,
 					 struct platform_device *pd)
 {
-	struct hsi_platform_data *pdata = pd->dev.platform_data;
+	struct hsi_platform_data *pdata = dev_get_platdata(&pd->dev);
 	struct resource *mem, *ioarea;
 	int err;
 
@@ -808,7 +806,7 @@ static void hsi_controller_exit(struct hsi_dev *hsi_ctrl)
 /* HSI Platform Device probing & hsi_device registration */
 static int __init hsi_platform_device_probe(struct platform_device *pd)
 {
-	struct hsi_platform_data *pdata = pd->dev.platform_data;
+	struct hsi_platform_data *pdata = dev_get_platdata(&pd->dev);
 	struct hsi_dev *hsi_ctrl;
 	u32 revision;
 	int err;
@@ -950,7 +948,7 @@ static int hsi_pm_prepare(struct device *dev)
 
 static int hsi_pm_suspend(struct device *dev)
 {
-	struct hsi_platform_data *pdata = dev->platform_data;
+	struct hsi_platform_data *pdata = dev_get_platdata(dev);
 	struct platform_device *pd = to_platform_device(dev);
 	struct hsi_dev *hsi_ctrl = platform_get_drvdata(pd);
 	unsigned int i;
@@ -994,7 +992,7 @@ static int hsi_pm_suspend_noirq(struct device *dev)
 
 static int hsi_pm_resume(struct device *dev)
 {
-	struct hsi_platform_data *pdata = dev->platform_data;
+	struct hsi_platform_data *pdata = dev_get_platdata(dev);
 	struct platform_device *pd = to_platform_device(dev);
 	struct hsi_dev *hsi_ctrl = platform_get_drvdata(pd);
 	unsigned int i;
@@ -1030,9 +1028,9 @@ static int hsi_pm_resume(struct device *dev)
 */
 int hsi_runtime_resume(struct device *dev)
 {
+	struct hsi_platform_data *pdata = dev_get_platdata(dev);
 	struct platform_device *pd = to_platform_device(dev);
 	struct hsi_dev *hsi_ctrl = platform_get_drvdata(pd);
-	struct hsi_platform_data *pdata = hsi_ctrl->dev->platform_data;
 	unsigned int i;
 
 	dev_dbg(dev, "%s\n", __func__);
@@ -1065,9 +1063,9 @@ int hsi_runtime_resume(struct device *dev)
 */
 int hsi_runtime_suspend(struct device *dev)
 {
+	struct hsi_platform_data *pdata = dev_get_platdata(dev);
 	struct platform_device *pd = to_platform_device(dev);
 	struct hsi_dev *hsi_ctrl = platform_get_drvdata(pd);
-	struct hsi_platform_data *pdata = hsi_ctrl->dev->platform_data;
 	int port, i;
 
 	dev_dbg(dev, "%s\n", __func__);
