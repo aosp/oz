@@ -808,11 +808,18 @@ static void __init prcm_clear_statdep_regs(void)
 	 * Asynchronous Bridge is safe on OMAP4460
 	 */
 	if (!cpu_is_omap443x()) {
+#if 0
+		/*
+		 * Since we have random crashes and freezes
+		 * on trimmed 4460 SOM's keep SD
+		 * between MPU and EMIF
+		 */
+
 		/* MPU towards EMIF clockdomain */
 		reg = OMAP4430_MEMIF_STATDEP_MASK;
 		cm_rmw_mod_reg_bits(reg, 0, OMAP4430_CM1_MPU_MOD,
 			OMAP4_CM_MPU_STATICDEP_OFFSET);
-
+#endif
 		/* Ducati towards EMIF clockdomain */
 		reg = OMAP4430_MEMIF_STATDEP_MASK;
 		cm_rmw_mod_reg_bits(reg, 0, OMAP4430_CM2_CORE_MOD,
