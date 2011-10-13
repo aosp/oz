@@ -485,7 +485,7 @@ static struct omap_vdd_dep_volt omap44xx_vddiva_vddcore_data[] = {
 /* OMAP 4460 MPU Core VDD dependency table */
 static struct omap_vdd_dep_volt omap446x_vddmpu_vddcore_data[] = {
 	{.main_vdd_volt = 1025000, .dep_vdd_volt = 1025000},
-	{.main_vdd_volt = 1200000, .dep_vdd_volt = 1025000},
+	{.main_vdd_volt = 1200000, .dep_vdd_volt = 1200000},
 	{.main_vdd_volt = 1313000, .dep_vdd_volt = 1200000},
 	{.main_vdd_volt = 1375000, .dep_vdd_volt = 1200000},
 	{.main_vdd_volt = 1376000, .dep_vdd_volt = 1200000},
