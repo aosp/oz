@@ -275,8 +275,7 @@ int hsi_open(struct hsi_device *dev)
 		return -EINVAL;
 	}
 	if (ch->flags & HSI_CH_OPEN) {
-		dev_err(dev->device.parent,
-			"Port %d Channel %d already OPENED\n",
+		dev_err(dev->device.parent, "Port %d Channel %d already open\n",
 			dev->n_p, dev->n_ch);
 		return -EBUSY;
 	}
@@ -286,7 +285,7 @@ int hsi_open(struct hsi_device *dev)
 
 	spin_lock_bh(&hsi_ctrl->lock);
 
-	err = hsi_clocks_enable_channel(dev->device.parent, ch->channel_number,
+	err = hsi_clocks_enable_channel(hsi_ctrl->dev, ch->channel_number,
 					__func__);
 	if (err < 0) {
 		spin_unlock_bh(&hsi_ctrl->lock);
@@ -302,8 +301,7 @@ int hsi_open(struct hsi_device *dev)
 	/* NOTE: error and break are port events and do not need to be
 	 * enabled for HSI extended enable register */
 
-	hsi_clocks_disable_channel(dev->device.parent, ch->channel_number,
-				__func__);
+	hsi_clocks_disable_channel(hsi_ctrl->dev, ch->channel_number, __func__);
 	spin_unlock_bh(&hsi_ctrl->lock);
 
 	return 0;
@@ -324,6 +322,7 @@ EXPORT_SYMBOL(hsi_open);
 int hsi_write(struct hsi_device *dev, u32 *addr, unsigned int size)
 {
 	struct hsi_channel *ch;
+	struct hsi_dev *hsi_ctrl;
 	int err;
 
 	if (unlikely(!dev)) {
@@ -337,39 +336,41 @@ int hsi_write(struct hsi_device *dev, u32 *addr, unsigned int size)
 			dev, addr, size);
 		return -EINVAL;
 	}
-	dev_dbg(dev->device.parent, "%s ch %d, @%x, size %d u32\n", __func__,
+
+	ch = dev->ch;
+	hsi_ctrl = ch->hsi_port->hsi_controller;
+
+	dev_dbg(hsi_ctrl->dev, "%s ch %d, @%x, size %d u32\n", __func__,
 		dev->n_ch, (u32) addr, size);
 
 	if (unlikely(!(dev->ch->flags & HSI_CH_OPEN))) {
-		dev_err(dev->device.parent, "HSI device NOT open\n");
+		dev_err(hsi_ctrl->dev, "HSI device NOT open\n");
 		return -EINVAL;
 	}
 
-	ch = dev->ch;
 	if (ch->write_data.addr != NULL) {
-		dev_err(dev->device.parent, "# Invalid request - Write "
+		dev_err(hsi_ctrl->dev, "# Invalid request - Write "
 				"operation pending port %d channel %d\n",
 					ch->hsi_port->port_number,
 					ch->channel_number);
 		return -EINVAL;
 	}
 
-	spin_lock_bh(&ch->hsi_port->hsi_controller->lock);
+	spin_lock_bh(&hsi_ctrl->lock);
 
 #ifdef USE_PM_RUNTIME_FOR_HSI
-	if (pm_runtime_suspended(dev->device.parent) ||
-		!ch->hsi_port->hsi_controller->clock_enabled)
+	if (pm_runtime_suspended(hsi_ctrl->dev) || !hsi_ctrl->clock_enabled)
 #else
-	if (!ch->hsi_port->hsi_controller->clock_enabled)
+	if (!hsi_ctrl->clock_enabled)
 #endif
-		dev_dbg(dev->device.parent,
+		dev_dbg(hsi_ctrl->dev,
 			"hsi_write with HSI clocks OFF, clock_enabled = %d\n",
-			ch->hsi_port->hsi_controller->clock_enabled);
+			hsi_ctrl->clock_enabled);
 
-	err = hsi_clocks_enable_channel(dev->device.parent,
-				ch->channel_number, __func__);
+	err = hsi_clocks_enable_channel(hsi_ctrl->dev, ch->channel_number,
+					__func__);
 	if (err < 0) {
-		spin_unlock_bh(&ch->hsi_port->hsi_controller->lock);
+		spin_unlock_bh(&hsi_ctrl->lock);
 		return err;
 	}
 
@@ -385,10 +386,10 @@ int hsi_write(struct hsi_device *dev, u32 *addr, unsigned int size)
 	if (unlikely(err < 0)) {
 		ch->write_data.addr = NULL;
 		ch->write_data.size = 0;
-		dev_err(dev->device.parent, "Failed to program write\n");
+		dev_err(hsi_ctrl->dev, "Failed to program write\n");
 	}
 
-	spin_unlock_bh(&ch->hsi_port->hsi_controller->lock);
+	spin_unlock_bh(&hsi_ctrl->lock);
 
 	/* Leave clocks enabled until transfer is complete (write callback */
 	/* is called */
@@ -410,6 +411,7 @@ EXPORT_SYMBOL(hsi_write);
 int hsi_read(struct hsi_device *dev, u32 *addr, unsigned int size)
 {
 	struct hsi_channel *ch;
+	struct hsi_dev *hsi_ctrl;
 	int err;
 
 	if (unlikely(!dev)) {
@@ -432,27 +434,27 @@ int hsi_read(struct hsi_device *dev, u32 *addr, unsigned int size)
 	}
 
 	ch = dev->ch;
+	hsi_ctrl = ch->hsi_port->hsi_controller;
 
-	spin_lock_bh(&ch->hsi_port->hsi_controller->lock);
+	spin_lock_bh(&hsi_ctrl->lock);
 #ifdef USE_PM_RUNTIME_FOR_HSI
-	if (pm_runtime_suspended(dev->device.parent) ||
-		!ch->hsi_port->hsi_controller->clock_enabled)
+	if (pm_runtime_suspended(hsi_ctrl->dev) || !hsi_ctrl->clock_enabled)
 #else
-	if (!ch->hsi_port->hsi_controller->clock_enabled)
+	if (!hsi_ctrl->clock_enabled)
 #endif
-		dev_dbg(dev->device.parent,
+		dev_dbg(hsi_ctrl->dev,
 			"hsi_read with HSI clocks OFF, clock_enabled = %d\n",
-			ch->hsi_port->hsi_controller->clock_enabled);
+			hsi_ctrl->clock_enabled);
 
-	err = hsi_clocks_enable_channel(dev->device.parent, ch->channel_number,
+	err = hsi_clocks_enable_channel(hsi_ctrl->dev, ch->channel_number,
 				__func__);
 	if (err < 0) {
-		spin_unlock_bh(&ch->hsi_port->hsi_controller->lock);
+		spin_unlock_bh(&hsi_ctrl->lock);
 		return err;
 	}
 
 	if (ch->read_data.addr != NULL) {
-		dev_err(dev->device.parent, "# Invalid request - Read "
+		dev_err(hsi_ctrl->dev, "# Invalid request - Read "
 				"operation pending port %d channel %d\n",
 					ch->hsi_port->port_number,
 					ch->channel_number);
@@ -472,13 +474,12 @@ int hsi_read(struct hsi_device *dev, u32 *addr, unsigned int size)
 	if (unlikely(err < 0)) {
 		ch->read_data.addr = NULL;
 		ch->read_data.size = 0;
-		dev_err(dev->device.parent, "Failed to program read\n");
+		dev_err(hsi_ctrl->dev, "Failed to program read\n");
 	}
 
 done:
-	hsi_clocks_disable_channel(dev->device.parent, ch->channel_number,
-				__func__);
-	spin_unlock_bh(&ch->hsi_port->hsi_controller->lock);
+	hsi_clocks_disable_channel(hsi_ctrl->dev, ch->channel_number, __func__);
+	spin_unlock_bh(&hsi_ctrl->lock);
 
 	return err;
 }
@@ -487,21 +488,21 @@ EXPORT_SYMBOL(hsi_read);
 int __hsi_write_cancel(struct hsi_channel *ch)
 {
 	int err = -ENODATA;
+	struct hsi_dev *hsi_ctrl = ch->hsi_port->hsi_controller;;
 
 	if (ch->write_data.size == 1)
 		err = hsi_driver_cancel_write_interrupt(ch);
 	else if (ch->write_data.size > 1)
 		err = hsi_driver_cancel_write_dma(ch);
 	else
-		dev_dbg(ch->dev->device.parent, "%s : Nothing to cancel %d\n",
-			__func__, ch->write_data.size);
+		dev_dbg(hsi_ctrl->dev, "%s : Nothing to cancel %d\n", __func__,
+			ch->write_data.size);
 
 	/* Trash any frame still in the FIFO */
-	hsi_hst_fifo_flush_channel(ch->hsi_port->hsi_controller,
-				   ch->hsi_port->port_number,
+	hsi_hst_fifo_flush_channel(hsi_ctrl, ch->hsi_port->port_number,
 				   ch->channel_number);
 
-	dev_dbg(ch->dev->device.parent, "%s : %d\n", __func__, err);
+	dev_dbg(hsi_ctrl->dev, "%s : %d\n", __func__, err);
 
 	return err;
 }
@@ -522,32 +523,36 @@ int __hsi_write_cancel(struct hsi_channel *ch)
  */
 int hsi_write_cancel(struct hsi_device *dev)
 {
+	struct hsi_dev *hsi_ctrl;
 	int err;
 
 	if (unlikely(!dev || !dev->ch)) {
 		pr_err(LOG_NAME "Wrong HSI device %p\n", dev);
 		return -ENODEV;
 	}
-	dev_dbg(dev->device.parent, "%s ch %d\n", __func__, dev->n_ch);
+
+	hsi_ctrl = dev->ch->hsi_port->hsi_controller;
+
+	dev_dbg(hsi_ctrl->dev, "%s ch %d\n", __func__, dev->n_ch);
 
 	if (unlikely(!(dev->ch->flags & HSI_CH_OPEN))) {
-		dev_err(dev->device.parent, "HSI device NOT open\n");
+		dev_err(hsi_ctrl->dev, "HSI device NOT open\n");
 		return -ENODEV;
 	}
 
-	spin_lock_bh(&dev->ch->hsi_port->hsi_controller->lock);
-	err = hsi_clocks_enable_channel(dev->device.parent,
-					dev->ch->channel_number, __func__);
+	spin_lock_bh(&hsi_ctrl->lock);
+	err = hsi_clocks_enable_channel(hsi_ctrl->dev, dev->ch->channel_number,
+					__func__);
 	if (err < 0) {
-		spin_unlock_bh(&dev->ch->hsi_port->hsi_controller->lock);
+		spin_unlock_bh(&hsi_ctrl->lock);
 		return err;
 	}
 
 	err = __hsi_write_cancel(dev->ch);
 
-	hsi_clocks_disable_channel(dev->device.parent, dev->ch->channel_number,
-				__func__);
-	spin_unlock_bh(&dev->ch->hsi_port->hsi_controller->lock);
+	hsi_clocks_disable_channel(hsi_ctrl->dev, dev->ch->channel_number,
+				   __func__);
+	spin_unlock_bh(&hsi_ctrl->lock);
 
 	return err;
 }
@@ -556,21 +561,21 @@ EXPORT_SYMBOL(hsi_write_cancel);
 int __hsi_read_cancel(struct hsi_channel *ch)
 {
 	int err = -ENODATA;
+	struct hsi_dev *hsi_ctrl = ch->hsi_port->hsi_controller;;
 
 	if (ch->read_data.size == 1)
 		err = hsi_driver_cancel_read_interrupt(ch);
 	else if (ch->read_data.size > 1)
 		err = hsi_driver_cancel_read_dma(ch);
 	else
-		dev_dbg(ch->dev->device.parent, "%s : Nothing to cancel %d\n",
-			__func__, ch->read_data.size);
+		dev_dbg(hsi_ctrl->dev, "%s : Nothing to cancel %d\n", __func__,
+			ch->read_data.size);
 
 	/* Trash any frame still in the FIFO */
-	hsi_hsr_fifo_flush_channel(ch->hsi_port->hsi_controller,
-				   ch->hsi_port->port_number,
+	hsi_hsr_fifo_flush_channel(hsi_ctrl, ch->hsi_port->port_number,
 				   ch->channel_number);
 
-	dev_dbg(ch->dev->device.parent, "%s : %d\n", __func__, err);
+	dev_dbg(hsi_ctrl->dev, "%s : %d\n", __func__, err);
 
 	return err;
 }
@@ -591,32 +596,36 @@ int __hsi_read_cancel(struct hsi_channel *ch)
  */
 int hsi_read_cancel(struct hsi_device *dev)
 {
+	struct hsi_dev *hsi_ctrl;
 	int err;
 
 	if (unlikely(!dev || !dev->ch)) {
 		pr_err(LOG_NAME "Wrong HSI device %p\n", dev);
 		return -ENODEV;
 	}
-	dev_dbg(dev->device.parent, "%s ch %d\n", __func__, dev->n_ch);
+
+	hsi_ctrl = dev->ch->hsi_port->hsi_controller;
+
+	dev_dbg(hsi_ctrl->dev, "%s ch %d\n", __func__, dev->n_ch);
 
 	if (unlikely(!(dev->ch->flags & HSI_CH_OPEN))) {
-		dev_err(dev->device.parent, "HSI device NOT open\n");
+		dev_err(hsi_ctrl->dev, "HSI device NOT open\n");
 		return -ENODEV;
 	}
 
-	spin_lock_bh(&dev->ch->hsi_port->hsi_controller->lock);
-	err = hsi_clocks_enable_channel(dev->device.parent,
-					dev->ch->channel_number, __func__);
+	spin_lock_bh(&hsi_ctrl->lock);
+	err = hsi_clocks_enable_channel(hsi_ctrl->dev, dev->ch->channel_number,
+					__func__);
 	if (err < 0) {
-		spin_unlock_bh(&dev->ch->hsi_port->hsi_controller->lock);
+		spin_unlock_bh(&hsi_ctrl->lock);
 		return err;
 	}
 
 	err = __hsi_read_cancel(dev->ch);
 
-	hsi_clocks_disable_channel(dev->device.parent, dev->ch->channel_number,
-				__func__);
-	spin_unlock_bh(&dev->ch->hsi_port->hsi_controller->lock);
+	hsi_clocks_disable_channel(hsi_ctrl->dev, dev->ch->channel_number,
+				   __func__);
+	spin_unlock_bh(&hsi_ctrl->lock);
 
 	return err;
 }
@@ -649,8 +658,8 @@ int hsi_poll(struct hsi_device *dev)
 	hsi_ctrl = ch->hsi_port->hsi_controller;
 
 	spin_lock_bh(&hsi_ctrl->lock);
-	err = hsi_clocks_enable_channel(dev->device.parent,
-					dev->ch->channel_number, __func__);
+	err = hsi_clocks_enable_channel(hsi_ctrl->dev, dev->ch->channel_number,
+					__func__);
 	if (err < 0) {
 		spin_unlock_bh(&hsi_ctrl->lock);
 		return err;
@@ -660,8 +669,8 @@ int hsi_poll(struct hsi_device *dev)
 
 	err = hsi_driver_enable_read_interrupt(ch, NULL);
 
-	hsi_clocks_disable_channel(dev->device.parent, dev->ch->channel_number,
-				__func__);
+	hsi_clocks_disable_channel(hsi_ctrl->dev, dev->ch->channel_number,
+				   __func__);
 	spin_unlock_bh(&hsi_ctrl->lock);
 
 	return err;
@@ -695,8 +704,8 @@ int hsi_unpoll(struct hsi_device *dev)
 	hsi_ctrl = ch->hsi_port->hsi_controller;
 
 	spin_lock_bh(&hsi_ctrl->lock);
-	err = hsi_clocks_enable_channel(dev->device.parent,
-					dev->ch->channel_number, __func__);
+	err = hsi_clocks_enable_channel(hsi_ctrl->dev, dev->ch->channel_number,
+					__func__);
 	if (err < 0) {
 		spin_unlock_bh(&hsi_ctrl->lock);
 		return err;
@@ -706,8 +715,8 @@ int hsi_unpoll(struct hsi_device *dev)
 
 	hsi_driver_disable_read_interrupt(ch);
 
-	hsi_clocks_disable_channel(dev->device.parent, dev->ch->channel_number,
-				__func__);
+	hsi_clocks_disable_channel(hsi_ctrl->dev, dev->ch->channel_number,
+				   __func__);
 	spin_unlock_bh(&hsi_ctrl->lock);
 
 	return 0;
@@ -752,12 +761,10 @@ int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg)
 	channel = ch->channel_number;
 	base = hsi_ctrl->base;
 
-	dev_dbg(dev->device.parent, "IOCTL: ch %d, command %d\n",
-		channel, command);
+	dev_dbg(hsi_ctrl->dev, "IOCTL: ch %d, command %d\n", channel, command);
 
 	spin_lock_bh(&hsi_ctrl->lock);
-	err_clk = hsi_clocks_enable_channel(dev->device.parent, channel,
-					    __func__);
+	err_clk = hsi_clocks_enable_channel(hsi_ctrl->dev, channel, __func__);
 	if (err_clk < 0) {
 		spin_unlock_bh(&hsi_ctrl->lock);
 		return err_clk;
@@ -768,7 +775,7 @@ int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg)
 		/* Wake up request to Modem (typically OMAP initiated) */
 		/* Symetrical disable will be done in HSI_IOCTL_ACWAKE_DOWN */
 		if (ch->flags & HSI_CH_ACWAKE) {
-			dev_dbg(dev->device.parent, "Duplicate ACWAKE UP\n");
+			dev_dbg(hsi_ctrl->dev, "Duplicate ACWAKE UP\n");
 			err = -EPERM;
 			goto out;
 		}
@@ -790,7 +797,7 @@ int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg)
 		/* following inactivity timeout) */
 		/* ACPU HSI block shall still be capable of receiving */
 		if (!(ch->flags & HSI_CH_ACWAKE)) {
-			dev_dbg(dev->device.parent, "Duplicate ACWAKE DOWN\n");
+			dev_dbg(hsi_ctrl->dev, "Duplicate ACWAKE DOWN\n");
 			err = -EPERM;
 			goto out;
 		}
@@ -798,7 +805,7 @@ int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg)
 		acwake = hsi_inl(base, HSI_SYS_WAKE_REG(port));
 		if (unlikely(pport->acwake_status !=
 				(acwake & HSI_WAKE_MASK))) {
-			dev_warn(dev->device.parent,
+			dev_warn(hsi_ctrl->dev,
 				"ACWAKE shadow register mismatch"
 				" acwake_status: 0x%x, HSI_SYS_WAKE_REG: 0x%x",
 				pport->acwake_status, acwake);
@@ -890,7 +897,7 @@ int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg)
 		hsi_get_tx(dev->ch->hsi_port, (struct hst_ctx *)arg);
 		break;
 	case HSI_IOCTL_SW_RESET:
-		dev_info(dev->device.parent, "SW Reset\n");
+		dev_info(hsi_ctrl->dev, "SW Reset\n");
 		err = hsi_softreset(hsi_ctrl);
 
 		/* Reset HSI config to default */
@@ -911,7 +918,7 @@ int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg)
 		*(size_t *)arg = hsi_get_rx_fifo_occupancy(hsi_ctrl, fifo);
 		break;
 	case HSI_IOCTL_SET_WAKE_RX_3WIRES_MODE:
-		dev_info(dev->device.parent,
+		dev_info(hsi_ctrl->dev,
 			 "Entering RX wakeup in 3 wires mode (no CAWAKE)\n");
 		pport->wake_rx_3_wires_mode = 1;
 		/* HW errata HSI-C1BUG00085, HSI wakeup issue in 3 wires mode :
@@ -926,8 +933,7 @@ int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg)
 		hsi_driver_disable_interrupt(pport, HSI_CAWAKEDETECTED);
 		break;
 	case HSI_IOCTL_SET_WAKE_RX_4WIRES_MODE:
-		dev_info(dev->device.parent,
-			 "Entering RX wakeup in 4 wires mode\n");
+		dev_info(hsi_ctrl->dev, "Entering RX wakeup in 4 wires mode\n");
 		pport->wake_rx_3_wires_mode = 0;
 		/* HW errata HSI-C1BUG00085 : go back to normal IDLE mode */
 		if (hsi_driver_device_is_hsi(to_platform_device(hsi_ctrl->dev)))
@@ -942,7 +948,7 @@ int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg)
 	}
 out:
 	/* All IOCTL end by disabling the clocks, except ACWAKE high. */
-	hsi_clocks_disable_channel(dev->device.parent, channel, __func__);
+	hsi_clocks_disable_channel(hsi_ctrl->dev, channel, __func__);
 
 	spin_unlock_bh(&hsi_ctrl->lock);
 
@@ -968,8 +974,8 @@ void hsi_close(struct hsi_device *dev)
 	hsi_ctrl = dev->ch->hsi_port->hsi_controller;
 
 	spin_lock_bh(&hsi_ctrl->lock);
-	err = hsi_clocks_enable_channel(dev->device.parent,
-					dev->ch->channel_number, __func__);
+	err = hsi_clocks_enable_channel(hsi_ctrl->dev, dev->ch->channel_number,
+					__func__);
 	if (err < 0) {
 		spin_unlock_bh(&hsi_ctrl->lock);
 		return;
@@ -981,8 +987,8 @@ void hsi_close(struct hsi_device *dev)
 		__hsi_read_cancel(dev->ch);
 	}
 
-	hsi_clocks_disable_channel(dev->device.parent, dev->ch->channel_number,
-				__func__);
+	hsi_clocks_disable_channel(hsi_ctrl->dev, dev->ch->channel_number,
+				   __func__);
 	spin_unlock_bh(&hsi_ctrl->lock);
 }
 EXPORT_SYMBOL(hsi_close);
@@ -1037,7 +1043,7 @@ void hsi_set_port_event_cb(struct hsi_device *dev,
 	struct hsi_dev *hsi_ctrl = port->hsi_controller;
 	int err;
 
-	dev_dbg(dev->device.parent, "%s ch %d\n", __func__, dev->n_ch);
+	dev_dbg(hsi_ctrl->dev, "%s ch %d\n", __func__, dev->n_ch);
 
 	write_lock_bh(&dev->ch->rw_lock);
 	dev->ch->port_event = port_event_cb;
@@ -1046,8 +1052,8 @@ void hsi_set_port_event_cb(struct hsi_device *dev,
 	/* Since we now have a callback registered for events, we can now */
 	/* enable the CAWAKE, ERROR and BREAK interrupts */
 	spin_lock_bh(&hsi_ctrl->lock);
-	err = hsi_clocks_enable_channel(dev->device.parent,
-					dev->ch->channel_number, __func__);
+	err = hsi_clocks_enable_channel(hsi_ctrl->dev, dev->ch->channel_number,
+					__func__);
 	if (err < 0) {
 		spin_unlock_bh(&hsi_ctrl->lock);
 		return;
@@ -1055,8 +1061,8 @@ void hsi_set_port_event_cb(struct hsi_device *dev,
 
 	hsi_driver_enable_interrupt(port, HSI_CAWAKEDETECTED | HSI_ERROROCCURED
 					| HSI_BREAKDETECTED);
-	hsi_clocks_disable_channel(dev->device.parent, dev->ch->channel_number,
-				__func__);
+	hsi_clocks_disable_channel(hsi_ctrl->dev, dev->ch->channel_number,
+				   __func__);
 	spin_unlock_bh(&hsi_ctrl->lock);
 }
 EXPORT_SYMBOL(hsi_set_port_event_cb);
