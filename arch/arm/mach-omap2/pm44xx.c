@@ -393,9 +393,10 @@ static irqreturn_t prcm_interrupt_handler (int irq, void *dev_id)
 
 	/* Check if a IO_ST interrupt */
 	if (irqstatus_mpu & OMAP4430_IO_ST_MASK) {
+#ifdef CONFIG_OMAP_HSI_DEVICE
 		/* Modem HSI wakeup */
 		omap_hsi_io_wakeup_check();
-
+#endif
 		/* usbhs remote wakeup */
 		usbhs_wakeup();
 		omap4_trigger_ioctrl();
@@ -443,8 +444,10 @@ static int omap4_pm_suspend(void)
 	omap4_wakeupgen_set_interrupt(cpu_id, OMAP44XX_IRQ_GPT1);
 	omap4_wakeupgen_set_interrupt(cpu_id, OMAP44XX_IRQ_PRCM);
 	omap4_wakeupgen_set_interrupt(cpu_id, OMAP44XX_IRQ_SYS_1N);
+#ifdef CONFIG_OMAP_HSI_DEVICE
 	omap4_wakeupgen_set_interrupt(cpu_id, OMAP44XX_IRQ_HSI_P1);
 	omap4_wakeupgen_set_interrupt(cpu_id, OMAP44XX_IRQ_HSI_DMA);
+#endif
 	omap4_wakeupgen_set_interrupt(cpu_id, OMAP44XX_IRQ_EMIF4_1);
 	omap4_wakeupgen_set_interrupt(cpu_id, OMAP44XX_IRQ_EMIF4_2);
 

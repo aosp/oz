@@ -1588,6 +1588,7 @@ static char *modem_ipc = "n/a";
 module_param(modem_ipc, charp, 0);
 MODULE_PARM_DESC(modem_ipc, "Modem IPC setting");
 
+#ifdef CONFIG_OMAP_HSI_DEVICE
 static void omap_4430hsi_pad_conf(void)
 {
 	/*
@@ -1641,6 +1642,7 @@ static void omap_4430hsi_pad_conf(void)
 		OMAP_PIN_OUTPUT | \
 		OMAP_PIN_OFF_NONE);
 }
+#endif
 
 static void enable_board_wakeup_source(void)
 {
@@ -1667,6 +1669,7 @@ static void enable_board_wakeup_source(void)
 	omap_mux_enable_wakeup("sys_nirq1");
 	omap_mux_enable_wakeup("sys_nirq2");
 
+#ifdef CONFIG_OMAP_HSI_DEVICE
 	if (!strcmp(modem_ipc, "hsi")) {
 		/*
 		 * Enable IO daisy for HSI CAWAKE line, to be able to
@@ -1675,7 +1678,7 @@ static void enable_board_wakeup_source(void)
 		 */
 		omap_mux_enable_wakeup("usbb1_ulpitll_clk.hsi1_cawake");
 	}
-
+#endif
 }
 
 static struct omap_volt_pmic_info omap4430_pmic_core = {
@@ -2062,6 +2065,7 @@ static void __init omap_4430sdp_init(void)
 	}
 #endif
 
+#ifdef CONFIG_OMAP_HSI_DEVICE
 	/*
 	 * Test board-4430sdp.modem_ipc bootargs value to detect if HSI pad
 	 * conf is required
@@ -2097,6 +2101,7 @@ static void __init omap_4430sdp_init(void)
 			 GPIO_REG_ADDR(6, OMAP4_GPIO_DATAOUT));
 
 	} else
+#endif
 		pr_info("Modem HSI not detected");
 
 	usb_uhhtll_init(&usbhs_pdata);

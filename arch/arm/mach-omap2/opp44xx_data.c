@@ -37,7 +37,11 @@
 static struct clk *dpll_mpu_clk, *iva_clk, *dsp_clk, *l3_clk, *core_m2_clk;
 static struct clk *core_m3_clk, *core_m6_clk, *core_m7_clk;
 static struct clk *per_m3_clk, *per_m6_clk;
-static struct clk *abe_clk, *sgx_clk, *fdif_clk, *hsi_clk;
+static struct clk *abe_clk, *sgx_clk, *fdif_clk;
+
+#ifdef CONFIG_OMAP_HSI_DEVICE
+static struct clk *hsi_clk;
+#endif
 
 static unsigned long cur_rate;
 static unsigned long rev_lpg;
@@ -92,10 +96,12 @@ static struct omap_opp_def __initdata omap44xx_pre_es2_1_opp_def_list[] = {
 	OMAP_OPP_DEF("gpu", true, 153600000, 930000),
 	/* SGX OPP2 - OPP100 */
 	OMAP_OPP_DEF("gpu", true, 307200000, 1100000),
+#ifdef CONFIG_OMAP_HSI_DEVICE
 	/* HSI OPP1 - OPP50 */
 	OMAP_OPP_DEF("hsi", true, 96000000, 930000),
 	/* HSI OPP2 - OPP100 */
 	OMAP_OPP_DEF("hsi", true, 96000000, 1100000),
+#endif
 };
 
 static struct omap_opp_def __initdata omap443x_opp_def_list[] = {
@@ -174,12 +180,14 @@ static struct omap_opp_def __initdata omap443x_opp_def_list[] = {
 	/* SGX OPP2 - OPP100 */
 	OMAP_OPP_DEF("gpu", true, 307200000, 1200000),
 
+#ifdef CONFIG_OMAP_HSI_DEVICE
 	/* HSI OPPLP - DPLL cascading */
 	OMAP_OPP_DEF("hsi", false, 98304000, 1005000),
 	/* HSI OPP1 - OPP50 */
 	OMAP_OPP_DEF("hsi", true, 96000000, 1025000),
 	/* HSI OPP2 - OPP100 */
 	OMAP_OPP_DEF("hsi", true, 96000000, 1200000),
+#endif
 };
 
 static struct omap_opp_def __initdata omap446x_opp_def_list[] = {
@@ -261,12 +269,14 @@ static struct omap_opp_def __initdata omap446x_opp_def_list[] = {
 	/* SGX OPP OVER - OPP119 */
 	OMAP_OPP_DEF("gpu", true, 384000000, 1200000),
 
+#ifdef CONFIG_OMAP_HSI_DEVICE
 	/* HSI OPPLP - DPLL cascading */
 	OMAP_OPP_DEF("hsi", false, 98304000, 1025000),
 	/* HSI OPP1 - OPP50 */
 	OMAP_OPP_DEF("hsi", true, 96000000, 1025000),
 	/* HSI OPP2 - OPP100 */
 	OMAP_OPP_DEF("hsi", true, 96000000, 1200000),
+#endif
 };
 
 #define	L3_OPP50_RATE			100000000
@@ -434,6 +444,7 @@ static unsigned long omap4_fdif_get_rate(struct device *dev)
 	return fdif_clk->rate ;
 }
 
+#ifdef CONFIG_OMAP_HSI_DEVICE
 static int omap4_hsi_set_rate(struct device *dev, unsigned long rate)
 {
 	return clk_set_rate(hsi_clk, rate);
@@ -443,6 +454,7 @@ static unsigned long omap4_hsi_get_rate(struct device *dev)
 {
 	return hsi_clk->rate ;
 }
+#endif
 
 struct device *find_dev_ptr(char *name)
 {
@@ -540,7 +552,9 @@ int __init omap4_pm_init_opp_table(void)
 	per_m6_clk = clk_get(NULL, "dpll_per_m6x2_ck");
 	abe_clk = clk_get(NULL, "abe_clk");
 	fdif_clk = clk_get(NULL, "fdif_fck");
+#ifdef CONFIG_OMAP_HSI_DEVICE
 	hsi_clk = clk_get(NULL, "hsi_fck");
+#endif
 
 	cur_rate = clk_get_rate(dpll_mpu_clk);
 	rev_lpg = loops_per_jiffy;
@@ -602,10 +616,12 @@ int __init omap4_pm_init_opp_table(void)
 		opp_populate_rate_fns(dev, omap4_fdif_set_rate,
 				omap4_fdif_get_rate);
 
+#ifdef CONFIG_OMAP_HSI_DEVICE
 	dev = find_dev_ptr("hsi");
 	if (dev)
 		opp_populate_rate_fns(dev, omap4_hsi_set_rate,
 				omap4_hsi_get_rate);
+#endif
 
 	return 0;
 }
