@@ -636,6 +636,7 @@ void hsi_clocks_disable_channel(struct device *dev, u8 channel_number,
 				const char *s)
 {
 	struct platform_device *pd = to_platform_device(dev);
+	struct hsi_platform_data *pdata = dev_get_platdata(dev);
 	struct hsi_dev *hsi_ctrl = platform_get_drvdata(pd);
 	int ret;
 
@@ -665,7 +666,7 @@ void hsi_clocks_disable_channel(struct device *dev, u8 channel_number,
 
 #ifndef USE_PM_RUNTIME_FOR_HSI
 	hsi_runtime_suspend(dev);
-	ret = omap_device_idle(pd);
+	ret = pdata->device_idle(pd);
 	if (ret)
 		dev_err(dev, "Failed to disable device: %s %d\n", s, ret);
 #else
@@ -696,6 +697,7 @@ int hsi_clocks_enable_channel(struct device *dev, u8 channel_number,
 				const char *s)
 {
 	struct platform_device *pd = to_platform_device(dev);
+	struct hsi_platform_data *pdata = dev_get_platdata(dev);
 	struct hsi_dev *hsi_ctrl = platform_get_drvdata(pd);
 	int ret;
 
@@ -716,7 +718,7 @@ int hsi_clocks_enable_channel(struct device *dev, u8 channel_number,
 #endif /* CONFIG_PM */
 
 #ifndef USE_PM_RUNTIME_FOR_HSI
-	ret = omap_device_enable(pd);
+	ret = pdata->device_enable(pd);
 	if (ret < 0) {
 		dev_err(dev, "Failed to enable device: %s %d\n", s, ret);
 		return ret;
@@ -821,6 +823,15 @@ static int __init hsi_platform_device_probe(struct platform_device *pd)
 		return -ENXIO;
 	}
 
+	/* Check if mandatory board functions are populated */
+	if (!pdata->device_enable || !pdata->device_idle ||
+	    !pdata->device_set_rate || !pdata->wakeup_enable ||
+	    !pdata->wakeup_disable || !pdata->wakeup_is_from_hsi ||
+	    !pdata->board_suspend) {
+		dev_err(&pd->dev, "Missing platform function pointers\n");
+		return -EINVAL;
+	}
+
 	hsi_ctrl = kzalloc(sizeof(*hsi_ctrl), GFP_KERNEL);
 	if (hsi_ctrl == NULL) {
 		dev_err(&pd->dev, "Could not allocate memory for"
@@ -882,7 +893,7 @@ static int __init hsi_platform_device_probe(struct platform_device *pd)
 	device_init_wakeup(hsi_ctrl->dev, true);
 
 	/* Set the HSI FCLK to default. */
-	err = omap_device_set_rate(hsi_ctrl->dev, hsi_ctrl->dev,
+	err = pdata->device_set_rate(hsi_ctrl->dev, hsi_ctrl->dev,
 					pdata->default_hsi_fclk);
 	if (err)
 		dev_err(&pd->dev, "Cannot set HSI FClk to default value: %ld\n",
