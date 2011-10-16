@@ -337,6 +337,8 @@ bool dss_get_mainclk_state(void);
 unsigned long dss_get_cache_req_pck(void);
 int dss_mainclk_enable(void);
 void dss_mainclk_disable(void);
+void dss_clk_lock(void);
+void dss_clk_unlock(void);
 
 /* SDI */
 #ifdef CONFIG_OMAP2_DSS_SDI

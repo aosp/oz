@@ -1672,9 +1672,12 @@ static irqreturn_t hdmi_irq_handler(int irq, void *arg)
 	unsigned long flags;
 	int r = 0;
 
+	dss_clk_lock();
 	/* don't let work with HDMI regs when clocks are off */
-	if (!dss_get_mainclk_state())
+	if (!dss_get_mainclk_state()) {
+		dss_clk_unlock();
 		return IRQ_HANDLED;
+	}
 
 	/* process interrupt in critical section to handle conflicts */
 	spin_lock_irqsave(&irqstatus_lock, flags);
@@ -1692,6 +1695,7 @@ static irqreturn_t hdmi_irq_handler(int irq, void *arg)
 		hdmi_connected = false;
 
 	spin_unlock_irqrestore(&irqstatus_lock, flags);
+	dss_clk_unlock();
 
 	hdmi_handle_irq_work(r | in_reset);
 
@@ -1724,13 +1728,6 @@ static void hdmi_power_off(struct omap_dss_device *dssdev)
 		set_hdmi_hot_plug_status(dssdev, false);
 		/* ignore return value for now */
 
-	/*
-	 * WORKAROUND: wait before turning off HDMI.  This may give
-	 * audio/video enough time to stop operations.  However, if
-	 * user reconnects HDMI, response will be delayed.
-	 */
-	mdelay(100); /* Tunning the delay*/
-
 	dssdev->state = OMAP_DSS_DISPLAY_DISABLED;
 	hdmi_power_off_phy(dssdev);
 
@@ -1738,6 +1735,15 @@ static void hdmi_power_off(struct omap_dss_device *dssdev)
 		dssdev->platform_disable(dssdev);
 
 	hdmi_enable_clocks(0);
+
+	/*
+	 * WORKAROUND: wait before turning off HDMI.  This may give
+	 * audio/video enough time to stop operations.  However, if
+	 * user reconnects HDMI, response will be delayed.
+	 * Handle interrupts (disconnect irq) with disabled clocks is
+	 * not a good idea. Moved mdelay() after hdmi_power_off_phy()
+	 */
+	mdelay(100); /* Tunning the delay*/
 
 	/* cut clock(s) */
 	dss_mainclk_state_disable(true);
