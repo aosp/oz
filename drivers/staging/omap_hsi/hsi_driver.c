@@ -43,6 +43,38 @@
 #define HSI_RESETDONE_NORMAL_RETRIES	1 /* Reset should complete in 1 R/W */
 					  /* cycle */
 
+
+void hsi_hsr_suspend(struct hsi_dev *hsi_ctrl)
+{
+	struct hsi_platform_data *pdata = hsi_ctrl->dev->platform_data;
+	int port;
+
+	dev_dbg(hsi_ctrl->dev, "%s\n", __func__);
+
+	/* Put HSR into SLEEP mode to force ACREADY to low while HSI is idle */
+	for (port = 1; port <= pdata->num_ports; port++) {
+		hsi_outl_and(HSI_HSR_MODE_MODE_VAL_SLEEP, hsi_ctrl->base,
+			     HSI_HSR_MODE_REG(port));
+	}
+}
+
+void hsi_hsr_resume(struct hsi_dev *hsi_ctrl)
+{
+	struct hsi_platform_data *pdata = hsi_ctrl->dev->platform_data;
+	void __iomem *base = hsi_ctrl->base;
+	struct hsi_port_ctx *p;
+	int port;
+
+	dev_dbg(hsi_ctrl->dev, "%s\n", __func__);
+
+	/* Move HSR from MODE_VAL.SLEEP to the relevant mode. */
+	/* This will enable the ACREADY flow control mechanism. */
+	for (port = 1; port <= pdata->num_ports; port++) {
+		p = &pdata->ctx->pctx[port - 1];
+		hsi_outl(p->hsr.mode, base, HSI_HSR_MODE_REG(port));
+	}
+}
+
 void hsi_save_ctx(struct hsi_dev *hsi_ctrl)
 {
 	struct hsi_platform_data *pdata = dev_get_platdata(hsi_ctrl->dev);
@@ -127,14 +159,6 @@ void hsi_restore_ctx(struct hsi_dev *hsi_ctrl)
 		/* SW strategy for HSI fifo management can be changed here */
 		hsi_fifo_mapping(hsi_ctrl, hsi_ctrl->fifo_mapping_strategy);
 	}
-
-	/* As a last step move HSR from MODE_VAL.SLEEP to the relevant mode. */
-	/* This will enable the ACREADY flow control mechanism. */
-	for (port = 1; port <= pdata->num_ports; port++) {
-		p = &pdata->ctx->pctx[port - 1];
-		hsi_outl(p->hsr.mode, base, HSI_HSR_MODE_REG(port));
-	}
-
 }
 
 
@@ -1054,6 +1078,9 @@ int hsi_runtime_resume(struct device *dev)
 	/* Restore context */
 	hsi_restore_ctx(hsi_ctrl);
 
+	/* Allow data reception */
+	hsi_hsr_resume(hsi_ctrl);
+
 	/* When HSI is ON, no need for IO wakeup mechanism on any HSI port */
 	for (i = 0; i < hsi_ctrl->max_p; i++)
 		pdata->wakeup_disable(hsi_ctrl->hsi_port[i].port_number);
@@ -1077,7 +1104,7 @@ int hsi_runtime_suspend(struct device *dev)
 	struct hsi_platform_data *pdata = dev_get_platdata(dev);
 	struct platform_device *pd = to_platform_device(dev);
 	struct hsi_dev *hsi_ctrl = platform_get_drvdata(pd);
-	int port, i;
+	int i;
 
 	dev_dbg(dev, "%s\n", __func__);
 
@@ -1089,11 +1116,8 @@ int hsi_runtime_suspend(struct device *dev)
 
 	hsi_ctrl->clock_enabled = false;
 
-	/* Put HSR into SLEEP mode to force ACREADY to low while HSI is idle */
-	for (port = 1; port <= pdata->num_ports; port++) {
-		hsi_outl_and(HSI_HSR_MODE_MODE_VAL_SLEEP, hsi_ctrl->base,
-			     HSI_HSR_MODE_REG(port));
-	}
+	/* Forbid data reception */
+	hsi_hsr_suspend(hsi_ctrl);
 
 	/* HSI is going to IDLE, it needs IO wakeup mechanism enabled */
 	if (device_may_wakeup(dev))
