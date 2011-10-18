@@ -450,15 +450,12 @@ static ssize_t display_hpd_enabled_store(struct device *dev,
 
 	enabled = simple_strtoul(buf, NULL, 10);
 
-	if (enabled != (dssdev->state != OMAP_DSS_DISPLAY_DISABLED)) {
-		if (enabled) {
-			r = dssdev->driver->hpd_enable(dssdev);
-			if (r)
-				return r;
-		} else {
-			dssdev->driver->disable(dssdev);
-		}
-	}
+	if (enabled) {
+		r = dssdev->driver->hpd_enable(dssdev);
+		if (r)
+			return r;
+	} else
+		dssdev->driver->disable(dssdev);
 
 	return size;
 }
