@@ -380,41 +380,39 @@ static irqreturn_t omap_mcpdm_irq_handler(int irq, void *dev_id)
 	/* Acknowledge irq event */
 	omap_mcpdm_write(mcpdm, MCPDM_IRQSTATUS, irq_status);
 
-	if (irq & MCPDM_DN_IRQ_FULL) {
-		dev_err(mcpdm->dev, "DN FIFO error %x\n", irq_status);
+	if (irq_status & MCPDM_DN_IRQ_FULL) {
+		dev_dbg(mcpdm->dev, "DN FIFO error %x\n", irq_status);
 		omap_mcpdm_reset_playback(mcpdm, 1);
 		omap_mcpdm_playback_open(mcpdm, mcpdm->downlink);
 		omap_mcpdm_reset_playback(mcpdm, 0);
 	}
 
-	if (irq & MCPDM_DN_IRQ_EMPTY) {
-		dev_err(mcpdm->dev, "DN FIFO error %x\n", irq_status);
+	if (irq_status & MCPDM_DN_IRQ_EMPTY) {
+		dev_dbg(mcpdm->dev, "DN FIFO error %x\n", irq_status);
 		omap_mcpdm_reset_playback(mcpdm, 1);
 		omap_mcpdm_playback_open(mcpdm, mcpdm->downlink);
 		omap_mcpdm_reset_playback(mcpdm, 0);
 	}
 
-	if (irq & MCPDM_DN_IRQ) {
+	if (irq_status & MCPDM_DN_IRQ)
 		dev_dbg(mcpdm->dev, "DN write request\n");
-	}
 
-	if (irq & MCPDM_UP_IRQ_FULL) {
-		dev_err(mcpdm->dev, "UP FIFO error %x\n", irq_status);
+	if (irq_status & MCPDM_UP_IRQ_FULL) {
+		dev_dbg(mcpdm->dev, "UP FIFO error %x\n", irq_status);
 		omap_mcpdm_reset_capture(mcpdm, 1);
 		omap_mcpdm_capture_open(mcpdm, mcpdm->uplink);
 		omap_mcpdm_reset_capture(mcpdm, 0);
 	}
 
-	if (irq & MCPDM_UP_IRQ_EMPTY) {
-		dev_err(mcpdm->dev, "UP FIFO error %x\n", irq_status);
+	if (irq_status & MCPDM_UP_IRQ_EMPTY) {
+		dev_dbg(mcpdm->dev, "UP FIFO error %x\n", irq_status);
 		omap_mcpdm_reset_capture(mcpdm, 1);
 		omap_mcpdm_capture_open(mcpdm, mcpdm->uplink);
 		omap_mcpdm_reset_capture(mcpdm, 0);
 	}
 
-	if (irq & MCPDM_UP_IRQ) {
+	if (irq_status & MCPDM_UP_IRQ)
 		dev_dbg(mcpdm->dev, "UP write request\n");
-	}
 
 	return IRQ_HANDLED;
 }
