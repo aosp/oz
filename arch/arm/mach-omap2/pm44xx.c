@@ -64,6 +64,8 @@ static struct powerdomain *core_pwrdm, *per_pwrdm;
 
 static struct voltagedomain *vdd_mpu, *vdd_iva, *vdd_core;
 
+static struct clockdomain *l3_emif_clkdm;
+
 #define MAX_IOPAD_LATCH_TIME 1000
 
 /**
@@ -211,6 +213,9 @@ void omap4_enter_sleep(unsigned int cpu, unsigned int power_state)
 	core_next_state = pwrdm_read_next_pwrst(core_pwrdm);
 	mpu_next_state = pwrdm_read_next_pwrst(mpu_pwrdm);
 
+	if (!l3_emif_clkdm)
+		l3_emif_clkdm = clkdm_lookup("l3_emif_clkdm");
+
 	if (mpu_next_state < PWRDM_POWER_INACTIVE) {
 		/* Disable SR for MPU VDD */
 		omap_smartreflex_disable(vdd_mpu);
@@ -231,8 +236,28 @@ void omap4_enter_sleep(unsigned int cpu, unsigned int power_state)
 		 * optimized.
 		 */
 
-		if (cpu_is_omap446x())
+		if (cpu_is_omap446x()) {
 			omap_temp_sensor_prepare_idle();
+
+		       /*
+			* Since we have random crashes and freezes
+			* on trimmed 4460 SOM's keep SD
+			* between MPU and EMIF during non active
+			* states.
+			*/
+
+			/* Configures MEMIF clockdomain in SW_WKUP */
+			omap2_clkdm_wakeup(l3_emif_clkdm);
+
+			/* Enable SD for MPU towards EMIF */
+			cm_rmw_mod_reg_bits(OMAP4430_MEMIF_STATDEP_MASK,
+					    (1 << OMAP4430_MEMIF_STATDEP_SHIFT),
+					    OMAP4430_CM1_MPU_MOD,
+					    OMAP4_CM_MPU_STATICDEP_OFFSET);
+
+			/* Configures MEMIF clockdomain back to HW_AUTO */
+			omap2_clkdm_allow_idle(l3_emif_clkdm);
+		}
 
 		if (omap4_device_off_read_next_state()) {
 			omap2_gpio_prepare_for_idle(1);
@@ -247,6 +272,7 @@ void omap4_enter_sleep(unsigned int cpu, unsigned int power_state)
 
 		omap4_trigger_ioctrl();
 	}
+
 	if (core_next_state < PWRDM_POWER_INACTIVE) {
 		/* Disable SR for CORE and IVA VDD*/
 		omap_smartreflex_disable(vdd_iva);
@@ -343,10 +369,20 @@ restore_state:
 				OMAP4430_PRM_DEVICE_MOD,
 				OMAP4_PRM_IO_PMCTRL_OFFSET);
 
-		if (cpu_is_omap446x())
+		if (cpu_is_omap446x()) {
 			omap_temp_sensor_resume_idle();
 
+			/* Configures MEMIF clockdomain in SW_WKUP */
+			omap2_clkdm_wakeup(l3_emif_clkdm);
 
+			/* Disable SD for MPU towards EMIF */
+			cm_rmw_mod_reg_bits(OMAP4430_MEMIF_STATDEP_MASK, 0,
+					    OMAP4430_CM1_MPU_MOD,
+					    OMAP4_CM_MPU_STATICDEP_OFFSET);
+
+			/* Configures MEMIF clockdomain back to HW_AUTO */
+			omap2_clkdm_allow_idle(l3_emif_clkdm);
+		}
 	}
 
 	if (core_next_state < PWRDM_POWER_INACTIVE) {
@@ -781,7 +817,7 @@ static void __init prcm_clear_statdep_regs(void)
 	return;
 #else
 	u32 reg;
-	struct clockdomain *l3_emif_clkdm, *l3_init_clkdm, *l4_per_clkdm;
+	struct clockdomain *l3_init_clkdm, *l4_per_clkdm;
 
 	pr_info("%s: Clearing static depndencies\n", __func__);
 
@@ -794,7 +830,9 @@ static void __init prcm_clear_statdep_regs(void)
 	* during 1 idle cycle if SD is changed while domain is OFF
 	*/
 
-	l3_emif_clkdm = clkdm_lookup("l3_emif_clkdm");
+	if (!l3_emif_clkdm)
+		l3_emif_clkdm = clkdm_lookup("l3_emif_clkdm");
+
 	l3_init_clkdm = clkdm_lookup("l3_init_clkdm");
 	l4_per_clkdm = clkdm_lookup("l4_per_clkdm");
 
@@ -811,18 +849,11 @@ static void __init prcm_clear_statdep_regs(void)
 	 * Asynchronous Bridge is safe on OMAP4460
 	 */
 	if (!cpu_is_omap443x()) {
-#if 0
-		/*
-		 * Since we have random crashes and freezes
-		 * on trimmed 4460 SOM's keep SD
-		 * between MPU and EMIF
-		 */
-
 		/* MPU towards EMIF clockdomain */
 		reg = OMAP4430_MEMIF_STATDEP_MASK;
 		cm_rmw_mod_reg_bits(reg, 0, OMAP4430_CM1_MPU_MOD,
 			OMAP4_CM_MPU_STATICDEP_OFFSET);
-#endif
+
 		/* Ducati towards EMIF clockdomain */
 		reg = OMAP4430_MEMIF_STATDEP_MASK;
 		cm_rmw_mod_reg_bits(reg, 0, OMAP4430_CM2_CORE_MOD,
@@ -910,7 +941,6 @@ static int __init omap4_pm_init(void)
 	cpu1_pwrdm = pwrdm_lookup("cpu1_pwrdm");
 	core_pwrdm = pwrdm_lookup("core_pwrdm");
 	per_pwrdm = pwrdm_lookup("l4per_pwrdm");
-
 
 #ifdef CONFIG_PM
 	prcm_setup_regs();
