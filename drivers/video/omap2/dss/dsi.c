@@ -53,6 +53,9 @@
 
 struct dsi_reg { u16 idx; };
 
+#define VP_HSYNC_START 17
+#define VP_HSYNC_END 18
+
 #define DSI_REG(idx)		((const struct dsi_reg) { idx })
 
 #define DSI_SZ_REGS		SZ_1K
@@ -4270,6 +4273,61 @@ void dsi2_exit(void)
 }
 
 /**
+ * dsi_get_tl - Calculate field Tl of DSI_VM_TIMING3
+ * @dssdev: Pointer to dss device
+ *
+ * return Tl values
+ */
+static int dsi_get_tl(struct omap_dss_device *dssdev)
+{
+	int ndl;
+	int hsa;
+	int the;
+	int hfp;
+	int hbp;
+	int wc;
+	int vp_hsync_start;
+	int vp_hsync_end;
+	int tl;
+	struct omap_dsi_video_timings vm_timing;
+	enum omap_dsi_index ix;
+
+	vm_timing = dssdev->phy.dsi.vm_timing;
+
+	ix = (dssdev->channel == OMAP_DSS_CHANNEL_LCD) ? DSI1 : DSI2;
+
+	vp_hsync_start = ((dsi_read_reg(ix, DSI_CTRL)) >> VP_HSYNC_START) & 0x1;
+	vp_hsync_end = ((dsi_read_reg(ix, DSI_CTRL)) >> VP_HSYNC_END) & 0x1;
+
+	ndl = 0;
+	if (dssdev->phy.dsi.data1_lane != 0)
+		ndl++;
+	if (dssdev->phy.dsi.data2_lane != 0)
+		ndl++;
+	if (dssdev->phy.dsi.data3_lane != 0)
+		ndl++;
+	if (dssdev->phy.dsi.data4_lane != 0)
+		ndl++;
+
+	hsa = vm_timing.hsa;
+	hfp = vm_timing.hfp;
+	hbp = vm_timing.hbp;
+
+	if (vp_hsync_start && vp_hsync_end && (hsa == 0) && (ndl == 3))
+		the = 1;
+	else if (vp_hsync_start && vp_hsync_end)
+		the = 4 / ndl + (4 % ndl ? 1 : 0);
+	else
+		the = 0;
+
+	wc = dssdev->panel.timings.x_res * 3;
+
+	tl = hsa + the + hfp + (wc + 6) / ndl + ((wc + 6) / ndl ? 1 : 0) + hbp;
+
+	return tl;
+}
+
+/**
  * dsi_videomode_panel_preinit - Configure DSI registers for video mode
  * @dssdev: Pointer to dss device
  *
@@ -4310,10 +4368,11 @@ void dsi_videomode_panel_preinit(struct omap_dss_device *dssdev)
 
 	dsi_write_reg(ix, DSI_VM_TIMING2, r);
 
-	/* TODO remove harcoding */
-	/* TL(31:16)=1008,
-	 * VACT(15:0)=768 */
-	dsi_write_reg(ix, DSI_VM_TIMING3, 0x03F00300);
+	r = 0;
+	r = FLD_MOD(r, dssdev->panel.timings.y_res, 15, 0);
+	r = FLD_MOD(r, dsi_get_tl(dssdev), 31, 16);
+	dsi_write_reg(ix, DSI_VM_TIMING3, r);
+
 	/* HSA_HS_INTERLEAVING(23:16)=72,
 	 * HFP_HS_INTERLEAVING(15:8)=114,
 	 * HBP_HS_INTERLEAVING(7:0)=150 */
