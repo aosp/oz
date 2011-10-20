@@ -438,7 +438,6 @@ int dsi_vc_send_long(enum omap_dsi_index ix, int channel,
 void dsi_set_stop_mode(bool stop);
 void dsi_videomode_panel_preinit(struct omap_dss_device *dssdev);
 void dsi_videomode_panel_postinit(struct omap_dss_device *dssdev);
-void d2l_config(void);
 
 /* Board specific data */
 #define PWM2ON			0x03

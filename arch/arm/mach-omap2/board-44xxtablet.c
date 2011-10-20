@@ -517,6 +517,8 @@ static struct toshiba_dsi_panel_data blazetablet_dsi_panel = {
 	.ext_te_gpio	= 101,
 	.use_esd_check	= false,
 	.set_backlight	= NULL,
+	.x_res			= 1024,/*1280 for tablet2*/
+	.y_res			= 768, /*800 for tablet2*/
 };
 
 static struct omap_dss_device blazetablet_lcd_device = {
@@ -1901,6 +1903,11 @@ static void __init omap_44xxtablet_init(void)
 		sdp4430_spi_board_info[0].irq = gpio_to_irq(ETH_KS8851_IRQ);
 		spi_register_board_info(sdp4430_spi_board_info,
 				ARRAY_SIZE(sdp4430_spi_board_info));
+	}
+
+	if (omap_get_board_version() >= OMAP4_TABLET_2_0) {
+		blazetablet_dsi_panel.x_res = 1280;
+		blazetablet_dsi_panel.y_res = 800;
 	}
 
 	omap_display_init(&blazetablet_dss_data);

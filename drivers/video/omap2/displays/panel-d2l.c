@@ -452,9 +452,11 @@ static void d2l_set_timings(struct omap_dss_device *dssdev,
 }
 
 static int d2l_check_timings(struct omap_dss_device *dssdev,
-			     struct omap_video_timings *timings)
+				struct omap_video_timings *timings)
 {
-	if (timings->x_res != D2L_WIDTH || timings->y_res != D2L_HEIGHT)
+	if (timings->x_res != dssdev->panel.timings.x_res ||
+			timings->y_res != dssdev->panel.timings.y_res)
+
 		return -EINVAL;
 
 	return 0;
@@ -596,6 +598,9 @@ static int d2l_probe(struct omap_dss_device *dssdev)
 		goto err;
 	}
 
+	panel_config->timings.x_res = panel_data->x_res;
+	panel_config->timings.y_res = panel_data->y_res;
+
 	dssdev->panel.config = OMAP_DSS_LCD_TFT;
 	dssdev->panel.timings = panel_config->timings;
 	dssdev->panel.data_type = DSI_DT_PXLSTREAM_24BPP_PACKED;
@@ -646,6 +651,8 @@ static void d2l_remove(struct omap_dss_device *dssdev)
 	kfree(d2d);
 }
 
+static void d2l_config(struct omap_dss_device *dssdev);
+
 static int d2l_power_on(struct omap_dss_device *dssdev)
 {
 	struct d2l_data *d2d = dev_get_drvdata(&dssdev->dev);
@@ -673,7 +680,8 @@ static int d2l_power_on(struct omap_dss_device *dssdev)
 
 		/* Toshiba Bridge Constraint */
 		msleep(100);
-		d2l_config();
+
+		d2l_config(dssdev);
 
 		dsi_videomode_panel_postinit(dssdev);
 
@@ -689,8 +697,10 @@ err:
  *
  * Initial configuration for D2L configuration registers, PLL...
  */
-void d2l_config(void)
+static void d2l_config(struct omap_dss_device *dssdev)
 {
+	struct omap_video_timings *panel_timings = &dssdev->panel.timings;
+
 	/* configure D2L chip DSI-RX configuration registers */
 	/* SYSLPTX Timing Generation Counter */
 	d2l_write_register(PPI_LPTXTIMECNT, 0x00000004);
@@ -713,10 +723,12 @@ void d2l_config(void)
 
 	/* configure D2L chip LCD Controller configuration registers */
 	d2l_write_register(VPCTRL, 0x00F00110); /* vtgen on */
-	d2l_write_register(HTIM1, 0x00200006);
-	d2l_write_register(HTIM2, 0x011A0400);
-	d2l_write_register(VTIM1, 0x000F0008);
-	d2l_write_register(VTIM2, 0x000F0300);
+
+	d2l_write_register(HTIM1, panel_timings->hbp << 16 | panel_timings->hsw);
+	d2l_write_register(HTIM2, panel_timings->hfp << 16 | panel_timings->x_res);
+	d2l_write_register(VTIM1, panel_timings->vbp << 16 | panel_timings->vsw);
+	d2l_write_register(VTIM2, panel_timings->vfp << 16 | panel_timings->y_res);
+
 	d2l_write_register(LVCFG, 0x00000001);
 
 	/* Issue a soft reset to LCD Controller for a clean start */
