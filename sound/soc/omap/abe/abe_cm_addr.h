@@ -1,15 +1,15 @@
 /*
  *
- * This file is provided under a dual BSD/GPLv2license.  When using or
+ * This file is provided under a dual BSD/GPLv2 license.  When using or
  * redistributing this file, you may do so under either license.
  *
  * GPL LICENSE SUMMARY
  *
- * Copyright(c) 2010-2011Texas Instruments Incorporated,
+ * Copyright(c) 2010-2011 Texas Instruments Incorporated,
  * All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
- * it under the terms of version 2of the GNU General Public License as
+ * it under the terms of version 2 of the GNU General Public License as
  * published by the Free Software Foundation.
  *
  * This program is distributed in the hope that it will be useful, but
@@ -19,13 +19,13 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51Franklin St - Fifth Floor, Boston, MA 02110-1301USA.
+ * Foundation, Inc., 51 Franklin St - Fifth Floor, Boston, MA 02110-1301 USA.
  * The full GNU General Public License is included in this distribution
  * in the file called LICENSE.GPL.
  *
  * BSD LICENSE
  *
- * Copyright(c) 2010-2011Texas Instruments Incorporated,
+ * Copyright(c) 2010-2011 Texas Instruments Incorporated,
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -297,4 +297,10 @@
 #define C_SRC_44P1_MULFAC2_ADDR                             1758
 #define C_SRC_44P1_MULFAC2_ADDR_END                         1759
 #define C_SRC_44P1_MULFAC2_sizeof                           2
+#define C_SRC_FIR12_LP_GAIN_Coefs_ADDR                      1760
+#define C_SRC_FIR12_LP_GAIN_Coefs_ADDR_END                  1880
+#define C_SRC_FIR12_LP_GAIN_Coefs_sizeof                    121
+#define C_SRC_6_HP_New_Coefs_ADDR                           1881
+#define C_SRC_6_HP_New_Coefs_ADDR_END                       1887
+#define C_SRC_6_HP_New_Coefs_sizeof                         7
 #endif /* _ABECM_ADDR_H_ */

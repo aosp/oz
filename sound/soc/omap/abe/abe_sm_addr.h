@@ -501,4 +501,19 @@
 #define S_SRC_44P1_MULFAC1_ADDR                             2444
 #define S_SRC_44P1_MULFAC1_ADDR_END                         2444
 #define S_SRC_44P1_MULFAC1_sizeof                           1
+#define S_SATURATION_EQ_ADDR                                2445
+#define S_SATURATION_EQ_ADDR_END                            2445
+#define S_SATURATION_EQ_sizeof                              1
+#define S_BT_DL_48_8_LP_NEW_data_ADDR                       2446
+#define S_BT_DL_48_8_LP_NEW_data_ADDR_END                   2462
+#define S_BT_DL_48_8_LP_NEW_data_sizeof                     17
+#define S_BT_DL_8_48_OSR_LP_data_ADDR                       2463
+#define S_BT_DL_8_48_OSR_LP_data_ADDR_END                   2583
+#define S_BT_DL_8_48_OSR_LP_data_sizeof                     121
+#define S_VX_UL_48_8_LP_NEW_data_ADDR                       2584
+#define S_VX_UL_48_8_LP_NEW_data_ADDR_END                   2600
+#define S_VX_UL_48_8_LP_NEW_data_sizeof                     17
+#define S_VX_UL_8_48_OSR_LP_data_ADDR                       2601
+#define S_VX_UL_8_48_OSR_LP_data_ADDR_END                   2721
+#define S_VX_UL_8_48_OSR_LP_data_sizeof                     121
 #endif /* _ABESM_ADDR_H_ */

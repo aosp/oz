@@ -75,7 +75,7 @@ const abe_port_t abe_port_init[LAST_PORT_ID] = {
 	   reseted at start Port Name for the debug trace */
 	/* DMIC */ {
 		    OMAP_ABE_PORT_ACTIVITY_IDLE, {96000, SIX_MSB},
-		    NODRIFT, NOCALLBACK, 0, (DMIC_ITER/6),
+		    NODRIFT, NOCALLBACK, 1, (DMIC_ITER/6),
 		    {
 		     SNK_P, DMIC_PORT_PROT,
 		     {{dmem_dmic, dmem_dmic_size, DMIC_ITER} }
@@ -209,7 +209,7 @@ const abe_port_t abe_port_init[LAST_PORT_ID] = {
 			{0, 0}, {0}, "BT_VX_DL"},
 	/* PDM_DL */ {
 		      OMAP_ABE_PORT_ACTIVITY_IDLE, {96000, SIX_MSB},
-		      NODRIFT, NOCALLBACK, 0, (MCPDM_DL_ITER/6),
+		      NODRIFT, NOCALLBACK, 1, (MCPDM_DL_ITER/6),
 		      {SRC_P, MCPDMDL_PORT_PROT, {{dmem_mcpdm,
 						dmem_mcpdm_size} } },
 		      {0, 0},
@@ -240,7 +240,7 @@ const abe_port_t abe_port_init[LAST_PORT_ID] = {
 	 {0, 0}, {0}, "MM_EXT_IN"},
 	/* PCM3_TX */ {
 		       OMAP_ABE_PORT_ACTIVITY_IDLE, {48000, STEREO_MSB},
-		       NODRIFT, NOCALLBACK, 0, 1,
+		       NODRIFT, NOCALLBACK, 1, 1,
 		       {
 			SRC_P, TDM_SERIAL_PORT_PROT, {{
 						      (MCBSP3_DMA_TX *
@@ -253,7 +253,7 @@ const abe_port_t abe_port_init[LAST_PORT_ID] = {
 		       {0, 0}, {0}, "TDM_OUT"},
 	/* PCM3_RX */ {
 		       OMAP_ABE_PORT_ACTIVITY_IDLE, {48000, STEREO_MSB},
-		       NODRIFT, NOCALLBACK, 0, 1,
+		       NODRIFT, NOCALLBACK, 1, 1,
 		       {
 			SRC_P, TDM_SERIAL_PORT_PROT, {{
 						      (MCBSP3_DMA_RX *
@@ -266,7 +266,7 @@ const abe_port_t abe_port_init[LAST_PORT_ID] = {
 		       {0, 0}, {0}, "TDM_IN"},
 	/* SCHD_DBG_PORT */ {
 			     OMAP_ABE_PORT_ACTIVITY_IDLE, {48000, MONO_MSB},
-			     NODRIFT, NOCALLBACK, 0, 1,
+			     NODRIFT, NOCALLBACK, 1, 1,
 			     {
 			      SRC_P, DMAREQ_PORT_PROT, {{
 							(CBPr_DMA_RTX7 *
