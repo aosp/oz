@@ -899,15 +899,6 @@ static int __init omap4_pm_init(void)
 	if (!cpu_is_omap44xx())
 		return -ENODEV;
 
-	/*
-	 * Keep volt/device off disabled by default
-	 * on 446x.
-	 */
-	if (cpu_is_omap446x())
-		volt_off_mode = 0;
-	else
-		volt_off_mode = 1;
-
 	enable_off_mode = 0;
 
 	pr_err("Power Management for TI OMAP4.\n");

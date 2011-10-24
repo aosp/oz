@@ -42,7 +42,7 @@
 
 int omap2_pm_debug;
 u32 enable_off_mode;
-u32 volt_off_mode;
+u32 volt_off_mode = 1;
 u32 sleep_while_idle;
 u32 wakeup_timer_seconds;
 u32 wakeup_timer_milliseconds;
