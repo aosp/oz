@@ -89,6 +89,11 @@
 #define OMAP4_TSL2771_PWR_GPIO		188
 #define OMAP4SDP_MDM_PWR_EN_GPIO	157
 #define OMAP_UART_GPIO_MUX_MODE_143	143
+#define OMAP4_LED_GPIO_4_C			50
+#define OMAP4_BLUE_LED_GPIO			169
+#define OMAP4_RED_LED_GPIO			170
+#define TABLET2_GREEN_LED_GPIO		174
+#define TABLET2_GREEN_DBG2_LED_GPIO	173
 
 #define LED_PWM2ON		0x03
 #define LED_PWM2OFF		0x04
@@ -236,6 +241,34 @@ static struct gpio_led sdp4430_gpio_leds[] = {
 		.name	= "green",
 		.default_trigger = "timer",
 		.gpio	= 139,
+	},
+};
+
+static struct gpio_led tablet2_gpio_leds[] = {
+	{
+		.name	= "omap4:green:debug2",
+		.gpio	= TABLET2_GREEN_DBG2_LED_GPIO,
+		.active_low = 0,
+	},
+	{
+		.name	= "tablet:led_gp_4_c",
+		.gpio	= OMAP4_LED_GPIO_4_C,
+	},
+	{
+		.name	= "blue",
+		.default_trigger = "timer",
+		.gpio	= OMAP4_BLUE_LED_GPIO,
+	},
+	{
+		.name	= "red",
+		.default_trigger = "timer",
+		.gpio	= OMAP4_RED_LED_GPIO,
+	},
+	{
+		.name	= "green",
+		.default_trigger = "timer",
+		.gpio	= TABLET2_GREEN_LED_GPIO,
+		.active_low = 0,
 	},
 };
 
@@ -1836,8 +1869,6 @@ static int omap_tshut_init(void)
 	return 0;
 }
 
-
-
 static void __init omap_44xxtablet_init(void)
 {
 	int status;
@@ -1858,6 +1889,15 @@ static void __init omap_44xxtablet_init(void)
 	blaze_tablet_touch_init();
 	omap_dmm_init();
 	omap4_display_init();
+
+	if (omap_get_board_version() >= OMAP4_TABLET_2_0) {
+
+		sdp4430_led_data.leds = tablet2_gpio_leds;
+		sdp4430_led_data.num_leds = ARRAY_SIZE(tablet2_gpio_leds);
+
+		blazetablet_dsi_panel.x_res = 1280;
+		blazetablet_dsi_panel.y_res = 800;
+	}
 
 	platform_add_devices(blazetablet_devices,
 		ARRAY_SIZE(blazetablet_devices));
@@ -1903,11 +1943,6 @@ static void __init omap_44xxtablet_init(void)
 		sdp4430_spi_board_info[0].irq = gpio_to_irq(ETH_KS8851_IRQ);
 		spi_register_board_info(sdp4430_spi_board_info,
 				ARRAY_SIZE(sdp4430_spi_board_info));
-	}
-
-	if (omap_get_board_version() >= OMAP4_TABLET_2_0) {
-		blazetablet_dsi_panel.x_res = 1280;
-		blazetablet_dsi_panel.y_res = 800;
 	}
 
 	omap_display_init(&blazetablet_dss_data);
