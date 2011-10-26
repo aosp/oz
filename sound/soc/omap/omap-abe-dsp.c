@@ -2037,6 +2037,9 @@ static int abe_ping_pong_init(struct snd_pcm_hw_params *params,
 	runtime->dma_addr  = 0;
 	runtime->dma_bytes = period_size * 2;
 
+	/* clear ping/pong buffer area */
+	memset(runtime->dma_area, 0 , runtime->dma_bytes);
+
 	/* Need to set the first buffer in order to get interrupt */
 	abe_set_ping_pong_buffer(MM_DL_PORT, period_size);
 	abe->first_irq = 1;
