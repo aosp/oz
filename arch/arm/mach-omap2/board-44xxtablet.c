@@ -94,6 +94,7 @@
 #define OMAP4_RED_LED_GPIO			170
 #define TABLET2_GREEN_LED_GPIO		174
 #define TABLET2_GREEN_DBG2_LED_GPIO	173
+#define TABLET2_UART1_CTSDEBUG		139
 
 #define LED_PWM2ON		0x03
 #define LED_PWM2OFF		0x04
@@ -1869,6 +1870,31 @@ static int omap_tshut_init(void)
 	return 0;
 }
 
+static int __init tablet2_UART1_GPIO_init(void)
+{
+	int status;
+
+	/* Request for gpio_139 line */
+	status = gpio_request(TABLET2_UART1_CTSDEBUG, "tshut");
+	if (status < 0) {
+		pr_err("Failed to request UART1 CTS GPIO: %d\n",
+					TABLET2_UART1_CTSDEBUG);
+
+		return status;
+	}
+
+	status = gpio_direction_input(TABLET2_UART1_CTSDEBUG);
+	if (status < 0) {
+		pr_err(" GPIO configuration failed for UART1 CTS GPIO: %d\n",
+					TABLET2_UART1_CTSDEBUG);
+		gpio_free(TABLET2_UART1_CTSDEBUG);
+
+		return status;
+	}
+
+	return 0;
+}
+
 static void __init omap_44xxtablet_init(void)
 {
 	int status;
@@ -1897,6 +1923,8 @@ static void __init omap_44xxtablet_init(void)
 
 		blazetablet_dsi_panel.x_res = 1280;
 		blazetablet_dsi_panel.y_res = 800;
+
+		tablet2_UART1_GPIO_init();
 	}
 
 	platform_add_devices(blazetablet_devices,
