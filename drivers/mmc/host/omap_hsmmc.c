@@ -286,8 +286,13 @@ static int omap_hsmmc_1_set_power(struct device *dev, int slot, int power_on,
 	if (mmc_slot(host).before_set_reg)
 		mmc_slot(host).before_set_reg(dev, slot, power_on, vdd);
 
-	if (power_on)
-		ret = mmc_regulator_set_ocr(host->mmc, host->vcc, vdd);
+	if (power_on) {
+
+		if (mmc_slot(host).card_detect && !mmc_slot(host).card_detect(host->dev, host->slot_id))
+			ret = 0;
+		else
+			ret = mmc_regulator_set_ocr(host->mmc, host->vcc, vdd);
+	}
 	else
 		ret = mmc_regulator_set_ocr(host->mmc, host->vcc, 0);
 
@@ -365,7 +370,10 @@ static int omap_hsmmc_1_set_sleep(struct device *dev, int slot, int sleep,
 		platform_get_drvdata(to_platform_device(dev));
 	int mode = sleep ? REGULATOR_MODE_STANDBY : REGULATOR_MODE_NORMAL;
 
-	return regulator_set_mode(host->vcc, mode);
+	if (host->power_mode != MMC_POWER_OFF)
+		return regulator_set_mode(host->vcc, mode);
+	else
+		return 0;
 }
 
 static int omap_hsmmc_23_set_sleep(struct device *dev, int slot, int sleep,
