@@ -46,6 +46,8 @@
 #define DCS_RDDSDR		0x0f
 #define DCS_SLEEP_IN		0x10
 #define DCS_SLEEP_OUT		0x11
+#define DCS_PARTIAL_MODE_ON	0x12
+#define DCS_ALL_PIXEL_OFF	0x22
 #define DCS_DISPLAY_OFF		0x28
 #define DCS_DISPLAY_ON		0x29
 #define DCS_COLUMN_ADDR		0x2a
@@ -911,8 +913,6 @@ static int taal_power_on(struct omap_dss_device *dssdev)
 		goto err0;
 	}
 
-	taal_hw_reset(dssdev);
-
 	omapdss_dsi_vc_enable_hs(ix, TCH, false);
 
 	r = taal_sleep_out(ix, td);
@@ -950,6 +950,10 @@ static int taal_power_on(struct omap_dss_device *dssdev)
 		if (r)
 			goto err;
 	}
+
+	r = taal_dcs_write_0(ix, DCS_ALL_PIXEL_OFF);
+	if (r)
+		goto err;
 
 	r = taal_dcs_write_0(ix, DCS_DISPLAY_ON);
 	if (r)
@@ -1233,7 +1237,10 @@ static int taal_update_locked(struct omap_dss_device *dssdev,
 
 	r = omap_dsi_prepare_update(dssdev, &x, &y, &w, &h, true);
 	if (r)
+		goto err;
 
+	r = taal_dcs_write_0(0, DCS_PARTIAL_MODE_ON);
+	if (r)
 		goto err;
 
 	r = taal_set_update_window(ix, x, y, w, h);
