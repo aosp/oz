@@ -207,7 +207,7 @@ static int dss_get_clocks(void)
 		if (r)
 			goto err;
 
-		r = dss_get_clock(&core.dss2_fck, "dss_dss_clk");
+		r = dss_get_clock(&core.dss2_fck, "dss_sys_clk");
 		if (r)
 			goto err;
 

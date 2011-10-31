@@ -182,6 +182,10 @@ enum hdmi_s3d_subsampling_type {
 #define PLLCTRL_CFG3					0x14ul
 #define PLLCTRL_CFG4					0x20ul
 
+/* ADPLLLJ internal reference clock */
+#define MAX_REFCLK	2400000 /* 2.5MHz */
+#define MIN_REFCLK	500000  /* 0.5Mhz */
+
 /* HDMI PHY */
 #define HDMI_TXPHY_TX_CTRL				0x0ul
 #define HDMI_TXPHY_DIGITAL_CTRL			0x4ul
@@ -716,21 +720,21 @@ static inline void print_omap_video_timings(struct omap_video_timings *timings)
 	}
 }
 
-static void compute_pll(int clkin, int phy,
-	int n, struct hdmi_pll_info *pi)
+static void compute_pll(int clkin, int phy, struct hdmi_pll_info *pi)
 {
-	int refclk;
-	u32 temp, mf;
+	/* run ADPLLLJ loop at max rate
+	 * decrease value to be more suitable for our computations
+	 */
+	int refclk = MAX_REFCLK/10000;
+	u32 mf;
 
-	refclk = clkin / (n + 1);
+	clkin /= 10000;
 
-	temp = phy * 100/(refclk);
-
-	pi->regn = n;
-	pi->regm = temp/100;
+	pi->regn = (clkin / refclk) - 1;
+	pi->regm = phy/refclk;
 	pi->regm2 = 1;
 
-	mf = (phy - pi->regm * refclk) * 262144;
+	mf = (phy - pi->regm * refclk) * (1 << 18);
 	pi->regmf = mf/(refclk);
 
 	if (phy > 1000 * 100) {
@@ -739,7 +743,8 @@ static void compute_pll(int clkin, int phy,
 		pi->dcofreq = 0;
 	}
 
-	pi->regsd = ((pi->regm * clkin / 10) / ((n + 1) * 250) + 5) / 10;
+	/* funny way to implement ceiling function */
+	pi->regsd = ((pi->regm * clkin / 10) / ((pi->regn + 1) * 256) + 5) / 10;
 
 	DSSDBG("M = %d Mf = %d\n", pi->regm, pi->regmf);
 	DSSDBG("range = %d sd = %d\n", pi->dcofreq, pi->regsd);
@@ -1123,7 +1128,7 @@ static int hdmi_power_on(struct omap_dss_device *dssdev)
 	struct omap_video_timings *p;
 	struct hdmi_pll_info pll_data;
 	struct deep_color *vsdb_format = NULL;
-	int clkin, n, phy = 0, max_tmds = 0, temp = 0, tmds_freq;
+	int clkin, phy = 0, max_tmds = 0, temp = 0, tmds_freq;
 
 	hdmi_power = HDMI_POWER_FULL;
 	code = get_timings_index();
@@ -1165,8 +1170,8 @@ static int hdmi_power_on(struct omap_dss_device *dssdev)
 
 	dssdev->panel.timings = all_timings_direct[code];
 
-	clkin = 3840; /* 38.4 mHz */
-	n = 15; /* this is a constant for our math */
+	/*TODO:DSS_FCK2 for now, until SYS_CLK support implemented in DSS core*/
+	clkin = dss_clk_get_rate(DSS_CLK_FCK2);
 
 	switch (hdmi.deep_color) {
 	case 1:
@@ -1211,7 +1216,7 @@ static int hdmi_power_on(struct omap_dss_device *dssdev)
 		break;
 	}
 
-	compute_pll(clkin, phy, n, &pll_data);
+	compute_pll(clkin, phy, &pll_data);
 
 	HDMI_W1_StopVideoFrame(HDMI_WP);
 

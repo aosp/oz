@@ -1004,8 +1004,6 @@ int dsi_calc_clock_rates(enum omap_channel channel,
 
 	if (cinfo->use_dss2_fck) {
 		cinfo->clkin = dss_clk_get_rate(DSS_CLK_FCK2);
-		if (cpu_is_omap44xx())
-			cinfo->clkin = 38400000;
 		/* XXX it is unclear if highfreq should be used
 		 * with DSS2_FCK source also */
 		cinfo->highfreq = 0;
