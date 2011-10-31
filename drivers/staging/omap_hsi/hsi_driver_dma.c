@@ -519,7 +519,7 @@ static void do_hsi_gdd_lch(struct hsi_dev *hsi_ctrl, unsigned int gdd_lch)
 								fifo);
 				if (fifo_words_avail)
 					dev_dbg(hsi_ctrl->dev,
-						"WARNING: FIFO %d not empty "
+						"FIFO %d not empty "
 						"after DMA copy, remaining "
 						"%d/%d frames\n",
 						fifo, fifo_words_avail,

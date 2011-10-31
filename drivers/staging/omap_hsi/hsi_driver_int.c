@@ -415,8 +415,7 @@ static void hsi_do_channel_rx(struct hsi_channel *ch)
 		fifo_words_avail = hsi_get_rx_fifo_occupancy(hsi_ctrl, fifo);
 		if (!fifo_words_avail) {
 			dev_warn(hsi_ctrl->dev,
-				"WARNING: RX FIFO %d empty before CPU copy\n",
-				fifo);
+				"RX FIFO %d empty before CPU copy\n", fifo);
 
 			/* Do not disable interrupt because another interrupt */
 			/* can still come, this time with a real frame. */

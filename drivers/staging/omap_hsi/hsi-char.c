@@ -581,7 +581,6 @@ out_unregister_chrdev:
 	unregister_chrdev_region(hsi_char_dev, num_channels);
 out_hsi_exit:
 	if_hsi_exit();
-out:
 	return ret;
 }
 
