@@ -823,10 +823,10 @@ const u32 abe_port_priority[LAST_PORT_ID - 1] = {
 	MM_UL2_PORT,
 	MM_DL_PORT,
 	TONES_DL_PORT,
-	VX_UL_PORT,
-	VX_DL_PORT,
 	BT_VX_DL_PORT,
 	BT_VX_UL_PORT,
+	VX_UL_PORT,
+	VX_DL_PORT,
 	VIB_DL_PORT,
 };
 
