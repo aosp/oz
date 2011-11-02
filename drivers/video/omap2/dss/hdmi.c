@@ -980,6 +980,7 @@ static int hdmi_panel_enable(struct omap_dss_device *dssdev)
 
 static void hdmi_panel_disable(struct omap_dss_device *dssdev)
 {
+	audio_on = 0;
 	hdmi_disable_video(dssdev);
 }
 
@@ -1885,13 +1886,20 @@ int hdmi_set_audio_power(bool _audio_on)
 
 static int hdmi_enable_hpd(struct omap_dss_device *dssdev)
 {
-	int r;
+	int r = 0;
 	DSSDBG("ENTER hdmi_enable_hpd()\n");
 
 	/* use at least min power, keep suspended state if set */
 	mutex_lock(&hdmi.lock);
 	mutex_lock(&hdmi.lock_aux);
-	r = set_video_power(dssdev, video_power ? : HDMI_POWER_MIN);
+	/* check if main display in suspend mode */
+	if (dss_get_mainclk_state()) {
+		r = hdmi_set_power(dssdev, video_power ? : HDMI_POWER_MIN ,
+		false , audio_on);
+	} else {
+		dssdev->activate_after_resume = true;
+		video_power = 1;
+	}
 	mutex_unlock(&hdmi.lock_aux);
 	mutex_unlock(&hdmi.lock);
 	return r;
