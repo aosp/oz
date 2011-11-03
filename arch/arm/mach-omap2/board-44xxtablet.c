@@ -1269,9 +1269,11 @@ static struct cdc_tcxo_platform_data sdp4430_cdc_data = {
 		CDC_TCXO_REQ2POL | CDC_TCXO_REQ1POL,
 		CDC_TCXO_MREQ4 | CDC_TCXO_MREQ3 |
 		CDC_TCXO_MREQ2 | CDC_TCXO_MREQ1,
-		0, 0 },
-};
 
+		CDC_TCXO_LDOEN1,
+
+		0 },
+};
 static struct pico_platform_data picodlp_platform_data[] = {
 	[0] = { /* DLP Controller */
 		.gpio_intr = 40,
