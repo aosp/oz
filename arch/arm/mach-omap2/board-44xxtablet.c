@@ -1650,15 +1650,15 @@ static struct omap_volt_vc_data vc446x_config = {
 	.vdd0_on = 1350000,	/* 1.35v */
 	.vdd0_onlp = 1350000,	/* 1.35v */
 	.vdd0_ret = 750000,	/* 0.75v */
-	.vdd0_off = 600000,	/* 0.6 v */
+	.vdd0_off = 0,		/* 0 v */
 	.vdd1_on = 1350000,	/* 1.35v */
 	.vdd1_onlp = 1350000,	/* 1.35v */
 	.vdd1_ret = 750000,	/* 0.75v */
-	.vdd1_off = 600000,	/* 0.6 v */
+	.vdd1_off = 0,		/* 0 v */
 	.vdd2_on = 1350000,	/* 1.35v */
 	.vdd2_onlp = 1350000,	/* 1.35v */
 	.vdd2_ret = 750000,	/* .75v */
-	.vdd2_off = 600000,	/* 0.6 v */
+	.vdd2_off = 0,		/* 0 v */
 };
 
 static struct omap_volt_vc_data vc_config = {
