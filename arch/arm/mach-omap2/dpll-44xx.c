@@ -224,8 +224,9 @@ int omap4_core_dpll_set_rate(struct clk *clk, unsigned long rate)
 		__raw_writel(shadow_freq_cfg2, OMAP4430_CM_SHADOW_FREQ_CONFIG2);
 
 		/*
-		 * program CM_DIV_M2_DPLL_CORE.DPLL_CLKOUT_DIV for divide by
-		 * two and put DPLL_CORE into LP Bypass
+		 * program CM_DIV_M2_DPLL_CORE.DPLL_CLKOUT_DIV
+		 * for divide by two, ensure DLL_OVERRIDE = '1'
+		 * and put DPLL_CORE into LP Bypass
 		 */
 		m2_div = omap4_prm_read_bits_shift(dpll_core_m2_ck->clksel_reg,
 				dpll_core_m2_ck->clksel_mask);
@@ -235,7 +236,8 @@ int omap4_core_dpll_set_rate(struct clk *clk, unsigned long rate)
 			(DPLL_LOW_POWER_BYPASS <<
 			 OMAP4430_DPLL_CORE_DPLL_EN_SHIFT) |
 			(1 << OMAP4430_DLL_RESET_SHIFT) |
-			(1 << OMAP4430_FREQ_UPDATE_SHIFT);
+			(1 << OMAP4430_FREQ_UPDATE_SHIFT) |
+			(1 << OMAP4430_DLL_OVERRIDE_SHIFT);
 		__raw_writel(shadow_freq_cfg1, OMAP4430_CM_SHADOW_FREQ_CONFIG1);
 
 		new_parent = dd->clk_bypass;
@@ -287,8 +289,9 @@ int omap4_core_dpll_set_rate(struct clk *clk, unsigned long rate)
 		__raw_writel(shadow_freq_cfg2, OMAP4430_CM_SHADOW_FREQ_CONFIG2);
 
 		/*
-		 * program DPLL_CORE_M2_DIV with same value as the one already
-		 * in direct register and lock DPLL_CORE
+		 * program DPLL_CORE_M2_DIV with same value
+		 * as the one already in direct register, ensure
+		 * DLL_OVERRIDE = '0' and lock DPLL_CORE
 		 */
 		m2_div = omap4_prm_read_bits_shift(dpll_core_m2_ck->clksel_reg,
 				dpll_core_m2_ck->clksel_mask);
@@ -297,7 +300,8 @@ int omap4_core_dpll_set_rate(struct clk *clk, unsigned long rate)
 			(m2_div << OMAP4430_DPLL_CORE_M2_DIV_SHIFT) |
 			(DPLL_LOCKED << OMAP4430_DPLL_CORE_DPLL_EN_SHIFT) |
 			(1 << OMAP4430_DLL_RESET_SHIFT) |
-			(1 << OMAP4430_FREQ_UPDATE_SHIFT);
+			(1 << OMAP4430_FREQ_UPDATE_SHIFT) |
+			(0 << OMAP4430_DLL_OVERRIDE_SHIFT);
 		__raw_writel(shadow_freq_cfg1, OMAP4430_CM_SHADOW_FREQ_CONFIG1);
 
 		new_parent = dd->clk_ref;
