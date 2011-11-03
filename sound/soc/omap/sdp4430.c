@@ -37,6 +37,7 @@
 #include <plat/hardware.h>
 #include <plat/mux.h>
 #include <plat/mcbsp.h>
+#include <plat/clock.h>
 
 #include "omap-mcpdm.h"
 #include "omap-abe.h"
@@ -113,12 +114,20 @@ static int sdp4430_mcpdm_hw_params(struct snd_pcm_substream *substream,
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct snd_soc_dai *codec_dai = rtd->codec_dai;
+	struct clk *clock;
 	int clk_id, freq;
 	int ret = 0;
 
 	if (twl6040_power_mode) {
 		clk_id = TWL6040_SYSCLK_SEL_HPPLL;
-		freq = 38400000;
+		/* SDP44xx shares twl6040 MCLK with omap SYSCLK */
+		clock = clk_get(NULL, "sys_clkin_ck");
+		if (IS_ERR(clock)) {
+			ret = PTR_ERR(clock);
+			printk(KERN_ERR "failed to obtain sys_clkin_ck\n");
+			return ret;
+		}
+		freq = clk_get_rate(clock);
 		/*
 		 * TWL6040 requires MCLK to be active as long as
 		 * high-performance mode is in use. Glitch-free mux
@@ -131,7 +140,13 @@ static int sdp4430_mcpdm_hw_params(struct snd_pcm_substream *substream,
 		}
 	} else {
 		clk_id = TWL6040_SYSCLK_SEL_LPPLL;
-		freq = 32768;
+		clock = clk_get(NULL, "sys_32k_ck");
+		if (IS_ERR(clock)) {
+			ret = PTR_ERR(clock);
+			printk(KERN_ERR "failed to obtain sys_32k_ck\n");
+			return ret;
+		}
+		freq = clk_get_rate(clock);;
 	}
 
 	/* set the codec mclk */
