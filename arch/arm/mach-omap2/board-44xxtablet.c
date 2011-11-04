@@ -1917,6 +1917,24 @@ static int __init tablet2_UART1_GPIO_init(void)
 	return 0;
 }
 
+static void __init tablet_camera_mux_init(void)
+{
+	omap_mux_init_signal("csi21_dx0", OMAP_MUX_MODE0 | OMAP_PULL_ENA);
+	omap_mux_init_signal("csi21_dy0", OMAP_MUX_MODE0 | OMAP_PULL_ENA);
+	omap_mux_init_signal("csi21_dx1", OMAP_MUX_MODE0 | OMAP_PULL_ENA);
+	omap_mux_init_signal("csi21_dy1", OMAP_MUX_MODE0 | OMAP_PULL_ENA);
+	omap_mux_init_signal("csi21_dx2", OMAP_MUX_MODE0 | OMAP_PULL_ENA);
+	omap_mux_init_signal("csi21_dy2", OMAP_MUX_MODE0 | OMAP_PULL_ENA);
+	omap_mux_init_signal("csi21_dx3", OMAP_MUX_MODE0 | OMAP_PULL_ENA);
+	omap_mux_init_signal("csi21_dy3", OMAP_MUX_MODE0 | OMAP_PULL_ENA);
+	omap_mux_init_signal("csi21_dx4", OMAP_MUX_MODE0 | OMAP_PULL_ENA);
+	omap_mux_init_signal("csi21_dy4", OMAP_MUX_MODE0 | OMAP_PULL_ENA);
+	omap_mux_init_signal("csi22_dx0", OMAP_MUX_MODE0 | OMAP_PULL_ENA);
+	omap_mux_init_signal("csi22_dy0", OMAP_MUX_MODE0 | OMAP_PULL_ENA);
+	omap_mux_init_signal("csi22_dx1", OMAP_MUX_MODE0 | OMAP_PULL_ENA);
+	omap_mux_init_signal("csi22_dy1", OMAP_MUX_MODE0 | OMAP_PULL_ENA);
+}
+
 static void __init omap_44xxtablet_init(void)
 {
 	int status;
@@ -1925,6 +1943,8 @@ static void __init omap_44xxtablet_init(void)
 	if (omap_rev() == OMAP4430_REV_ES1_0)
 		package = OMAP_PACKAGE_CBL;
 	omap4_mux_init(board_mux, package);
+
+	tablet_camera_mux_init();
 
 	omap_emif_setup_device_details(&emif_devices, &emif_devices);
 	omap_init_emif_timings();
@@ -1959,7 +1979,6 @@ static void __init omap_44xxtablet_init(void)
 	omap4_twl6030_hsmmc_init(mmc);
 	omap_mpu3050_init();
 	blaze_tablet_tsl2771_init();
-
 	omap4_4430sdp_wifi_init();
 
 	/* Power on the ULPI PHY */
