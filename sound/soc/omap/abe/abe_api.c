@@ -2144,4 +2144,15 @@ void abe_write_pdmdl_offset(u32 path, u32 offset_left, u32 offset_right)
 	}
 }
 EXPORT_SYMBOL(abe_write_pdmdl_offset);
-
+/**
+ * abe_write_select_pdm_output - Select the path for OPP25 route input
+ *
+ * Parameters:
+ *   path: 1 for output om headset, 2 for output on handsfree
+ *
+ */
+void abe_write_select_pdm_output(u32 path)
+{
+	abe_mcpdm_path = path;
+}
+EXPORT_SYMBOL(abe_write_select_pdm_output);

@@ -666,6 +666,14 @@ void abe_add_subroutine(u32 *id, abe_subroutine2 f, u32 nparam, u32 *params);
  * processing
  */
 int abe_read_next_ping_pong_buffer(u32 port, u32 *p, u32 *n);
+/**
+ * abe_write_select_pdm_output - Select the path for OPP25 route input
+ *
+ * Parameters:
+ *   path: 1 for output om headset, 2 for output on handsfree
+ *
+ */
+void abe_write_select_pdm_output(u32 path);
 
 extern u32 abe_irq_pingpong_player_id;
 #endif/* _ABE_API_H_ */

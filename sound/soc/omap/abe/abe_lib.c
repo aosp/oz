@@ -303,7 +303,11 @@ int abe_dma_port_copy_subroutine_id(u32 port_id)
 			break;
 		case SIX_MSB:
 			if (port_id == PDM_DL_PORT) {
-				sub_id = COPY_MCPDM_DL_CFPID;
+				if (abe_mcpdm_path == 2)
+					sub_id = COPY_MCPDM_DL_HF_PDL1_CFPID;
+				else
+					sub_id = COPY_MCPDM_DL_CFPID;
+				break;
 				break;
 			}
 			if (port_id == MM_UL_PORT) {

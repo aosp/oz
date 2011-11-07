@@ -796,6 +796,10 @@ const u32 abe_alpha_iir[64] = {
 	0x7FFC01, 0x7FFCA5, 0x7FFD2D, 0x7FFDA1,	/* 8.192 */
 	0x7FFE01, 0x7FFE51, 0x7FFE95, 0x7FFED1,
 };
+
+/* Variable to switch path for headset or handsfree at OPP25*/
+u32 abe_mcpdm_path;
+
 /*
  * ABE_DEBUG DATA
  */
