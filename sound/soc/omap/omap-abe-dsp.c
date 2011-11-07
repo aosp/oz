@@ -2054,6 +2054,8 @@ static int aess_hw_params(struct snd_pcm_substream *substream,
 	struct snd_soc_dai *dai = rtd->cpu_dai;
 	int ret = 0;
 
+	mutex_lock(&abe->mutex);
+
 	dev_dbg(&rtd->dev, "%s ID %d\n", __func__, dai->id);
 
 	switch (dai->id) {
@@ -2068,6 +2070,7 @@ static int aess_hw_params(struct snd_pcm_substream *substream,
 		break;
 	}
 
+	mutex_unlock(&abe->mutex);
 	return 0;
 }
 
