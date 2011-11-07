@@ -1516,9 +1516,8 @@ static void hdmi_work_queue(struct work_struct *ws)
 			goto done;
 
 		HDMI_W1_StopVideoFrame(HDMI_WP);
-		if (dssdev->platform_disable)
-			dssdev->platform_disable(dssdev);
-			dispc_enable_digit_out(0);
+
+		dispc_enable_digit_out(0);
 
 		if (hdmi.hdmi_stop_frame_cb)
 			(*hdmi.hdmi_stop_frame_cb)();
@@ -1530,6 +1529,9 @@ static void hdmi_work_queue(struct work_struct *ws)
 		/* turn OFF clocks on disconnect*/
 		if (cpu_is_omap44xx())
 			hdmi_set_48Mhz_l3_cstr(dssdev, false);
+
+		if (dssdev->platform_disable)
+			dssdev->platform_disable(dssdev);
 
 		DSSINFO("Disable Display Done - HDMI_DISCONNECT\n\n");
 	}
@@ -1550,6 +1552,9 @@ static void hdmi_work_queue(struct work_struct *ws)
 		(hdmi_power != HDMI_POWER_FULL)) {
 
 		DSSINFO("Physical Connect\n");
+
+		if (dssdev->platform_enable)
+			dssdev->platform_enable(dssdev);
 
 		/* turn ON clocks, set L3 and core constraints on connect*/
 		if (cpu_is_omap44xx())
