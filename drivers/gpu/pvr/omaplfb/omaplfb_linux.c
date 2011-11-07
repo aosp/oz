@@ -400,6 +400,8 @@ static void OMAPLFBFlipDSS(OMAPLFB_SWAPCHAIN *psSwapChain,
 				driver->update(display, 0, 0,
 					overlay_info.width,
 					overlay_info.height);
+		} else if (manager && manager->wait_for_go) {
+			manager->wait_for_go(manager);
 		}
 	}
 }
