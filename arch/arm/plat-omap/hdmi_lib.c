@@ -548,37 +548,10 @@ static void hdmi_core_init(enum hdmi_deep_mode deep_color,
 	}
 
 	/* info frame */
-	avi->db1y_rgb_yuv422_yuv444 = 0;
-	avi->db1a_active_format_off_on = 0;
-	avi->db1b_no_vert_hori_verthori = 0;
-	avi->db1s_0_1_2 = 0;
-	avi->db2c_no_itu601_itu709_extented = 0;
-	avi->db2m_no_43_169 = 0;
-	avi->db2r_same_43_169_149 = 0;
-	avi->db3itc_no_yes = 0;
-	avi->db3ec_xvyuv601_xvyuv709 = 0;
-	avi->db3q_default_lr_fr = 0;
-	avi->db3sc_no_hori_vert_horivert = 0;
-	avi->db4vic_videocode = 0;
-	avi->db5pr_no_2_3_4_5_6_7_8_9_10 = 0;
-	avi->db6_7_lineendoftop = 0 ;
-	avi->db8_9_linestartofbottom = 0;
-	avi->db10_11_pixelendofleft = 0;
-	avi->db12_13_pixelstartofright = 0;
+	memset(avi, 0, sizeof(*avi));
 
 	/* packet enable and repeat */
-	r_p->AudioPacketED = 0;
-	r_p->AudioPacketRepeat = 0;
-	r_p->AVIInfoFrameED = 0;
-	r_p->AVIInfoFrameRepeat = 0;
-	r_p->GeneralcontrolPacketED = 0;
-	r_p->GeneralcontrolPacketRepeat = 0;
-	r_p->GenericPacketED = 0;
-	r_p->GenericPacketRepeat = 0;
-	r_p->MPEGInfoFrameED = 0;
-	r_p->MPEGInfoFrameRepeat = 0;
-	r_p->SPDInfoFrameED = 0;
-	r_p->SPDInfoFrameRepeat = 0;
+	memset(r_p, 0, sizeof(*r_p));
 }
 
 static void hdmi_core_powerdown_disable(void)
@@ -1088,34 +1061,16 @@ static void hdmi_w1_init(struct hdmi_video_timing *t_p,
 {
 	DBG("Enter HDMI_W1_GlobalInitVars()\n");
 
-	t_p->horizontalBackPorch = 0;
-	t_p->horizontalFrontPorch = 0;
-	t_p->horizontalSyncPulse = 0;
-	t_p->verticalBackPorch = 0;
-	t_p->verticalFrontPorch = 0;
-	t_p->verticalSyncPulse = 0;
+	memset(t_p, 0, sizeof(*t_p));
 
+	memset(f_p, 0, sizeof(*f_p));
 	f_p->packingMode = HDMI_PACK_10b_RGB_YUV444;
-	f_p->linePerPanel = 0;
-	f_p->pixelPerLine = 0;
 
-	i_p->vSyncPolarity = 0;
-	i_p->hSyncPolarity = 0;
+	memset(i_p, 0, sizeof(*i_p));
 
-	i_p->interlacing = 0;
-	i_p->timingMode = 0; /* HDMI_TIMING_SLAVE */
-
-	pIrqVectorEnable->pllRecal = 0;
-	pIrqVectorEnable->pllUnlock = 0;
-	pIrqVectorEnable->pllLock = 0;
+	memset(pIrqVectorEnable, 0, sizeof(*pIrqVectorEnable));
 	pIrqVectorEnable->phyDisconnect = 1;
 	pIrqVectorEnable->phyConnect = 1;
-	pIrqVectorEnable->phyShort5v = 0;
-	pIrqVectorEnable->videoEndFrame = 0;
-	pIrqVectorEnable->videoVsync = 0;
-	pIrqVectorEnable->fifoSampleRequest = 0;
-	pIrqVectorEnable->fifoOverflow = 0;
-	pIrqVectorEnable->fifoUnderflow = 0;
 	pIrqVectorEnable->ocpTimeOut = 1;
 	pIrqVectorEnable->core = 1;
 
@@ -1818,23 +1773,15 @@ void hdmi_lib_exit(void){
 int hdmi_set_irqs(int i)
 {
 	u32 r = 0 , hpd = 0;
-	struct hdmi_irq_vector pIrqVectorEnable;
+	struct hdmi_irq_vector pIrqVectorEnable = {
+		.pllUnlock = 1,
+		.pllLock = 1,
+		.phyDisconnect = 1,
+		.phyConnect = 1,
+		.core = 1,
+	};
 
 	if (!i) {
-		pIrqVectorEnable.pllRecal = 0;
-		pIrqVectorEnable.phyShort5v = 0;
-		pIrqVectorEnable.videoEndFrame = 0;
-		pIrqVectorEnable.videoVsync = 0;
-		pIrqVectorEnable.fifoSampleRequest = 0;
-		pIrqVectorEnable.fifoOverflow = 0;
-		pIrqVectorEnable.fifoUnderflow = 0;
-		pIrqVectorEnable.ocpTimeOut = 0;
-		pIrqVectorEnable.pllUnlock = 1;
-		pIrqVectorEnable.pllLock = 1;
-		pIrqVectorEnable.phyDisconnect = 1;
-		pIrqVectorEnable.phyConnect = 1;
-		pIrqVectorEnable.core = 1;
-
 		hdmi_w1_irq_enable(&pIrqVectorEnable);
 
 		r = hdmi_read_reg(HDMI_WP, HDMI_WP_IRQENABLE_SET);
