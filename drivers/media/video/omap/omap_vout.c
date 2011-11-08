@@ -1335,6 +1335,8 @@ int omapvid_apply_changes(struct omap_vout_device *vout)
 				dev->driver->update(dev, 0, 0,
 					dev->panel.timings.x_res,
 					dev->panel.timings.y_res);
+		} else if (ovl->manager->wait_for_go) {
+			ovl->manager->wait_for_go(ovl->manager);
 		}
 #endif
 	}
@@ -1541,30 +1543,19 @@ wb:
 
 intlace:
 
-	/* if any manager is in manual update mode, we must schedule work */
-	if (manually_updated(vout)) {
-		/* queue process frame */
-
-		if (w) {
-			if (!w->queued) {
-				w->vout = vout;
-				w->process = process;
-				w->queued = true;
-				INIT_WORK(&w->work, omapvid_process_frame_work);
-				queue_work(vout->workqueue, &w->work);
-			} else
-				printk(KERN_ERR "<%s> work already Queued. "
-						"skip processing the frame ="
-						" %d\n",
-				       __func__, w->queued);
+	/* queue process frame */
+	if (w) {
+		if (!w->queued) {
+			w->vout = vout;
+			w->process = process;
+			w->queued = true;
+			queue_work(vout->workqueue, &w->work);
 		} else
-			printk(KERN_ERR "Failed to get allocate work struct\n");
-	} else {
-		/* process frame here for auto update screens */
-		if (process && next_frame(vout))
-			goto vout_isr_err;
-		omapvid_process_frame(vout);
-	}
+			printk(KERN_DEBUG "<%s> work already Queued. "
+					"skip processing the frame ="
+					" %d\n", __func__, w->queued);
+	} else
+		printk(KERN_ERR "Failed to get allocate work struct\n");
 
 vout_isr_err:
 	spin_unlock_irqrestore(&vout->vbq_lock, flags);
@@ -3740,6 +3731,7 @@ static int __init omap_vout_create_video_devices(struct platform_device *pdev)
 			ret = -ENOMEM;
 			goto error_q;
 		}
+		INIT_WORK(&vout->work->work, omapvid_process_frame_work);
 		vout->work->queued = false;
 
 #endif
