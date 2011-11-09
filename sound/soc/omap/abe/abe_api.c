@@ -956,13 +956,13 @@ int abe_connect_cbpr_dmareq_port(u32 id, abe_data_format_t *f, u32 d,
 	/* load the dma_t with physical information from AE memory mapping */
 	abe_init_dma_t(id, &((abe_port[id]).protocol));
 
+	/* load the ATC descriptors - disabled */
+	abe_init_atc(id);
 	/* load the micro-task parameters */
 	abe_init_io_tasks(id, &((abe_port[id]).format),
 			  &((abe_port[id]).protocol));
 	abe_port[id].status = OMAP_ABE_PORT_INITIALIZED;
 
-	/* load the ATC descriptors - disabled */
-	abe_init_atc(id);
 	/* return the dma pointer address */
 	abe_read_port_address(id, returned_dma_t);
 
@@ -1063,11 +1063,13 @@ int abe_connect_irq_ping_pong_port(u32 id, abe_data_format_t *f,
 		(abe_port[id]).protocol.p.prot_pingpong.irq_addr =
 			ABE_DSP_IRQSTATUS_RAW;
 	abe_port[id].status = OMAP_ABE_PORT_INITIALIZED;
+
+	/* load the ATC descriptors - disabled */
+	abe_init_atc(id);
 	/* load the micro-task parameters */
 	abe_init_io_tasks(id, &((abe_port[id]).format),
 			  &((abe_port[id]).protocol));
-	/* load the ATC descriptors - disabled */
-	abe_init_atc(id);
+
 	*sink = (abe_port[id]).protocol.p.prot_pingpong.buf_addr;
 
 	return 0;
@@ -1102,12 +1104,13 @@ int abe_connect_serial_port(u32 id, abe_data_format_t *f,
 	(abe_port[id]).protocol.p.prot_serial.iter =
 		abe_dma_port_iter_factor(f);
 
+	/* load the ATC descriptors - disabled */
+	abe_init_atc(id);
+
 	/* load the micro-task parameters */
 	abe_init_io_tasks(id, &((abe_port[id]).format),
 			  &((abe_port[id]).protocol));
 	abe_port[id].status = OMAP_ABE_PORT_INITIALIZED;
-	/* load the ATC descriptors - disabled */
-	abe_init_atc(id);
 
 	return 0;
 }
@@ -1145,11 +1148,12 @@ int abe_connect_slimbus_port(u32 id, abe_data_format_t *f,
 	/* SLIMBUS iter should be 1 */
 	(abe_port[id]).protocol.p.prot_serial.iter = iter;
 	abe_port[id].status = OMAP_ABE_PORT_INITIALIZED;
+
+	/* load the ATC descriptors - disabled */
+	abe_init_atc(id);
 	/* load the micro-task parameters */
 	abe_init_io_tasks(id, &((abe_port[id]).format),
 			  &((abe_port[id]).protocol));
-	/* load the ATC descriptors - disabled */
-	abe_init_atc(id);
 
 	return 0;
 }
@@ -1187,11 +1191,12 @@ int abe_connect_tdm_port(u32 id, abe_data_format_t *f, u32 mcbsp_id)
 	/* McBSP iter should be 1 */
 	(abe_port[id]).protocol.p.prot_serial.iter = iter;
 	abe_port[id].status = OMAP_ABE_PORT_INITIALIZED;
+
+	/* load the ATC descriptors - disabled */
+	abe_init_atc(id);
 	/* load the micro-task parameters */
 	abe_init_io_tasks(id, &((abe_port[id]).format),
 			  &((abe_port[id]).protocol));
-	/* load the ATC descriptors - disabled */
-	abe_init_atc(id);
 
 	return 0;
 }
