@@ -1160,6 +1160,10 @@ int hdmi_w1_set_wait_phy_pwr(HDMI_PhyPwr_t val)
 	/* Set module to smart idle to allow DSS to go into OFF mode*/
 	if (val == HDMI_PHYPWRCMD_OFF)
 		REG_FLD_MOD(HDMI_WP, HDMI_WP_SYSCONFIG, 0x2, 3, 2);
+	/* Set module to "smart idle wakeup-capable" to allow immediately
+	   process interrupts like PHY_LINK_CONNECT_INTR */
+	else if (val == HDMI_PHYPWRCMD_TXON)
+		REG_FLD_MOD(HDMI_WP, HDMI_WP_SYSCONFIG, 0x3, 3, 2);
 
 	return 0;
 }
