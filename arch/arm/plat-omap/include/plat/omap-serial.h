@@ -203,4 +203,5 @@ void omap_uart_enable_clock_from_ext(int uart_num);
 void omap_uart_disable_clock_from_ext(int uart_num);
 void omap_uart_start_inactivity_timer(unsigned int uart_num);
 #endif
+void omap_uart_mdr1_errataset(int uart_no, u8 mdr1_val, u8 fcr_val);
 #endif /* __OMAP_SERIAL_H__ */

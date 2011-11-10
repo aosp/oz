@@ -314,8 +314,11 @@ static void omap_uart_restore_context(struct omap_uart_state *uart)
 		return;
 
 	uart->context_valid = 0;
+	if (uart->dma_enabled)
+		omap_uart_mdr1_errataset(uart->num, 0x07, 0x59);
+	else
+		omap_uart_mdr1_errataset(uart->num, 0x07, 0x51);
 
-	serial_write_reg(uart, UART_OMAP_MDR1, 0x7);
 	/* Config B mode */
 	serial_write_reg(uart, UART_LCR, OMAP_UART_LCR_CONF_MDB);
 	efr = serial_read_reg(uart, UART_EFR);
@@ -350,8 +353,11 @@ static void omap_uart_restore_context(struct omap_uart_state *uart)
 		serial_write_reg(uart, UART_TX_DMA_THRESHOLD, uart->dma_thresh);
 		serial_write_reg(uart, UART_MDR3, uart->mdr3);
 	}
+	if (uart->dma_enabled)
+		omap_uart_mdr1_errataset(uart->num, 0x0, 0x59);
+	else
+		omap_uart_mdr1_errataset(uart->num, 0x0, 0x51);
 
-	serial_write_reg(uart, UART_OMAP_MDR1, 0x00); /* UART 16x mode */
 }
 #else
 static inline void omap_uart_save_context(struct omap_uart_state *uart) {}

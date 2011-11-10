@@ -851,7 +851,7 @@ serial_omap_set_termios(struct uart_port *port, struct ktermios *termios,
 
 	/* Protocol, Baud Rate, and Interrupt Settings */
 
-	serial_out(up, UART_OMAP_MDR1, OMAP_MDR1_DISABLE);
+	omap_uart_mdr1_errataset(up->pdev->id, OMAP_MDR1_DISABLE, up->fcr);
 	serial_out(up, UART_LCR, OMAP_UART_LCR_CONF_MDB);
 
 	up->efr = serial_in(up, UART_EFR);
@@ -872,9 +872,11 @@ serial_omap_set_termios(struct uart_port *port, struct ktermios *termios,
 	serial_out(up, UART_LCR, cval);
 
 	if (baud > 230400 && baud != 3000000)
-		serial_out(up, UART_OMAP_MDR1, OMAP_MDR1_MODE13X);
+		omap_uart_mdr1_errataset(up->pdev->id, OMAP_MDR1_MODE13X,
+							up->fcr);
 	else
-		serial_out(up, UART_OMAP_MDR1, OMAP_MDR1_MODE16X);
+		omap_uart_mdr1_errataset(up->pdev->id, OMAP_MDR1_MODE16X,
+							up->fcr);
 
 	/* Hardware Flow Control Configuration */
 
@@ -908,6 +910,45 @@ serial_omap_set_termios(struct uart_port *port, struct ktermios *termios,
 	spin_unlock_irqrestore(&up->port.lock, flags);
 	dev_dbg(up->port.dev, "serial_omap_set_termios+%d\n", up->pdev->id);
 }
+/*
+ * Work Around for Errata i202 (3430 - 1.12, 3630 - 1.6)
+ * The access to uart register after MDR1 Access
+ * causes UART to corrupt data.
+ *
+ * Need a delay =
+ * 5 L4 clock cycles + 5 UART functional clock cycle (@48MHz = ~0.2uS)
+ * give 5 times as much
+ *
+ * uart_no : Should be a Zero Based Index Value always.
+ */
+void omap_uart_mdr1_errataset(int uart_no, u8 mdr1_val,
+	      u8 fcr_val)
+{
+	struct uart_omap_port *up = ui[uart_no];
+	/* 10 retries, in this the FiFO's should get cleared */
+	u8 timeout = 0x05;
+
+	serial_out(up, UART_OMAP_MDR1, mdr1_val);
+	udelay(1);
+	serial_out(up, UART_FCR, fcr_val | UART_FCR_CLEAR_XMIT |
+	UART_FCR_CLEAR_RCVR);
+	/*
+	 * Wait for FIFO to empty: when empty, RX_FIFO_E bit is 0 and
+	 * TX_FIFO_E bit is 1.
+	 */
+	while (UART_LSR_THRE != (serial_in(up, UART_LSR) &
+		(UART_LSR_THRE | UART_LSR_DR))) {
+		timeout--;
+		if (!timeout) {
+			/* Should *never* happen. we warn and carry on */
+			dev_dbg(up->port.dev, "Errata i202: timedout %x\n",
+			serial_in(up, UART_LSR));
+			break;
+		}
+		udelay(1);
+	}
+}
+EXPORT_SYMBOL(omap_uart_mdr1_errataset);
 
 static void
 serial_omap_pm(struct uart_port *port, unsigned int state,
