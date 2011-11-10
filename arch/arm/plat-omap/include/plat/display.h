@@ -959,7 +959,8 @@ void omap_dss_stop_device(struct omap_dss_device *dssdev);
  * to the notifier function, and the dssdev is passed as the third.
  */
 enum omap_dss_event {
-	OMAP_DSS_SIZE_CHANGE
+	OMAP_DSS_SIZE_CHANGE,
+	OMAP_DSS_OVL_INFO_RESET,
 	/* possibly add additional events, like hot-plug connect/disconnect */
 };
 

@@ -626,6 +626,8 @@ static int dss_ovl_set_overlay_info(struct omap_overlay *ovl,
 			ovl->info = old_info;
 			return r;
 		}
+
+		omap_dss_notify(ovl->manager->device, OMAP_DSS_OVL_INFO_RESET);
 	}
 
 	ovl->info_dirty = true;
