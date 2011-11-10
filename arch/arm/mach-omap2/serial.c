@@ -117,6 +117,7 @@ struct omap_uart_state {
 	u16 lcr;
 	u16 dpll_ier_state;
 	u16 dpll_lcr_state;
+	u16 mdr1;
 #endif
 	unsigned int port_timer_active;
 };
@@ -222,9 +223,9 @@ static inline void serial_write_reg(struct omap_uart_state *uart, int offset,
 
 static inline void __init omap_uart_reset(struct omap_uart_state *p)
 {
-	serial_write_reg(p, UART_OMAP_MDR1, 0x07);
+	serial_write_reg(p, UART_OMAP_MDR1, OMAP_MDR1_DISABLE);
 	serial_write_reg(p, UART_OMAP_SCR, 0x08);
-	serial_write_reg(p, UART_OMAP_MDR1, 0x00);
+	serial_write_reg(p, UART_OMAP_MDR1, OMAP_MDR1_MODE16X);
 }
 
 static inline void omap_uart_disable_rtspullup(struct omap_uart_state *uart)
@@ -285,6 +286,7 @@ static void omap_uart_save_context(struct omap_uart_state *uart)
 	uart->sysc = serial_read_reg(uart, UART_OMAP_SYSC);
 	uart->scr = serial_read_reg(uart, UART_OMAP_SCR);
 	uart->wer = serial_read_reg(uart, UART_OMAP_WER);
+	uart->mdr1 = serial_read_reg(uart, UART_OMAP_MDR1);
 	lcr = serial_read_reg(uart, UART_LCR);
 
 	serial_write_reg(uart, UART_LCR, OMAP_UART_LCR_CONF_MDA);
@@ -315,9 +317,9 @@ static void omap_uart_restore_context(struct omap_uart_state *uart)
 
 	uart->context_valid = 0;
 	if (uart->dma_enabled)
-		omap_uart_mdr1_errataset(uart->num, 0x07, 0x59);
+		omap_uart_mdr1_errataset(uart->num, OMAP_MDR1_DISABLE, 0x59);
 	else
-		omap_uart_mdr1_errataset(uart->num, 0x07, 0x51);
+		omap_uart_mdr1_errataset(uart->num, OMAP_MDR1_DISABLE, 0x51);
 
 	/* Config B mode */
 	serial_write_reg(uart, UART_LCR, OMAP_UART_LCR_CONF_MDB);
@@ -354,9 +356,9 @@ static void omap_uart_restore_context(struct omap_uart_state *uart)
 		serial_write_reg(uart, UART_MDR3, uart->mdr3);
 	}
 	if (uart->dma_enabled)
-		omap_uart_mdr1_errataset(uart->num, 0x0, 0x59);
+		omap_uart_mdr1_errataset(uart->num, uart->mdr1, 0x59);
 	else
-		omap_uart_mdr1_errataset(uart->num, 0x0, 0x51);
+		omap_uart_mdr1_errataset(uart->num, uart->mdr1, 0x51);
 
 }
 #else
@@ -852,7 +854,8 @@ static int omap_uart_recalibrate_baud_cb(struct notifier_block *nb,
 			serial_write_reg(uart, UART_IER, 0);
 
 			/* Disable the UART Module, Enabled after DPLL Exit */
-			serial_write_reg(uart, UART_OMAP_MDR1, 0x7);
+			omap_uart_mdr1_errataset(uart->num, OMAP_MDR1_DISABLE,
+								up->fcr);
 			/* Do the Required thing for the Devices in The
 			 * Pre State
 			 */
@@ -874,7 +877,7 @@ static int omap_uart_recalibrate_baud_cb(struct notifier_block *nb,
 		/* these are hard coded here since the clock
 		 * framework is not return the correct value.
 		 */
-		if (cnd->new_rate == 3072000) /* Chnaged */
+		if (cnd->new_rate == 3072000) /* Changed */
 			up->port.uartclk = 24576000;
 		else if (cnd->new_rate == 24000000) /* Original */
 			up->port.uartclk = 49152000;
@@ -900,12 +903,13 @@ static int omap_uart_recalibrate_baud_cb(struct notifier_block *nb,
 			 * DPLL state.
 			 */
 			if (up->baud_rate > OMAP_MODE13X_SPEED &&
-				up->baud_rate != 3000000)
-				serial_write_reg(uart, UART_OMAP_MDR1,
-						OMAP_MDR1_MODE13X);
-			else
-				serial_write_reg(uart, UART_OMAP_MDR1,
-						OMAP_MDR1_MODE16X);
+				up->baud_rate != 3000000) {
+				omap_uart_mdr1_errataset(uart->num,
+						OMAP_MDR1_MODE13X, up->fcr);
+			} else {
+				omap_uart_mdr1_errataset(uart->num,
+						OMAP_MDR1_MODE16X, up->fcr);
+			}
 #if 0
 			dev_dbg(uart->pdev->dev, "Per Functional Clock Changed"
 					" %u Hz Change baud DLL %d DLM %d\n",
