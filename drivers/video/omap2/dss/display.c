@@ -441,6 +441,7 @@ static ssize_t display_custom_edid_timing_store(struct device *dev,
 
 }
 
+#ifdef CONFIG_OMAP2_DSS_HDMI
 static ssize_t display_hpd_enabled_store(struct device *dev,
 		struct device_attribute *attr,
 		const char *buf, size_t size)
@@ -459,6 +460,14 @@ static ssize_t display_hpd_enabled_store(struct device *dev,
 
 	return size;
 }
+#else
+static ssize_t display_hpd_enabled_store(struct device *dev,
+		struct device_attribute *attr,
+		const char *buf, size_t size)
+{
+	return -ENODEV;
+}
+#endif
 
 static DEVICE_ATTR(enabled, S_IRUGO|S_IWUSR,
 		display_enabled_show, display_enabled_store);

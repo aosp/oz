@@ -252,8 +252,18 @@ struct regulator *dss_get_vdds_sdi(void);
 struct regulator *dss_get_vdda_dac(void);
 int dss_opt_clock_enable(void);
 void dss_opt_clock_disable(void);
+#ifdef CONFIG_OMAP2_DSS_HDMI
 int hdmi_opt_clock_enable(void);
 void hdmi_opt_clock_disable(void);
+#else
+static inline int hdmi_opt_clock_enable(void)
+{
+	return 0;
+}
+static inline void hdmi_opt_clock_disable(void)
+{
+}
+#endif
 void save_all_ctx(void);
 void restore_all_ctx(void);
 
@@ -587,7 +597,6 @@ int hdmi_init(struct platform_device *pdev);
 void hdmi_exit(void);
 void hdmi_dump_regs(struct seq_file *s);
 int hdmi_init_display(struct omap_dss_device *display);
-extern bool hdmi_suspend;
 #endif
 
 #ifdef CONFIG_OMAP2_DSS_COLLECT_IRQ_STATS

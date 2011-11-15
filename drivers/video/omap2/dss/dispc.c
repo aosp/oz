@@ -3120,8 +3120,7 @@ static int _dispc_setup_plane(enum omap_plane plane,
 		fieldmode = 1;
 
 	if (ilace != PBUF_PDEV) {
-#ifdef CONFIG_OMAP2_DSS_HDMI
-		/* HDMI output */
+#ifndef CONFIG_OMAP2_DSS_VENC
 		switch (rotation) {
 		case OMAP_DSS_ROT_0:
 		case OMAP_DSS_ROT_180:
@@ -3591,26 +3590,6 @@ void dispc_enable_channel(enum omap_channel channel, bool enable)
 		dispc_enable_digit_out(enable);
 	else
 		BUG();
-
-#ifdef CONFIG_OMAP2_DSS_HDMI
-	/* Disable all video pipelines on suspend
-	 * to prevent DMA from invalid memory upon resume
-	 */
-	if (!enable && hdmi_suspend) {
-		int i;
-		for (i = 1; i < omap_dss_get_num_overlays(); ++i) {
-			struct omap_overlay *ovl;
-			ovl = omap_dss_get_overlay(i);
-
-			if (ovl->info.enabled) {
-				dispc_enable_plane(ovl->id, 0);
-				DSSINFO("Disabling ovl->id[%d], ovl-%s\n",
-					ovl->id, ovl->name);
-			}
-			ovl->info.enabled = false;
-		}
-	}
-#endif
 }
 
 void dispc_lcd_enable_signal_polarity(bool act_high)

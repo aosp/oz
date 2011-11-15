@@ -140,12 +140,13 @@ config SND_OMAP_SOC_OMAP4_PANDA
 	  Say Y if you want to add support for SoC audio on Texas Instruments
 	  OMAP4 Panda board.
 
-
 config SND_OMAP_SOC_HDMI
 	tristate "SoC Audio support for HDMI interface on SDP4430"
-	depends on SND_OMAP_SOC_SDP4430
+	depends on SND_OMAP_SOC_SDP4430 && OMAP2_DSS_HDMI
 	help
-	  Say Y if you want to add support for HDMI interface on SDP4430
+	  Say Y if you want to add support for HDMI interface on SDP4430.
+	  Depends on DSS HDMI.
+	  Disabled automatically when DSS HDMI turned off
 
 config SND_OMAP_SOC_OMAP3_PANDORA
 	tristate "SoC Audio support for OMAP3 Pandora"

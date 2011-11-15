@@ -59,7 +59,6 @@ static struct pm_qos_request_list *pm_qos_handle;
 #endif
 
 
-bool hdmi_suspend;
 static int hdmi_enable_video(struct omap_dss_device *dssdev);
 static void hdmi_disable_video(struct omap_dss_device *dssdev);
 static int hdmi_suspend_video(struct omap_dss_device *dssdev);
@@ -986,14 +985,12 @@ static void hdmi_panel_disable(struct omap_dss_device *dssdev)
 
 static int hdmi_panel_suspend(struct omap_dss_device *dssdev)
 {
-	hdmi_suspend = true;
 	hdmi_suspend_video(dssdev);
 	return 0;
 }
 
 static int hdmi_panel_resume(struct omap_dss_device *dssdev)
 {
-	hdmi_suspend = false;
 	hdmi_resume_video(dssdev);
 	return 0;
 }
