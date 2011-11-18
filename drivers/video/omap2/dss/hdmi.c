@@ -1596,8 +1596,11 @@ done:
 			if (hdmi_opt_clk_state) {
 				hdmi_set_irqs(0);
 				goto hpd_modify;
-			} else
+			} else {
+				first_hpd = 0;
+				dirty = 0;
 				goto done2;
+			}
 
 		}
 

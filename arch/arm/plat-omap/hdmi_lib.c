@@ -238,6 +238,8 @@ static struct {
 	u32 pixel_clock;
 } hdmi;
 
+bool first_hpd, dirty;
+
 static DEFINE_MUTEX(hdmi_mutex);
 
 static inline void hdmi_write_reg(u32 base, u16 idx, u32 val)
@@ -1808,7 +1810,6 @@ void HDMI_W1_HPD_handler(int *r)
 {
 	u32 val, set = 0, hpd_intr = 0, core_state = 0;
 	u32 time_in_ms, intr2 = 0, intr3 = 0;
-	static bool first_hpd, dirty;
 	static ktime_t ts_hpd_low, ts_hpd_high;
 
 	//mdelay(30);
