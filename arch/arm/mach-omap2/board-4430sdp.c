@@ -64,6 +64,7 @@
 #include <plat/omap4-keypad.h>
 #include <plat/hwspinlock.h>
 #include <plat/nokia-dsi-panel.h>
+#include "clock.h"
 #include <plat/temperature_sensor.h>
 #include "mux.h"
 #include "hsmmc.h"
@@ -884,6 +885,7 @@ static struct platform_device *sdp4430_devices[] __initdata = {
 
 static void __init omap_4430sdp_init_irq(void)
 {
+	omap4_clk_prepare_for_dpll_relock();
 	omap2_init_common_hw(NULL, NULL);
 #ifdef CONFIG_OMAP_32K_TIMER
 	omap2_gp_clockevent_set_gptimer(1);
