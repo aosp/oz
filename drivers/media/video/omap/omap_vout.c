@@ -2114,6 +2114,7 @@ static int omap_vout_release(struct file *file)
 	struct videobuf_queue *q;
 	struct omapvideo_info *ovid;
 	struct omap_vout_device *vout = file->private_data;
+	struct omap_overlay *ovl;
 
 	if (!vout)
 		return 0;
@@ -2135,7 +2136,7 @@ static int omap_vout_release(struct file *file)
 	q = &vout->vbq;
 	/* Disable all the overlay managers connected with this interface */
 	for (i = 0; i < ovid->num_overlays; i++) {
-		struct omap_overlay *ovl = ovid->overlays[i];
+		ovl = ovid->overlays[i];
 		if (ovl->manager && ovl->manager->device) {
 			struct omap_overlay_info info;
 			ovl->get_overlay_info(ovl, &info);
@@ -2148,6 +2149,15 @@ static int omap_vout_release(struct file *file)
 	if (ret)
 		v4l2_warn(&vout->vid_dev->v4l2_dev,
 				"Unable to apply changes\n");
+
+	for (i = 0; i < ovid->num_overlays; i++) {
+		ovl = ovid->overlays[i];
+		if (dss_ovl_manually_updated(ovl)) {
+			if  (ovl->manager->wait_for_vsync)
+				ovl->manager->wait_for_vsync(ovl->manager);
+		} else if (ovl->wait_for_go)
+			ovl->wait_for_go(ovl);
+	}
 
 #ifdef CONFIG_OMAP3_ISP_RESIZER_ON_OVERLAY
 	/* Release the ISP resizer resource if not already done so */
