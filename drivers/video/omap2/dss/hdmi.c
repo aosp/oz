@@ -1151,7 +1151,7 @@ static int hdmi_power_on(struct omap_dss_device *dssdev)
 		DSSINFO("deep_color_bit30=%d bit36=%d max_tmds_freq=%d\n",
 			vsdb_format->bit_30, vsdb_format->bit_36,
 			vsdb_format->max_tmds_freq);
-		max_tmds = vsdb_format->max_tmds_freq * 500;
+		max_tmds = vsdb_format->max_tmds_freq * 1000;
 
 		dirty = get_timings_index() != code;
 	} else {
