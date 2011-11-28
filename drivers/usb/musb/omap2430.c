@@ -297,12 +297,6 @@ void musb_platform_enable(struct musb *musb)
 
 void musb_platform_disable(struct musb *musb)
 {
-	struct musb_hdrc_platform_data *pdata = musb->controller->platform_data;
-	struct omap_musb_board_data *data = pdata->board_data;
-
-	/* Reset USBOTGHS_CONTROL to default value */
-	if (data->interface_type == MUSB_INTERFACE_UTMI)
-		__raw_writel(IDDIG | SESSEND, ctrl_base + USBOTGHS_CONTROL);
 }
 
 static void omap_set_vbus(struct musb *musb, int is_on)
@@ -372,6 +366,7 @@ int __init musb_platform_init(struct musb *musb)
 {
 	struct device *dev = musb->controller;
 	struct musb_hdrc_platform_data *plat = dev->platform_data;
+	struct omap_musb_board_data *board_data = plat->board_data;
 	int status;
 	u32 val;
 
@@ -431,6 +426,11 @@ int __init musb_platform_init(struct musb *musb)
 	val &= ~(SMARTIDLEWKUP | NOSTDBY | ENABLEWAKEUP);
 	val |= FORCEIDLE | FORCESTDBY;
 	musb_writel(musb->mregs, OTG_SYSCONFIG,	val);
+
+	/* Setting to default value*/
+	if (board_data->interface_type == MUSB_INTERFACE_UTMI)
+		__raw_writel(SESSEND | IDDIG, ctrl_base + USBOTGHS_CONTROL);
+
 	return 0;
 }
 
