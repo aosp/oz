@@ -1066,7 +1066,7 @@ static void _init_twl6030_settings(void)
 	 * BBSPOR_CFG - Disable BB charging. It should be
 	 * taken care by proper driver
 	 */
-	twl_i2c_write_u8(TWL6030_MODULE_ID0, 0x62, 0xE6);
+	twl_i2c_write_u8(TWL6030_MODULE_ID0, 0x72, 0xE6);
 	/* CFG_INPUT_PUPD2 */
 	twl_i2c_write_u8(TWL6030_MODULE_ID0, 0x65, 0xF1);
 	/* CFG_INPUT_PUPD4 */
