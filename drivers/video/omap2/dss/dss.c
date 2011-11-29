@@ -162,22 +162,23 @@ void dss_clk_unlock()
  */
 int dss_mainclk_enable()
 {
-	int ret = -EBUSY;
+	int ret = 0;
 
-	if (!dss.mainclk_state) {
+	if (dss.mainclk_state) {
+		ret = -EBUSY;
+	} else {
 		spin_lock(&dss.mainclk_lock);
-		if (cpu_is_omap44xx() || cpu_is_omap34xx())
+		if (cpu_is_omap44xx() || cpu_is_omap34xx()) {
 			ret = dss_opt_clock_enable();
-
-		if (ret)
-			dss_opt_clock_disable();
-#ifdef CONFIG_PM_RUNTIME
-		else
-			ret = pm_runtime_get_sync(&dss.pdev->dev);
-#endif
+			if (ret)
+				dss_opt_clock_disable();
+		}
 		if (!ret)
 			dss.mainclk_state = true;
 		spin_unlock(&dss.mainclk_lock);
+
+		if (!ret)
+			ret = pm_runtime_get_sync(&dss.pdev->dev);
 	}
 
 	return ret;
@@ -189,11 +190,12 @@ void dss_mainclk_disable()
 	if (dss.mainclk_state) {
 		spin_lock(&dss.mainclk_lock);
 		dss.mainclk_state = false;
-		pm_runtime_put_sync(&dss.pdev->dev);
 
 		if (cpu_is_omap44xx() || cpu_is_omap34xx())
 			dss_opt_clock_disable();
 		spin_unlock(&dss.mainclk_lock);
+
+		pm_runtime_put_sync(&dss.pdev->dev);
 	}
 }
 EXPORT_SYMBOL(dss_mainclk_disable);
