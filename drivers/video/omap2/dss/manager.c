@@ -992,11 +992,18 @@ static int configure_dispc(void)
 	bool busy;
 	r = 0;
 	busy = false;
-
-	for (i = 0; i < num_mgrs; i++) {
-		mgr_busy[i] = dispc_go_busy(i);
-		mgr_go[i] = false;
+	dss_clk_lock();
+	if (dss_get_mainclk_state()) {
+		for (i = 0; i < num_mgrs; i++) {
+			mgr_busy[i] = dispc_go_busy(i);
+			mgr_go[i] = false;
+		}
+	} else {
+		dss_clk_unlock();
+		DSSWARN("failed to configure dispc with mainclk off\n");
+		return -EBUSY;
 	}
+	dss_clk_unlock();
 	if (cpu_is_omap44xx())
 		wb = &dss_cache.writeback_cache;
 

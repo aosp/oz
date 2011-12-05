@@ -4605,9 +4605,12 @@ int omap_dispc_register_isr(omap_dispc_isr_t isr, void *arg, u32 mask)
 
 		break;
 	}
-
-	_omap_dispc_set_irqs();
-
+	dss_clk_lock();
+	if (dss_get_mainclk_state())
+		_omap_dispc_set_irqs();
+	else
+		DSSWARN("failed to set irq with mainclk off\n");
+	dss_clk_unlock();
 	spin_unlock_irqrestore(&dispc.irq_lock, flags);
 
 	return 0;

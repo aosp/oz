@@ -80,7 +80,7 @@ static struct {
 	enum dss_clk_source lcd2_clk_source;
 
 	bool mainclk_state;
-	spinlock_t mainclk_lock;
+	rwlock_t mainclk_lock;
 
 	u32		ctx[DSS_SZ_REGS / sizeof(u32)];
 	struct omap_display_platform_data *pdata;
@@ -147,12 +147,12 @@ unsigned long dss_get_cache_req_pck()
 
 void dss_clk_lock()
 {
-	spin_lock(&dss.mainclk_lock);
+	read_lock(&dss.mainclk_lock);
 }
 
 void dss_clk_unlock()
 {
-	spin_unlock(&dss.mainclk_lock);
+	read_unlock(&dss.mainclk_lock);
 }
 
 /*
@@ -162,41 +162,56 @@ void dss_clk_unlock()
  */
 int dss_mainclk_enable()
 {
-	int ret = 0;
+	int ret = -EBUSY;
+	unsigned long flags;
 
-	if (dss.mainclk_state) {
-		ret = -EBUSY;
-	} else {
-		spin_lock(&dss.mainclk_lock);
+	if (dss.mainclk_state)
+		goto out;
+
+	write_lock_irqsave(&dss.mainclk_lock, flags);
+	if (!dss.mainclk_state) {
 		if (cpu_is_omap44xx() || cpu_is_omap34xx()) {
 			ret = dss_opt_clock_enable();
-			if (ret)
-				dss_opt_clock_disable();
 		}
-		if (!ret)
-			dss.mainclk_state = true;
-		spin_unlock(&dss.mainclk_lock);
-
-		if (!ret)
-			ret = pm_runtime_get_sync(&dss.pdev->dev);
 	}
 
+	write_unlock_irqrestore(&dss.mainclk_lock, flags);
+
+	/* pm_runtime_get_sync() triggers DSS_FCLK on,
+	 * so must be called only after rest of DSS clocks
+	 * are on, because of clock ordering, but before
+	 * registers users are notified of activation
+	 */
+	if (!ret)
+		pm_runtime_get_sync(&dss.pdev->dev);
+	write_lock_irqsave(&dss.mainclk_lock, flags);
+	if (!ret && !dss.mainclk_state)
+		dss.mainclk_state = true;
+	write_unlock_irqrestore(&dss.mainclk_lock, flags);
+out:
 	return ret;
 }
 EXPORT_SYMBOL(dss_mainclk_enable);
 
 void dss_mainclk_disable()
 {
+	unsigned long flags;
+	write_lock_irqsave(&dss.mainclk_lock, flags);
 	if (dss.mainclk_state) {
-		spin_lock(&dss.mainclk_lock);
-		dss.mainclk_state = false;
-
+			dss.mainclk_state = false;
+	} else {
+		write_unlock_irqrestore(&dss.mainclk_lock, flags);
+		return;
+	}
+	write_unlock_irqrestore(&dss.mainclk_lock, flags);
+	pm_runtime_put_sync(&dss.pdev->dev);
+	write_lock_irqsave(&dss.mainclk_lock, flags);
+	if (!dss.mainclk_state) {
 		if (cpu_is_omap44xx() || cpu_is_omap34xx())
 			dss_opt_clock_disable();
-		spin_unlock(&dss.mainclk_lock);
-
-		pm_runtime_put_sync(&dss.pdev->dev);
 	}
+	write_unlock_irqrestore(&dss.mainclk_lock, flags);
+	return;
 }
 EXPORT_SYMBOL(dss_mainclk_disable);
 
@@ -703,7 +718,7 @@ int dss_init(struct platform_device *pdev)
 	struct resource *dss_mem;
 	bool skip_init = false;
 
-	spin_lock_init(&dss.mainclk_lock);
+	rwlock_init(&dss.mainclk_lock);
 
 	dss.pdata = pdev->dev.platform_data;
 	dss.pdev = pdev;
