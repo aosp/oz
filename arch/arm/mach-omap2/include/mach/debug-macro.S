@@ -19,6 +19,9 @@
 
 #define UART_OFFSET(addr)	((addr) & 0x00ffffff)
 
+#ifdef CONFIG_EARLY_PRINTK
+.global 	omap_uart_virt
+#endif
 		.pushsection .data
 omap_uart_phys:	.word	0
 omap_uart_virt:	.word	0

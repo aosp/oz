@@ -1124,6 +1124,14 @@ void __init omap_serial_early_init(void)
 	} while (1);
 }
 
+#ifdef CONFIG_EARLY_PRINTK
+/*
+ * Needed to detect UART used for earlyprintk.
+ * Imported from debug-macro.S
+ */
+extern void *omap_uart_virt;
+#endif
+
 /**
  * omap_serial_init_port() - initialize single serial port
  * @port: serial port number (0-3)
@@ -1327,6 +1335,11 @@ void __init omap_serial_init_port(int port,
 		device_init_wakeup(&od->pdev.dev, true);
 		DEV_CREATE_FILE(&od->pdev.dev, &dev_attr_sleep_timeout);
 	}
+#ifdef CONFIG_EARLY_PRINTK
+/* Need active UART to earlyprintk work properly */
+	if (omap_uart_virt == uart->membase)
+		omap_uart_enable_clocks(uart);
+#endif
 }
 
 /**
