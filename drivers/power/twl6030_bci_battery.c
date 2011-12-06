@@ -206,7 +206,10 @@
 #if CONFIG_TWL6030_USB
 extern unsigned int twl6030_get_usb_max_power(struct otg_transceiver *x);
 #else
-static inline unsigned int twl6030_get_usb_max_power(struct otg_transceiver *x) {return 0; };
+static inline unsigned int twl6030_get_usb_max_power(struct otg_transceiver *x)
+{
+	return 0;
+};
 #endif
 
 /* Ptr to thermistor table */
@@ -244,7 +247,7 @@ struct twl6030_bci_device_info {
 	u16			monitoring_interval;
 	unsigned int		min_vbus;
 
-	struct 			twl4030_bci_platform_data *platform_data;
+	struct			twl4030_bci_platform_data *platform_data;
 
 	unsigned int		charger_incurrentmA;
 	unsigned int		charger_outcurrentmA;
@@ -1106,7 +1109,8 @@ static void twl6030_bci_battery_work(struct work_struct *work)
 	if (req.rbuf[1] > 100 && req.rbuf[1] < 950) {
 		adc_code = req.rbuf[1];
 		for (temp = 0; temp < di->platform_data->tblsize; temp++) {
-			if (adc_code >= di->platform_data->battery_tmp_tbl[temp])
+			if (adc_code >= di->platform_data->
+					battery_tmp_tbl[temp])
 				break;
 		}
 
@@ -1332,7 +1336,7 @@ static int twl6030_usb_notifier_call(struct notifier_block *nb,
 	di->event = event;
 	switch (event) {
 	case USB_EVENT_VBUS:
-		di->usb_online = *((unsigned int *) data);;
+		di->usb_online = *((unsigned int *) data);
 		break;
 	case USB_EVENT_ENUMERATED:
 		di->usb_max_power = *((unsigned int *) data);
@@ -1559,7 +1563,7 @@ static ssize_t set_regulation_voltage(struct device *dev,
 	if ((strict_strtol(buf, 10, &val) < 0) || (val < 3500)
 			|| (val > di->platform_data->max_charger_voltagemV))
 		return -EINVAL;
-	di->platform_data->max_bat_voltagemV= val;
+	di->platform_data->max_bat_voltagemV = val;
 	twl6030_config_voreg_reg(di, val);
 
 	return status;
@@ -2027,7 +2031,8 @@ static int __devinit twl6030_bci_battery_probe(struct platform_device *pdev)
 	if (di->otg) {
 		ret = otg_register_notifier(di->otg, &di->nb);
 		if (ret)
-			dev_err(&pdev->dev, "otg register notifier failed %d\n", ret);
+			dev_err(&pdev->dev, "otg register notifier"
+						" failed %d\n", ret);
 	} else
 		dev_err(&pdev->dev, "otg_get_transceiver failed %d\n", ret);
 
@@ -2062,7 +2067,8 @@ static int __devinit twl6030_bci_battery_probe(struct platform_device *pdev)
 			if (!(hw_state & STS_USB_ID)) {
 				di->usb_online = POWER_SUPPLY_TYPE_USB;
 				di->charger_source = POWER_SUPPLY_TYPE_USB;
-				di->charge_status = POWER_SUPPLY_STATUS_CHARGING;
+				di->charge_status =
+						POWER_SUPPLY_STATUS_CHARGING;
 				di->event = USB_EVENT_VBUS;
 				schedule_work(&di->usb_work);
 			}
@@ -2194,7 +2200,8 @@ static int twl6030_bci_battery_resume(struct device *dev)
 	u8 rd_reg = 0;
 	int ret;
 
-	ret = twl_i2c_read_u8(TWL6030_MODULE_CHARGER, &rd_reg, CONTROLLER_INT_MASK);
+	ret = twl_i2c_read_u8(TWL6030_MODULE_CHARGER, &rd_reg,
+			CONTROLLER_INT_MASK);
 	if (ret)
 		goto err;
 
@@ -2220,7 +2227,7 @@ err:
 #define twl6030_bci_battery_resume	NULL
 #endif /* CONFIG_PM */
 
-static struct dev_pm_ops pm_ops = {
+static const struct dev_pm_ops pm_ops = {
 	.suspend	= twl6030_bci_battery_suspend,
 	.resume		= twl6030_bci_battery_resume,
 };
