@@ -445,6 +445,10 @@ static struct regulator_init_data tablet_vcxio = {
 		.valid_ops_mask	 = REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
 		.always_on	= true,
+		.state_mem = {
+			.disabled       = true,
+		},
+		.initial_state          = PM_SUSPEND_MEM,
 	},
 	.num_consumer_supplies	= ARRAY_SIZE(tablet_vcxio_supply),
 	.consumer_supplies	= tablet_vcxio_supply,
@@ -465,6 +469,10 @@ static struct regulator_init_data tablet_vdac = {
 		.valid_ops_mask	 = REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
 		.always_on	= true,
+		.state_mem = {
+			.disabled       = true,
+		},
+		.initial_state          = PM_SUSPEND_MEM,
 	},
 	.num_consumer_supplies  = ARRAY_SIZE(sdp4430_vdac_supply),
 	.consumer_supplies      = sdp4430_vdac_supply,
