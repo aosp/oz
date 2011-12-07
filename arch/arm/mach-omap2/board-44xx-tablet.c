@@ -478,6 +478,10 @@ static struct regulator_init_data tablet_vdac = {
 	.consumer_supplies      = sdp4430_vdac_supply,
 };
 
+static struct regulator_consumer_supply tablet_vusb_supply[] = {
+	REGULATOR_SUPPLY("vusb", "twl6030_usb"),
+};
+
 static struct regulator_init_data tablet_vusb = {
 	.constraints = {
 		.min_uV			= 3300000,
@@ -487,7 +491,14 @@ static struct regulator_init_data tablet_vusb = {
 					| REGULATOR_MODE_STANDBY,
 		.valid_ops_mask	 =	REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
+		.state_mem = {
+			.disabled       = true,
+		},
+		.initial_state          = PM_SUSPEND_MEM,
 	},
+	.num_consumer_supplies  = ARRAY_SIZE(tablet_vusb_supply),
+	.consumer_supplies      = tablet_vusb_supply,
+
 };
 
 static struct regulator_init_data tablet_vcore3 = {
