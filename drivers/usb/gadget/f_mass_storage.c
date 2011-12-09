@@ -628,7 +628,7 @@ static int fsg_setup(struct usb_function *f,
 	u16			w_value = le16_to_cpu(ctrl->wValue);
 	u16			w_length = le16_to_cpu(ctrl->wLength);
 
-	if (!fsg_is_set(fsg->common))
+	if (!fsg->common->fsg)
 		return -EOPNOTSUPP;
 
 	switch (ctrl->bRequest) {
