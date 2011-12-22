@@ -1283,23 +1283,18 @@ static int capacity_changed(struct twl6030_bci_device_info *di)
 						di->gpadc_vbat_chnl);
 	}
 
-	/* Setting the capacity level only makes sense when on
-	 * the battery is powering the board.
-	 */
-	if (di->charge_status == POWER_SUPPLY_STATUS_DISCHARGING) {
-		if (di->voltage_mV < 3500)
-			curr_capacity = 5;
-		else if (di->voltage_mV < 3600 && di->voltage_mV >= 3500)
-			curr_capacity = 20;
-		else if (di->voltage_mV < 3700 && di->voltage_mV >= 3600)
-			curr_capacity = 50;
-		else if (di->voltage_mV < 3800 && di->voltage_mV >= 3700)
-			curr_capacity = 75;
-		else if (di->voltage_mV < 3900 && di->voltage_mV >= 3800)
-			curr_capacity = 90;
-		else if (di->voltage_mV >= 3900)
-				curr_capacity = 100;
-	}
+	if (di->voltage_mV < 3500)
+		curr_capacity = 5;
+	else if (di->voltage_mV < 3600 && di->voltage_mV >= 3500)
+		curr_capacity = 20;
+	else if (di->voltage_mV < 3700 && di->voltage_mV >= 3600)
+		curr_capacity = 50;
+	else if (di->voltage_mV < 3800 && di->voltage_mV >= 3700)
+		curr_capacity = 75;
+	else if (di->voltage_mV < 3900 && di->voltage_mV >= 3800)
+		curr_capacity = 90;
+	else if (di->voltage_mV >= 3900)
+		curr_capacity = 100;
 
 	/* if we disabled charging to check capacity,
 	 * enable it again after we read the
