@@ -434,11 +434,10 @@ static int twl6030_gpadc_wait_conversion_ready(
 		unsigned int timeout_ms, u8 status_reg)
 {
 	unsigned long timeout;
+	u8 reg;
 
 	timeout = jiffies + msecs_to_jiffies(timeout_ms);
 	do {
-		u8 reg;
-
 		reg = twl6030_gpadc_read(gpadc, status_reg);
 		if (!(reg & TWL6030_GPADC_BUSY) && (reg & TWL6030_GPADC_EOC_SW))
 			return 0;
