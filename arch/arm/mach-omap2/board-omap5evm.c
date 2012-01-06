@@ -349,6 +349,10 @@ static struct regulator_init_data omap5_smps6 = {
 	},
 };
 
+static struct regulator_consumer_supply omap5_vdds1v8_main_supply[] = {
+	REGULATOR_SUPPLY("vio", "1-004b"),
+};
+
 static struct regulator_init_data omap5_smps7 = {
 	.constraints = {
 		.min_uV			= 1800000,
@@ -358,6 +362,8 @@ static struct regulator_init_data omap5_smps7 = {
 		.valid_ops_mask		= REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
 	},
+	.num_consumer_supplies	= ARRAY_SIZE(omap5_vdds1v8_main_supply),
+	.consumer_supplies	= omap5_vdds1v8_main_supply,
 };
 
 static struct regulator_init_data omap5_smps8 = {
@@ -373,7 +379,7 @@ static struct regulator_init_data omap5_smps8 = {
 };
 
 static struct regulator_consumer_supply omap5_adac_supply[] = {
-	REGULATOR_SUPPLY("vcc", "soc-audio"),
+	REGULATOR_SUPPLY("v2v1", "1-004b"),
 };
 
 static struct regulator_init_data omap5_smps9 = {
@@ -387,7 +393,6 @@ static struct regulator_init_data omap5_smps9 = {
 	},
 	.num_consumer_supplies	= ARRAY_SIZE(omap5_adac_supply),
 	.consumer_supplies	= omap5_adac_supply,
-
 };
 
 static struct regulator_consumer_supply omap5_vbus_supply[] = {
