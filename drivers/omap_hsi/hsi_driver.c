@@ -309,14 +309,18 @@ int hsi_softreset(struct hsi_dev *hsi_ctrl)
 	void __iomem *base = hsi_ctrl->base;
 	u32 status;
 
-	/* SW WA for HSI-C1BUG00088 OMAP4430 HSI : No recovery from SW reset */
-	/* under specific circumstances  */
-	for (port = 1; port <= hsi_ctrl->max_p; port++) {
-		hsi_outl_and(HSI_HSR_MODE_MODE_VAL_SLEEP, base,
-			     HSI_HSR_MODE_REG(port));
-		hsi_outl(HSI_HSR_ERROR_ALL, base, HSI_HSR_ERRORACK_REG(port));
+	/* HSI-C1BUG00088: i696 : HSI: Issue with SW reset
+	 * No recovery from SW reset under specific circumstances
+	 * If a SW RESET is done while some HSI errors are still not
+	 * acknowledged, the HSR FSM is stucked. */
+	if (is_hsi_errata(hsi_ctrl, HSI_ERRATUM_i696_SW_RESET_FSM_STUCK)) {
+		for (port = 1; port <= hsi_ctrl->max_p; port++) {
+			hsi_outl_and(HSI_HSR_MODE_MODE_VAL_SLEEP, base,
+				     HSI_HSR_MODE_REG(port));
+			hsi_outl(HSI_HSR_ERROR_ALL, base,
+				 HSI_HSR_ERRORACK_REG(port));
+		}
 	}
-
 	/* Reseting HSI Block */
 	hsi_outl_or(HSI_SOFTRESET, base, HSI_SYS_SYSCONFIG_REG);
 	do {
@@ -1027,7 +1031,8 @@ static int hsi_pm_resume(struct device *dev)
 	/* Perform (optional) HSI board specific action after platform wakeup */
 	if (pdata->board_resume)
 		for (i = 0; i < hsi_ctrl->max_p; i++)
-			pdata->board_resume(hsi_ctrl->hsi_port[i].port_number);
+			pdata->board_resume(hsi_ctrl->hsi_port[i].port_number,
+					    device_may_wakeup(dev));
 
 	return 0;
 }
@@ -1042,10 +1047,8 @@ static int hsi_pm_resume(struct device *dev)
 */
 int hsi_runtime_resume(struct device *dev)
 {
-	struct hsi_platform_data *pdata = dev_get_platdata(dev);
 	struct platform_device *pd = to_platform_device(dev);
 	struct hsi_dev *hsi_ctrl = platform_get_drvdata(pd);
-	unsigned int i;
 
 	dev_dbg(dev, "%s\n", __func__);
 
@@ -1059,10 +1062,6 @@ int hsi_runtime_resume(struct device *dev)
 
 	/* Allow data reception */
 	hsi_hsr_resume(hsi_ctrl);
-
-	/* When HSI is ON, no need for IO wakeup mechanism on any HSI port */
-	for (i = 0; i < hsi_ctrl->max_p; i++)
-		pdata->wakeup_disable(hsi_ctrl->hsi_port[i].port_number);
 
 	/* HSI device is now fully operational and _must_ be able to */
 	/* complete I/O operations */
@@ -1080,10 +1079,8 @@ int hsi_runtime_resume(struct device *dev)
 */
 int hsi_runtime_suspend(struct device *dev)
 {
-	struct hsi_platform_data *pdata = dev_get_platdata(dev);
 	struct platform_device *pd = to_platform_device(dev);
 	struct hsi_dev *hsi_ctrl = platform_get_drvdata(pd);
-	int i;
 
 	dev_dbg(dev, "%s\n", __func__);
 
@@ -1097,15 +1094,6 @@ int hsi_runtime_suspend(struct device *dev)
 
 	/* Forbid data reception */
 	hsi_hsr_suspend(hsi_ctrl);
-
-	/* HSI is going to IDLE, it needs IO wakeup mechanism enabled */
-	if (device_may_wakeup(dev))
-		for (i = 0; i < hsi_ctrl->max_p; i++)
-			pdata->wakeup_enable(hsi_ctrl->hsi_port[i].port_number);
-	else
-		for (i = 0; i < hsi_ctrl->max_p; i++)
-			pdata->wakeup_disable(
-				hsi_ctrl->hsi_port[i].port_number);
 
 	/* HSI is now ready to be put in low power state */
 

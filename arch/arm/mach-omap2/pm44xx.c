@@ -546,6 +546,55 @@ static inline u8 get_achievable_state(u8 available_states, u8 req_min_state,
 }
 
 /**
+ * _set_pwrdm_state() - Program powerdomain to the requested state
+ * @pwrst: pwrdm state struct
+ *
+ * This takes pointer to power_state struct as the function parameter.
+ * Program pwrst and logic state of the requested pwrdm.
+ */
+static int _set_pwrdm_state(struct power_state *pwrst, u32 state,
+			    u32 logic_state)
+{
+	u32 als;
+	bool parent_power_domain = false;
+	int ret = 0;
+
+	pwrst->saved_state = pwrdm_read_next_pwrst(pwrst->pwrdm);
+	pwrst->saved_logic_state = pwrdm_read_logic_retst(pwrst->pwrdm);
+	if (!strcmp(pwrst->pwrdm->name, "core_pwrdm") ||
+		!strcmp(pwrst->pwrdm->name, "mpu_pwrdm") ||
+		!strcmp(pwrst->pwrdm->name, "iva_pwrdm"))
+			parent_power_domain = true;
+	/*
+	 * Write only to registers which are writable! Don't touch
+	 * read-only/reserved registers. If pwrdm->pwrsts_logic_ret or
+	 * pwrdm->pwrsts are 0, consider those power domains containing
+	 * readonly/reserved registers which cannot be controlled by
+	 * software.
+	 */
+	if (pwrst->pwrdm->pwrsts_logic_ret) {
+		als =
+		   get_achievable_state(pwrst->pwrdm->pwrsts_logic_ret,
+				logic_state, parent_power_domain);
+		if (als < pwrst->saved_logic_state)
+			ret = pwrdm_set_logic_retst(pwrst->pwrdm, als);
+	}
+
+	if (pwrst->pwrdm->pwrsts) {
+		pwrst->next_state =
+		   get_achievable_state(pwrst->pwrdm->pwrsts, state,
+						parent_power_domain);
+		if (pwrst->next_state < pwrst->saved_state)
+			ret |= omap_set_pwrdm_state(pwrst->pwrdm,
+					     pwrst->next_state);
+		else
+			pwrst->next_state = pwrst->saved_state;
+	}
+
+	return ret;
+}
+
+/**
  * omap4_configure_pwrst() - Program powerdomain to their supported state
  * @is_off_mode: is this an OFF mode transition?
  *
@@ -559,7 +608,8 @@ static void omap4_configure_pwrst(bool is_off_mode)
 {
 	struct power_state *pwrst;
 	u32 state;
-	u32 logic_state, als;
+	u32 logic_state;
+	int ret = 0;
 
 #ifdef CONFIG_OMAP_ALLOW_OSWR
 	if (is_off_mode) {
@@ -575,42 +625,13 @@ static void omap4_configure_pwrst(bool is_off_mode)
 #endif
 
 	list_for_each_entry(pwrst, &pwrst_list, node) {
-		bool parent_power_domain = false;
-
-		pwrst->saved_state = pwrdm_read_next_pwrst(pwrst->pwrdm);
-		pwrst->saved_logic_state = pwrdm_read_logic_retst(pwrst->pwrdm);
-
 		if ((!strcmp(pwrst->pwrdm->name, "cpu0_pwrdm")) ||
 			(!strcmp(pwrst->pwrdm->name, "cpu1_pwrdm")))
 				continue;
-		if (!strcmp(pwrst->pwrdm->name, "core_pwrdm") ||
-			!strcmp(pwrst->pwrdm->name, "mpu_pwrdm") ||
-			!strcmp(pwrst->pwrdm->name, "iva_pwrdm"))
-				parent_power_domain = true;
-		/*
-		 * Write only to registers which are writable! Don't touch
-		 * read-only/reserved registers. If pwrdm->pwrsts_logic_ret or
-		 * pwrdm->pwrsts are 0, consider those power domains containing
-		 * readonly/reserved registers which cannot be controlled by
-		 * software.
-		 */
-		if (pwrst->pwrdm->pwrsts_logic_ret) {
-			als =
-			   get_achievable_state(pwrst->pwrdm->pwrsts_logic_ret,
-					logic_state, parent_power_domain);
-			if (als < pwrst->saved_logic_state)
-				pwrdm_set_logic_retst(pwrst->pwrdm, als);
-		}
-		if (pwrst->pwrdm->pwrsts) {
-			pwrst->next_state =
-			   get_achievable_state(pwrst->pwrdm->pwrsts, state,
-							parent_power_domain);
-			if (pwrst->next_state < pwrst->saved_state)
-				omap_set_pwrdm_state(pwrst->pwrdm,
-						     pwrst->next_state);
-			else
-				pwrst->next_state = pwrst->saved_state;
-		}
+
+		ret |= _set_pwrdm_state(pwrst, state, logic_state);
+		if (ret)
+			pr_err("Failed to setup powerdomains\n");
 	}
 }
 
@@ -641,6 +662,11 @@ static int omap4_restore_pwdms_after_suspend(void)
 			ret = -1;
 		}
 
+		if (!strcmp(pwrst->pwrdm->name, "l3init_pwrdm")) {
+			pwrdm_set_logic_retst(pwrst->pwrdm, PWRDM_POWER_RET);
+			continue;
+		}
+
 		/* If state already ON due to h/w dep, don't do anything */
 		if (cstate == PWRDM_POWER_ON)
 			continue;
@@ -664,9 +690,6 @@ static int omap4_restore_pwdms_after_suspend(void)
 		 */
 		if (pwrst->saved_state > cstate)
 			continue;
-
-		if (pwrst->pwrdm->pwrsts)
-			omap_set_pwrdm_state(pwrst->pwrdm, pwrst->saved_state);
 
 		if (pwrst->pwrdm->pwrsts_logic_ret)
 			pwrdm_set_logic_retst(pwrst->pwrdm,
@@ -832,6 +855,8 @@ static int __init clkdms_setup(struct clockdomain *clkdm, void *unused)
 static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
 {
 	struct power_state *pwrst;
+	int ret = 0;
+	u32 state, logic_state;
 
 	if (!pwrdm->pwrsts)
 		return 0;
@@ -839,6 +864,19 @@ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
 	pwrst = kmalloc(sizeof(struct power_state), GFP_ATOMIC);
 	if (!pwrst)
 		return -ENOMEM;
+
+#ifdef CONFIG_OMAP_ALLOW_OSWR
+	if (off_mode_enabled) {
+		state = PWRDM_POWER_OFF;
+		logic_state = PWRDM_POWER_OFF;
+	} else {
+		state = PWRDM_POWER_RET;
+		logic_state = PWRDM_POWER_OFF;
+	}
+#else
+	state = PWRDM_POWER_RET;
+	logic_state = PWRDM_POWER_RET;
+#endif
 
 	pwrst->pwrdm = pwrdm;
 
@@ -849,10 +887,15 @@ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
 			(!strcmp(pwrdm->name, "cpu0_pwrdm")) ||
 			(!strcmp(pwrdm->name, "cpu1_pwrdm")))
 		pwrst->next_state = PWRDM_POWER_ON;
+	else if (!strcmp(pwrdm->name, "l3init_pwrdm"))
+		/* REVISIT: Remove when EHCI IO wakeup is fixed */
+		ret = _set_pwrdm_state(pwrst, PWRDM_POWER_RET, PWRDM_POWER_RET);
 	else
-		omap4_configure_pwrst(off_mode_enabled);
+		ret = _set_pwrdm_state(pwrst, state, logic_state);
 
-	return omap_set_pwrdm_state(pwrst->pwrdm, pwrst->next_state);
+	list_add(&pwrst->node, &pwrst_list);
+
+	return ret;
 }
 
 static int __init _voltdm_sum_time(struct voltagedomain *voltdm, void *user)
@@ -1108,7 +1151,6 @@ void omap_pm_clear_dsp_wake_up(void)
 static irqreturn_t prcm_interrupt_handler (int irq, void *dev_id)
 {
 	u32 irqenable_mpu, irqstatus_mpu;
-	int hsi_port;
 
 	irqenable_mpu = omap4_prm_read_inst_reg(OMAP4430_PRM_OCP_SOCKET_INST,
 					 OMAP4_PRM_IRQENABLE_MPU_OFFSET);
@@ -1118,9 +1160,7 @@ static irqreturn_t prcm_interrupt_handler (int irq, void *dev_id)
 	/* Check if a IO_ST interrupt */
 	if (irqstatus_mpu & OMAP4430_IO_ST_MASK) {
 		/* Check if HSI caused the IO wakeup */
-		if (omap_hsi_is_io_wakeup_from_hsi(&hsi_port)) {
-			omap_hsi_wakeup(hsi_port);
-		}
+		omap_hsi_io_wakeup_check();
 		omap_uart_resume_idle();
 		usbhs_wakeup();
 		omap_debug_uart_resume_idle();

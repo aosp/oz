@@ -64,6 +64,7 @@
 #include "prm44xx.h"
 #include "board-44xx-tablet.h"
 #include "omap4_ion.h"
+#include "omap_ram_console.h"
 
 #define WILINK_UART_DEV_NAME	"/dev/ttyO1"
 #define ETH_KS8851_IRQ			34
@@ -513,6 +514,28 @@ static struct regulator_init_data tablet_vusb = {
 
 };
 
+static struct regulator_init_data tablet_vcore1	= {
+	.constraints = {
+		.valid_ops_mask         = REGULATOR_CHANGE_STATUS,
+		.always_on              = true,
+		.state_mem = {
+			.disabled       = true,
+		},
+		.initial_state          = PM_SUSPEND_MEM,
+	},
+};
+
+static struct regulator_init_data tablet_vcore2	= {
+	.constraints = {
+		.valid_ops_mask         = REGULATOR_CHANGE_STATUS,
+		.always_on              = true,
+		.state_mem = {
+			.disabled       = true,
+		},
+		.initial_state          = PM_SUSPEND_MEM,
+	},
+};
+
 static struct regulator_init_data tablet_vcore3 = {
 	.constraints = {
 		.valid_ops_mask         = REGULATOR_CHANGE_STATUS,
@@ -706,6 +729,10 @@ static struct twl4030_platform_data tablet_twldata = {
 	/* TWL6030/6032 common resources */
 	.clk32kg	= &tablet_clk32kg,
 	.clk32kaudio	= &tablet_clk32kaudio,
+
+	/* SMPS */
+	.vdd1		= &tablet_vcore1,
+	.vdd2		= &tablet_vcore2,
 
 	/* children */
 	.bci		= &sdp4430_bci_data,
@@ -1183,6 +1210,9 @@ static void __init omap_tablet_map_io(void)
 
 static void __init omap_tablet_reserve(void)
 {
+	omap_ram_console_init(OMAP_RAM_CONSOLE_START_DEFAULT,
+			OMAP_RAM_CONSOLE_SIZE_DEFAULT);
+
 	/* do the static reservations first */
 	memblock_remove(PHYS_ADDR_SMC_MEM, PHYS_ADDR_SMC_SIZE);
 	memblock_remove(PHYS_ADDR_DUCATI_MEM, PHYS_ADDR_DUCATI_SIZE);
