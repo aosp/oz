@@ -1426,9 +1426,9 @@ static void dss_completion_irq_handler(void *data, u32 mask)
 	const int num_mgrs = MAX_DSS_MANAGERS;
 	const u32 masks[] = {
 		DISPC_IRQ_FRAMEDONE | DISPC_IRQ_VSYNC,
-		DISPC_IRQ_FRAMEDONE2 | DISPC_IRQ_VSYNC2,
 		DISPC_IRQ_FRAMEDONETV | DISPC_IRQ_EVSYNC_EVEN |
-		DISPC_IRQ_EVSYNC_ODD
+		DISPC_IRQ_EVSYNC_ODD,
+		DISPC_IRQ_FRAMEDONE2 | DISPC_IRQ_VSYNC2
 	};
 	int i;
 
@@ -1466,9 +1466,9 @@ static void schedule_completion_irq(void)
 	const int num_mgrs = MAX_DSS_MANAGERS;
 	const u32 masks[] = {
 		DISPC_IRQ_FRAMEDONE | DISPC_IRQ_VSYNC,
-		DISPC_IRQ_FRAMEDONE2 | DISPC_IRQ_VSYNC2,
 		DISPC_IRQ_FRAMEDONETV | DISPC_IRQ_EVSYNC_EVEN |
-		DISPC_IRQ_EVSYNC_ODD
+		DISPC_IRQ_EVSYNC_ODD,
+		DISPC_IRQ_FRAMEDONE2 | DISPC_IRQ_VSYNC2
 	};
 	u32 mask = 0;
 	int i;
@@ -1644,7 +1644,11 @@ static int omap_dss_mgr_blank(struct omap_overlay_manager *mgr,
 
 		oc = &dss_cache.overlay_cache[ovl->id];
 
+
 		/* complete unconfigured info in cache */
+		if (ovl->info_dirty)
+			dss_ovl_cb(&ovl->info.cb, i,
+				DSS_COMPLETION_ECLIPSED_SET);
 		dss_ovl_cb(&oc->cb.cache, i, DSS_COMPLETION_ECLIPSED_CACHE);
 		oc->cb.cache.fn = NULL;
 
@@ -1656,7 +1660,9 @@ static int omap_dss_mgr_blank(struct omap_overlay_manager *mgr,
 
 	/* dirty manager */
 	mc = &dss_cache.manager_cache[mgr->id];
-	dss_ovl_cb(&mc->cb.cache, i, DSS_COMPLETION_ECLIPSED_CACHE);
+	if (mgr->info_dirty)
+		dss_ovl_cb(&mgr->info.cb, mgr->id, DSS_COMPLETION_ECLIPSED_SET);
+	dss_ovl_cb(&mc->cb.cache, mgr->id, DSS_COMPLETION_ECLIPSED_CACHE);
 	mc->cb.cache.fn = NULL;
 	mgr->info.cb.fn = NULL;
 	mc->dirty = true;
