@@ -366,8 +366,8 @@ static void hdmi_load_hdcp_keys(struct omap_dss_device *dssdev)
 			DSSERR("*** INVALID AKSV: %d "
 				"Do not perform HDCP AUTHENTICATION\n", aksv);
 	}
-
 }
+
 /* Set / Release c-state constraints */
 static void hdmi_set_l3_cstr(struct omap_dss_device *dssdev, bool enable)
 {
