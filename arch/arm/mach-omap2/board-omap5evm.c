@@ -27,6 +27,12 @@
 #include <linux/mfd/palmas.h>
 #endif
 
+#include <linux/regulator/machine.h>
+#include <linux/regulator/fixed.h>
+#ifdef CONFIG_OMAP5_SEVM_PALMAS
+#include <linux/mfd/palmas.h>
+#endif
+
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
 #include <asm/mach/map.h>
