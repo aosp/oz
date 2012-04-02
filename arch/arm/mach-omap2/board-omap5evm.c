@@ -26,12 +26,6 @@
 #include <linux/mfd/palmas.h>
 #endif
 
-#include <linux/regulator/machine.h>
-#include <linux/regulator/fixed.h>
-#ifdef CONFIG_OMAP5_SEVM_PALMAS
-#include <linux/mfd/palmas.h>
-#endif
-
 #include <linux/i2c/twl.h>
 #include <linux/mfd/twl6040.h>
 #include <linux/platform_data/omap-abe-twl6040.h>
@@ -394,6 +388,7 @@ static struct regulator_init_data omap5_smps9 = {
 	},
 	.num_consumer_supplies	= ARRAY_SIZE(omap5_adac_supply),
 	.consumer_supplies	= omap5_adac_supply,
+
 };
 
 static struct regulator_consumer_supply omap5_vbus_supply[] = {
