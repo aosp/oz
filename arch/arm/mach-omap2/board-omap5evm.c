@@ -347,10 +347,13 @@ static struct regulator_init_data omap5_smps6 = {
 	},
 };
 
+<<<<<<< HEAD
 static struct regulator_consumer_supply omap5_vdds1v8_main_supply[] = {
 	REGULATOR_SUPPLY("vio", "1-004b"),
 };
 
+=======
+>>>>>>> ARM: OMAP5: Board file changes to enable Palmas
 static struct regulator_init_data omap5_smps7 = {
 	.constraints = {
 		.min_uV			= 1800000,
@@ -360,8 +363,11 @@ static struct regulator_init_data omap5_smps7 = {
 		.valid_ops_mask		= REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
 	},
+<<<<<<< HEAD
 	.num_consumer_supplies	= ARRAY_SIZE(omap5_vdds1v8_main_supply),
 	.consumer_supplies	= omap5_vdds1v8_main_supply,
+=======
+>>>>>>> ARM: OMAP5: Board file changes to enable Palmas
 };
 
 static struct regulator_init_data omap5_smps8 = {
@@ -377,7 +383,11 @@ static struct regulator_init_data omap5_smps8 = {
 };
 
 static struct regulator_consumer_supply omap5_adac_supply[] = {
+<<<<<<< HEAD
 	REGULATOR_SUPPLY("v2v1", "1-004b"),
+=======
+	REGULATOR_SUPPLY("vcc", "soc-audio"),
+>>>>>>> ARM: OMAP5: Board file changes to enable Palmas
 };
 
 static struct regulator_init_data omap5_smps9 = {
@@ -484,12 +494,15 @@ static struct regulator_init_data omap5_ldo6 = {
 	},
 };
 
+<<<<<<< HEAD
 static struct regulator_consumer_supply omap5_dss_phy_supply[] = {
 	REGULATOR_SUPPLY("vdds_dsi", "omapdss"),
 	REGULATOR_SUPPLY("vdds_dsi", "omapdss_dsi.0"),
 	REGULATOR_SUPPLY("vdds_dsi", "omapdss_dsi.1"),
 };
 
+=======
+>>>>>>> ARM: OMAP5: Board file changes to enable Palmas
 static struct regulator_init_data omap5_ldo7 = {
 	.constraints = {
 		.min_uV			= 1500000,
@@ -498,10 +511,14 @@ static struct regulator_init_data omap5_ldo7 = {
 					| REGULATOR_MODE_STANDBY,
 		.valid_ops_mask		= REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
+<<<<<<< HEAD
 		.apply_uV		= 1,
 	},
 	.num_consumer_supplies	= ARRAY_SIZE(omap5_dss_phy_supply),
 	.consumer_supplies	= omap5_dss_phy_supply,
+=======
+	},
+>>>>>>> ARM: OMAP5: Board file changes to enable Palmas
 };
 
 static struct regulator_init_data omap5_ldo8 = {
