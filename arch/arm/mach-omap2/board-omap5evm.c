@@ -494,15 +494,12 @@ static struct regulator_init_data omap5_ldo6 = {
 	},
 };
 
-<<<<<<< HEAD
 static struct regulator_consumer_supply omap5_dss_phy_supply[] = {
 	REGULATOR_SUPPLY("vdds_dsi", "omapdss"),
 	REGULATOR_SUPPLY("vdds_dsi", "omapdss_dsi.0"),
 	REGULATOR_SUPPLY("vdds_dsi", "omapdss_dsi.1"),
 };
 
-=======
->>>>>>> ARM: OMAP5: Board file changes to enable Palmas
 static struct regulator_init_data omap5_ldo7 = {
 	.constraints = {
 		.min_uV			= 1500000,
@@ -678,11 +675,10 @@ static struct omap_abe_twl6040_data omap5evm_abe_audio_data = {
 	.has_afm	= ABE_TWL6040_LEFT | ABE_TWL6040_RIGHT,
 	.has_hsmic	= 1,
 	.has_abe	= 1,
-	.has_dmic	= 1,
 	/* Jack detection. */
 	.jack_detection	= 1,
 	/* MCLK input is 19.2MHz */
-	.mclk_freq	= 19200000,
+	.mclk_freq	= 38400000,
 	.card_name = "OMAP5EVM",
 
 };
