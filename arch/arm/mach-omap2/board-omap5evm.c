@@ -176,7 +176,6 @@ static struct omap2_hsmmc_info mmc[] = {
 
 #ifdef CONFIG_OMAP5_SEVM_PALMAS
 #define OMAP5_GPIO_END	0
-
 #define HDMI_GPIO_HPD 193
 
 static struct palmas_gpadc_platform_data omap5_palmas_gpadc = {
@@ -385,11 +384,7 @@ static struct regulator_init_data omap5_smps8 = {
 };
 
 static struct regulator_consumer_supply omap5_adac_supply[] = {
-<<<<<<< HEAD
 	REGULATOR_SUPPLY("v2v1", "1-004b"),
-=======
-	REGULATOR_SUPPLY("vcc", "soc-audio"),
->>>>>>> ARM: OMAP5: Board file changes to enable Palmas
 };
 
 static struct regulator_init_data omap5_smps9 = {
