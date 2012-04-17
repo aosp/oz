@@ -174,10 +174,10 @@ static struct omap2_hsmmc_info mmc[] = {
 	{}	/* Terminator */
 };
 
+#define HDMI_GPIO_HPD 193
+
 #ifdef CONFIG_OMAP5_SEVM_PALMAS
 #define OMAP5_GPIO_END	0
-
-#define HDMI_GPIO_HPD 193
 
 static struct palmas_gpadc_platform_data omap5_palmas_gpadc = {
 	.ch3_current = 0,
@@ -870,7 +870,6 @@ static void __init omap_5430evm_init(void)
 #endif
 #endif
 	omap5_mux_init(board_mux, NULL, OMAP_PACKAGE_CBL);
-	omap_5430evm_i2c_init();
 	omap_sdrc_init(NULL, NULL);
 	omap_5430evm_i2c_init();
 	omap_serial_init();
