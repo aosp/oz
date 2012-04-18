@@ -377,6 +377,7 @@ static int tick_broadcast_set_event(ktime_t expires, int force)
 	if (bc->mode != CLOCK_EVT_MODE_ONESHOT)
 		clockevents_set_mode(bc, CLOCK_EVT_MODE_ONESHOT);
 
+
 	return clockevents_program_event(bc, expires, force);
 }
 
