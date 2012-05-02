@@ -508,14 +508,11 @@ static struct regulator_init_data omap5_ldo7 = {
 					| REGULATOR_MODE_STANDBY,
 		.valid_ops_mask		= REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
-<<<<<<< HEAD
 		.apply_uV		= 1,
 	},
 	.num_consumer_supplies	= ARRAY_SIZE(omap5_dss_phy_supply),
 	.consumer_supplies	= omap5_dss_phy_supply,
-=======
 	},
->>>>>>> ARM: OMAP5: Board file changes to enable Palmas
 };
 
 static struct regulator_init_data omap5_ldo8 = {
