@@ -121,6 +121,13 @@
 		>;
 	};
 
+	i2c4_pins: pinmux_i2c4_pins {
+		pinctrl-single,pins = <
+			0x0334	 0x70004 /* I2C4_SDA: Mode5.Input.PD */
+			0x0338	 0x70004 /* I2C4_SCL: Mode5.Input.PD */
+		>;
+	};
+
 	irq_pins: pinmux_irq_pins {
 		pinctrl-single,pins = <
 			0x420	0x1	/* Wakeup2 INPUT | MODE1 */
@@ -807,6 +814,13 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&i2c3_pins>;
 	clock-frequency = <3400000>;
+};
+
+&i2c4 {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&i2c4_pins>;
+	clock-frequency = <400000>;
 };
 
 &mcspi1 {
