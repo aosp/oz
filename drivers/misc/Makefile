@@ -54,3 +54,7 @@ obj-$(CONFIG_VMWARE_VMCI)	+= vmw_vmci/
 obj-$(CONFIG_LATTICE_ECP3_CONFIG)	+= lattice-ecp3-config.o
 obj-$(CONFIG_SRAM)		+= sram.o
 obj-$(CONFIG_CROSSBAR)		+= crossbar.o
+obj-$(CONFIG_GCCORE)			+= gcx/gccore/
+obj-$(CONFIG_GCBV)				+= gcx/gcbv/
+obj-$(CONFIG_GCIOCTL)			+= gcx/gcioctl/
+obj-$(CONFIG_CACHE2DMANAGER)	+= cache-2dmanager/

@@ -545,4 +545,9 @@ source "drivers/misc/carma/Kconfig"
 source "drivers/misc/altera-stapl/Kconfig"
 source "drivers/misc/mei/Kconfig"
 source "drivers/misc/vmw_vmci/Kconfig"
+source "drivers/misc/gcx/gccore/Kconfig"
+source "drivers/misc/gcx/gcioctl/Kconfig"
+source "drivers/misc/gcx/gcbv/Kconfig"
+source "drivers/misc/cache-2dmanager/Kconfig"
+
 endmenu
