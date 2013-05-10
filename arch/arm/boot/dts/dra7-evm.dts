@@ -151,6 +151,14 @@
 	status = "disabled";
 };
 
+&dpi1 {
+       lcd {
+               compatible = "ti,tfc_s9700";
+               tlc = <&tlc59108>;
+               data-lines = <24>;
+       };
+};
+
 &hdmi {
 	tpd12s015: tpd12s015 {
 		compatible = "ti,tpd12s015";
