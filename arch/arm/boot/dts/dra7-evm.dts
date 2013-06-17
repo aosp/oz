@@ -1150,6 +1150,11 @@
 &atl {
 	status = "okay";
 
+	atl1 {
+		bws = <DRA7_ATL_WS_MCASP2_FSX>;
+		aws = <DRA7_ATL_WS_MCASP3_FSX>;
+	};
+
 	atl2 {
 		bws = <DRA7_ATL_WS_MCASP2_FSX>;
 		aws = <DRA7_ATL_WS_MCASP3_FSX>;
