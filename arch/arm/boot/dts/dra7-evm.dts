@@ -57,6 +57,7 @@
 	sound {
 		compatible = "ti,dra7xx-evm-audio";
 		ti,model = "DRA7xx-EVM";
+		ti,always-on;
 		ti,audio-codec = <&tlv320aic3106>;
 		ti,mcasp-controller = <&mcasp3>;
 		ti,codec-clock-rate = <5644800>;
@@ -66,7 +67,12 @@
 			"Headphone Jack",       "HPLOUT",
 			"Headphone Jack",       "HPROUT",
 			"LINE1L",               "Line In",
-			"LINE1R",               "Line In";
+			"LINE1R",               "Line In",
+			"MIC3L",		"Mic Bias 2V",
+			"MIC3R",		"Mic Bias 2V",
+			"Mic Bias 2V",		"Main Mic",
+			"Line Out",		"LLOUT",
+			"Line Out",		"RLOUT";
 	};
 
 	ocp {
