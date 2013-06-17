@@ -1179,4 +1179,7 @@
 		0 0 0 0
 		0 0 0 0
 	>;
+
+	ti,tx-inactive-mode = <2>; /* 0: Hi_Z, 2: Low, 3: High */
+	ti,rx-inactive-mode = <2>; /* 0: Hi_Z, 2: Low, 3: High */
 };
