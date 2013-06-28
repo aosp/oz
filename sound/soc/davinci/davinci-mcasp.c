@@ -422,8 +422,9 @@ static int davinci_config_channel_size(struct davinci_mcasp *mcasp,
 {
 	u32 fmt;
 	u32 tx_rotate = (word_length / 4) & 0x7;
-	u32 rx_rotate = (32 - word_length) / 4;
+	u32 rx_rotate;
 	u32 mask = (1ULL << word_length) - 1;
+	u32 slot_length;
 
 	/*
 	 * if s BCLK-to-LRCLK ratio has been configured via the set_clkdiv()
@@ -435,10 +436,14 @@ static int davinci_config_channel_size(struct davinci_mcasp *mcasp,
 	 * tdm-slots (for I2S - divided by 2).
 	 */
 	if (mcasp->bclk_lrclk_ratio)
-		word_length = mcasp->bclk_lrclk_ratio / mcasp->tdm_slots;
+		slot_length = mcasp->bclk_lrclk_ratio / mcasp->tdm_slots;
+	else
+		slot_length = word_length;
 
 	/* mapping of the XSSZ bit-field as described in the datasheet */
-	fmt = (word_length >> 1) - 1;
+	fmt = (slot_length >> 1) - 1;
+
+	rx_rotate = (slot_length - word_length) / 4;
 
 	if (mcasp->op_mode != DAVINCI_MCASP_DIT_MODE) {
 		mcasp_mod_bits(mcasp, DAVINCI_MCASP_RXFMT_REG, RXSSZ(fmt),
