@@ -62,6 +62,7 @@ struct davinci_mcasp {
 	u8	version;
 	u16	bclk_lrclk_ratio;
 	u32	channels;
+	u32 sample_bits;
 	int	streams;
 
 	/* McASP FIFO related */
@@ -679,6 +680,7 @@ static int davinci_mcasp_hw_params(struct snd_pcm_substream *substream,
 
 	dma_params->fifo_level = fifo_level;
 	dma_data->maxburst = fifo_level;
+	mcasp->sample_bits = word_length;
 
 	davinci_config_channel_size(mcasp, word_length);
 
@@ -727,6 +729,17 @@ static int davinci_mcasp_startup(struct snd_pcm_substream *substream,
 					     SNDRV_PCM_HW_PARAM_CHANNELS,
 					     mcasp->channels, mcasp->channels);
 
+	/*
+	 * Apply sample size symmetry since the slot size (defined by word
+	 * length) has to be the same for playback and capture in McASP
+	 * instances with unified clock/sync domain
+	 */
+	if (mcasp->sample_bits)
+		snd_pcm_hw_constraint_minmax(substream->runtime,
+					     SNDRV_PCM_HW_PARAM_SAMPLE_BITS,
+					     mcasp->sample_bits,
+					     mcasp->sample_bits);
+
 	return 0;
 }
 
@@ -735,8 +748,10 @@ static void davinci_mcasp_shutdown(struct snd_pcm_substream *substream,
 {
 	struct davinci_mcasp *mcasp = snd_soc_dai_get_drvdata(dai);
 
-	if (!dai->active)
+	if (!dai->active) {
 		mcasp->channels = 0;
+		mcasp->sample_bits = 0;
+	}
 }
 
 static const struct snd_soc_dai_ops davinci_mcasp_dai_ops = {
