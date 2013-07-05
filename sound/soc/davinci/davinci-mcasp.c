@@ -76,6 +76,12 @@ struct davinci_mcasp {
 #endif
 };
 
+/*
+ * Timeout value of 1 ms was chosen experimentally to account for the initial
+ * latency to have the first audio sample transferred to AFIFO by DMA
+ */
+#define MCASP_FIFO_FILL_TIMEOUT		1000
+
 static inline void mcasp_set_bits(struct davinci_mcasp *mcasp, u32 offset,
 				  u32 val)
 {
@@ -191,9 +197,11 @@ static void mcasp_start_tx(struct davinci_mcasp *mcasp)
 	mcasp_set_reg(mcasp, DAVINCI_MCASP_TXBUF_REG, 0);
 }
 
-static void davinci_mcasp_start(struct davinci_mcasp *mcasp, int stream)
+static int davinci_mcasp_start(struct davinci_mcasp *mcasp, int stream)
 {
+	int i = 0;
 	u32 reg;
+	u32 val;
 
 	mcasp->streams++;
 
@@ -202,6 +210,24 @@ static void davinci_mcasp_start(struct davinci_mcasp *mcasp, int stream)
 			reg = mcasp->fifo_base + MCASP_WFIFOCTL_OFFSET;
 			mcasp_clr_bits(mcasp, reg, FIFO_ENABLE);
 			mcasp_set_bits(mcasp, reg, FIFO_ENABLE);
+
+			/*
+			 * Wait until DMA has loaded at least one sample into
+			 * AFIFO to ensure XRUN is not immediately hit
+			 * Implementation has to use udelay since it's executed
+			 * in atomic context (trigger() callback)
+			 */
+			while (++i) {
+				val = mcasp_get_reg(mcasp,
+						mcasp->fifo_base + MCASP_WFIFOSTS_OFFSET);
+				if (val > 0)
+					break;
+
+				if (i > MCASP_FIFO_FILL_TIMEOUT)
+					return -ETIMEDOUT;
+
+				udelay(1);
+			}
 		}
 		mcasp_start_tx(mcasp);
 	} else {
@@ -212,6 +238,8 @@ static void davinci_mcasp_start(struct davinci_mcasp *mcasp, int stream)
 		}
 		mcasp_start_rx(mcasp);
 	}
+
+	return 0;
 }
 
 static void mcasp_stop_rx(struct davinci_mcasp *mcasp)
@@ -702,7 +730,7 @@ static int davinci_mcasp_trigger(struct snd_pcm_substream *substream,
 	case SNDRV_PCM_TRIGGER_RESUME:
 	case SNDRV_PCM_TRIGGER_START:
 	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
-		davinci_mcasp_start(mcasp, substream->stream);
+		ret = davinci_mcasp_start(mcasp, substream->stream);
 		break;
 	case SNDRV_PCM_TRIGGER_SUSPEND:
 	case SNDRV_PCM_TRIGGER_STOP:
