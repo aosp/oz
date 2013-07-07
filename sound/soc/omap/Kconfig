@@ -70,9 +70,12 @@ config SND_OMAP_SOC_AM3517EVM
 	  Say Y if you want to add support for SoC audio on the OMAP3517 / AM3517
 	  EVM.
 
-config SND_OMAP_SOC_DRA7EVM
+config SND_SOC_DRA7_EVM
 	tristate "SoC Audio support for DRA7 EVM"
 	depends on SND_OMAP_SOC && SOC_DRA7XX
+	select SND_DAVINCI_SOC_MCASP
+	select SND_SOC_TLV320AIC3X
+	select SND_DRA7_SOC_ATL
 	select SND_DAVINCI_SOC_GENERIC_EVM
 	help
 	  Say Y if you want to add support for SoC audio on the DRA7 EVM.
