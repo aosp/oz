@@ -84,6 +84,8 @@ struct snd_platform_data {
 	u8 version;
 	u8 txnumevt;
 	u8 rxnumevt;
+	u32 tx_dismod;
+	u32 rx_dismod;
 	int tx_dma_channel;
 	int rx_dma_channel;
 };

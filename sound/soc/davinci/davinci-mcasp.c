@@ -60,6 +60,8 @@ struct davinci_mcasp {
 	u8	num_serializer;
 	u8	*serial_dir;
 	u8	version;
+	u32	tx_dismod;
+	u32	rx_dismod;
 	u16	bclk_lrclk_ratio;
 	u32	channels;
 	u32 sample_bits;
@@ -520,10 +522,14 @@ static int mcasp_common_hw_param(struct davinci_mcasp *mcasp, int stream,
 			       mcasp->serial_dir[i]);
 		if (mcasp->serial_dir[i] == TX_MODE &&
 					tx_ser < max_active_serializers) {
+			mcasp_mod_bits(mcasp, DAVINCI_MCASP_XRSRCTL_REG(i),
+				       DISMOD(mcasp->tx_dismod), DISMOD(3));
 			mcasp_set_bits(mcasp, DAVINCI_MCASP_PDIR_REG, AXR(i));
 			tx_ser++;
 		} else if (mcasp->serial_dir[i] == RX_MODE &&
 					rx_ser < max_active_serializers) {
+			mcasp_mod_bits(mcasp, DAVINCI_MCASP_XRSRCTL_REG(i),
+					DISMOD(mcasp->rx_dismod), DISMOD(3));
 			mcasp_clr_bits(mcasp, DAVINCI_MCASP_PDIR_REG, AXR(i));
 			rx_ser++;
 		} else {
@@ -1054,6 +1060,29 @@ static struct snd_platform_data *davinci_mcasp_set_pdata_from_of(
 
 	pdata->rx_dma_channel = dma_spec.args[0];
 
+	ret = of_property_read_u32(np, "ti,tx-inactive-mode",
+			&pdata->tx_dismod);
+	if (ret < 0)
+		pdata->tx_dismod = 0; /* Hi-Z */
+
+	ret = of_property_read_u32(np, "ti,rx-inactive-mode",
+			&pdata->rx_dismod);
+	if (ret < 0)
+		pdata->rx_dismod = 0; /* Hi-Z */
+
+	/* DISMOD = 1 is a reserved value */
+	if ((pdata->tx_dismod == 1) || (pdata->rx_dismod == 1)) {
+		dev_err(&pdev->dev, "tx/rx-inactive-mode cannot be 1\n");
+		ret = -EINVAL;
+		goto nodata;
+	}
+
+	if ((pdata->tx_dismod > 3) || (pdata->rx_dismod > 3)) {
+		dev_err(&pdev->dev, "invalid tx/rx-inactive-mode\n");
+		ret = -EINVAL;
+		goto nodata;
+	}
+
 	ret = of_property_read_u32(np, "tx-num-evt", &val);
 	if (ret >= 0)
 		pdata->txnumevt = val;
@@ -1139,6 +1168,8 @@ static int davinci_mcasp_probe(struct platform_device *pdev)
 	mcasp->version = pdata->version;
 	mcasp->txnumevt = pdata->txnumevt;
 	mcasp->rxnumevt = pdata->rxnumevt;
+	mcasp->tx_dismod = pdata->tx_dismod;
+	mcasp->rx_dismod = pdata->rx_dismod;
 
 	mcasp->dev = &pdev->dev;
 

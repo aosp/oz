@@ -32,6 +32,10 @@ Optional properties:
 - rx-num-evt : FIFO levels.
 - sram-size-playback : size of sram to be allocated during playback
 - sram-size-capture  : size of sram to be allocated during capture
+- ti,tx-inactive-mode : Transmit pin mode while in an inactive slot (0 - Hi-Z,
+		2 - Low, 3 - High)
+- ti,rx-inactive-mode : Receive pin mode while in an inactive slot (0 - Hi-Z,
+		2 - Low, 3 - High)
 - interrupts : Interrupt numbers for McASP, currently not used by the driver
 - interrupt-names : Known interrupt names are "tx" and "rx"
 - pinctrl-0: Should specify pin control group used for this controller.
@@ -59,4 +63,6 @@ mcasp0: mcasp0@1d00000 {
 			2 0 0 0 >;
 	tx-num-evt = <1>;
 	rx-num-evt = <1>;
+	ti,tx-inactive-mode = <0>; /* 0: Hi-Z, 2: Low, 3: High */
+	ti,rx-inactive-mode = <0>; /* 0: Hi-Z, 2: Low, 3: High */
 };
