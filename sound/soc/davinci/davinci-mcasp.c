@@ -61,6 +61,7 @@ struct davinci_mcasp {
 	u8	*serial_dir;
 	u8	version;
 	u16	bclk_lrclk_ratio;
+	u32	channels;
 	int	streams;
 
 	/* McASP FIFO related */
@@ -531,19 +532,31 @@ static int mcasp_common_hw_param(struct davinci_mcasp *mcasp, int stream,
 	return 0;
 }
 
-static int mcasp_i2s_hw_param(struct davinci_mcasp *mcasp, int stream)
+static int mcasp_i2s_hw_param(struct davinci_mcasp *mcasp, int stream,
+			    int channels)
 {
 	int i, active_slots;
+	int total_slots;
+	int active_serializers;
 	u32 mask = 0;
 	u32 busel = 0;
 
-	if ((mcasp->tdm_slots < 2) || (mcasp->tdm_slots > 32)) {
-		dev_err(mcasp->dev, "tdm slot %d not supported\n",
-			mcasp->tdm_slots);
-		return -EINVAL;
+	total_slots = (mcasp->tdm_slots > 31) ? 32 : mcasp->tdm_slots;
+
+	/*
+	 * If more than one serializer is needed, then use them with
+	 * their specified tdm_slots count. Otherwise, one serializer
+	 * can cope with the transaction using as many slots as channels
+	 * in the stream, requires channels symmetry
+	 */
+	active_serializers = (channels + total_slots - 1) / total_slots;
+	if (active_serializers == 1) {
+		active_slots = channels;
+		mcasp->channels = channels;
+	} else {
+		active_slots = total_slots;
 	}
 
-	active_slots = (mcasp->tdm_slots > 31) ? 32 : mcasp->tdm_slots;
 	for (i = 0; i < active_slots; i++)
 		mask |= (1 << i);
 
@@ -555,12 +568,12 @@ static int mcasp_i2s_hw_param(struct davinci_mcasp *mcasp, int stream)
 	mcasp_set_reg(mcasp, DAVINCI_MCASP_TXTDM_REG, mask);
 	mcasp_set_bits(mcasp, DAVINCI_MCASP_TXFMT_REG, busel | TXORD);
 	mcasp_mod_bits(mcasp, DAVINCI_MCASP_TXFMCTL_REG,
-		       FSXMOD(mcasp->tdm_slots), FSXMOD(0x1FF));
+		       FSXMOD(total_slots), FSXMOD(0x1FF));
 
 	mcasp_set_reg(mcasp, DAVINCI_MCASP_RXTDM_REG, mask);
 	mcasp_set_bits(mcasp, DAVINCI_MCASP_RXFMT_REG, busel | RXORD);
 	mcasp_mod_bits(mcasp, DAVINCI_MCASP_RXFMCTL_REG,
-		       FSRMOD(mcasp->tdm_slots), FSRMOD(0x1FF));
+		       FSRMOD(total_slots), FSRMOD(0x1FF));
 
 	return 0;
 }
@@ -615,7 +628,7 @@ static int davinci_mcasp_hw_params(struct snd_pcm_substream *substream,
 	if (mcasp->op_mode == DAVINCI_MCASP_DIT_MODE)
 		ret = mcasp_dit_hw_param(mcasp);
 	else
-		ret = mcasp_i2s_hw_param(mcasp, substream->stream);
+		ret = mcasp_i2s_hw_param(mcasp, substream->stream, channels);
 
 	if (ret)
 		return ret;
@@ -708,11 +721,27 @@ static int davinci_mcasp_startup(struct snd_pcm_substream *substream,
 	else
 		snd_soc_dai_set_dma_data(dai, substream, mcasp->dma_params);
 
+	/* Apply channels symmetry, needed when using a single serializer */
+	if (mcasp->channels)
+		snd_pcm_hw_constraint_minmax(substream->runtime,
+					     SNDRV_PCM_HW_PARAM_CHANNELS,
+					     mcasp->channels, mcasp->channels);
+
 	return 0;
+}
+
+static void davinci_mcasp_shutdown(struct snd_pcm_substream *substream,
+				   struct snd_soc_dai *dai)
+{
+	struct davinci_mcasp *mcasp = snd_soc_dai_get_drvdata(dai);
+
+	if (!dai->active)
+		mcasp->channels = 0;
 }
 
 static const struct snd_soc_dai_ops davinci_mcasp_dai_ops = {
 	.startup	= davinci_mcasp_startup,
+	.shutdown	= davinci_mcasp_shutdown,
 	.trigger	= davinci_mcasp_trigger,
 	.hw_params	= davinci_mcasp_hw_params,
 	.set_fmt	= davinci_mcasp_set_dai_fmt,
