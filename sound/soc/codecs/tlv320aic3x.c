@@ -691,6 +691,8 @@ static const struct snd_soc_dapm_route intercon[] = {
 	{"Left Line1L Mux", "differential", "LINE1L"},
 	{"Left Line1R Mux", "single-ended", "LINE1R"},
 	{"Left Line1R Mux", "differential", "LINE1R"},
+	{"Right Line1L Mux", "single-ended", "LINE1L"},
+	{"Right Line1L Mux", "differential", "LINE1L"},
 
 	{"Left Line2L Mux", "single-ended", "LINE2L"},
 	{"Left Line2L Mux", "differential", "LINE2L"},
@@ -709,6 +711,9 @@ static const struct snd_soc_dapm_route intercon[] = {
 	{"Right Line1R Mux", "differential", "LINE1R"},
 	{"Right Line1L Mux", "single-ended", "LINE1L"},
 	{"Right Line1L Mux", "differential", "LINE1L"},
+
+	{"Left Line1R Mux", "single-ended", "LINE1R"},
+	{"Left Line1R Mux", "differential", "LINE1R"},
 
 	{"Right Line2R Mux", "single-ended", "LINE2R"},
 	{"Right Line2R Mux", "differential", "LINE2R"},
