@@ -63,6 +63,7 @@ struct davinci_mcasp {
 	u8	version;
 	u32	tx_dismod;
 	u32	rx_dismod;
+	u32	bit_mask;
 	u16	bclk_lrclk_ratio;
 	u32	channels;
 	u32 sample_bits;
@@ -176,6 +177,8 @@ static void mcasp_start_tx(struct davinci_mcasp *mcasp)
 	u8 offset = 0, i;
 	u32 cnt;
 
+	mcasp_set_reg(mcasp, DAVINCI_MCASP_TXMASK_REG, mcasp->bit_mask);
+
 	mcasp_set_ctl_reg(mcasp, DAVINCI_MCASP_GBLCTLX_REG, TXHCLKRST);
 	mcasp_set_ctl_reg(mcasp, DAVINCI_MCASP_GBLCTLX_REG, TXCLKRST);
 	mcasp_set_ctl_reg(mcasp, DAVINCI_MCASP_GBLCTLX_REG, TXSERCLR);
@@ -268,6 +271,19 @@ static void mcasp_stop_tx(struct davinci_mcasp *mcasp)
 	 */
 	if (mcasp_is_synchronous(mcasp) && mcasp->streams)
 		val =  TXHCLKRST | TXCLKRST | TXFSRST;
+
+	/*
+	 * Reset of the state machine, serializer and frame sync generator
+	 * can occur in the middle of a slot which can cause discontinuities
+	 * that may lead to glitches. It can be prevented muting the transmit
+	 * data by masking out all its bits.
+	 * A delay is required to ensure at least one slot uses the new TXMASK,
+	 * the worst case (longest slot) is for 8kHz, mono (125 us).
+	 * Implementation has to use udelay since it's executed in atomic
+	 * context (trigger() callback).
+	 */
+	mcasp_set_reg(mcasp, DAVINCI_MCASP_TXMASK_REG, 0);
+	udelay(125);
 
 	mcasp_set_reg(mcasp, DAVINCI_MCASP_GBLCTLX_REG, val);
 	mcasp_set_reg(mcasp, DAVINCI_MCASP_TXSTAT_REG, 0xFFFFFFFF);
@@ -457,6 +473,8 @@ static int davinci_config_channel_size(struct davinci_mcasp *mcasp,
 	u32 mask = (1ULL << word_length) - 1;
 	u32 slot_length;
 
+	mcasp->bit_mask = (1ULL << word_length) - 1;
+
 	/*
 	 * if s BCLK-to-LRCLK ratio has been configured via the set_clkdiv()
 	 * callback, take it into account here. That allows us to for example
@@ -487,8 +505,6 @@ static int davinci_config_channel_size(struct davinci_mcasp *mcasp,
 			       RXROT(7));
 		mcasp_set_reg(mcasp, DAVINCI_MCASP_RXMASK_REG, mask);
 	}
-
-	mcasp_set_reg(mcasp, DAVINCI_MCASP_TXMASK_REG, mask);
 
 	return 0;
 }
