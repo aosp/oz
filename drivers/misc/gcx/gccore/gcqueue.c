@@ -1185,6 +1185,8 @@ enum gcerror gcqueue_map(struct gccorecontext *gccorecontext,
 			/* Update the allocatable address. */
 			if (gccmdstorage == gcqueue->curstorage) {
 				gcqueue->physical = gccmdstorage->physical;
+				gcqueue->logical = (unsigned char *)
+					gccmdstorage->page.logical;
 				GCDBG(GCZONE_MAPPING,
 				      "  setting current physical address.\n");
 			}
@@ -1562,7 +1564,7 @@ enum gcerror gcqueue_execute(struct gccorecontext *gccorecontext,
 
 		/* Initialize current allocation info. */
 		gcqueue->logical = (unsigned char *)
-				gcqueue->curstorage->page.logical;
+			gcqueue->curstorage->page.logical;
 		gcqueue->physical = gcqueue->curstorage->physical;
 		gcqueue->available = gcqueue->curstorage->page.size
 					- GC_TAIL_RESERVE;
