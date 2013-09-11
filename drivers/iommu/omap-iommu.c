@@ -1044,8 +1044,6 @@ static int omap_iommu_remove(struct platform_device *pdev)
 	struct resource *res;
 	struct omap_iommu *obj = platform_get_drvdata(pdev);
 
-	platform_set_drvdata(pdev, NULL);
-
 	iopgtable_clear_entry_all(obj);
 
 	irq = platform_get_irq(pdev, 0);
