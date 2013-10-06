@@ -92,6 +92,13 @@ config DISPLAY_PANEL_TFCS9700
 		A TFT LCD DPI panel used on the LCD daughter board
 		of Vayu EVM
 
+config DISPLAY_PANEL_LG101
+	tristate "LG101 LCD Panel"
+	depends on OMAP2_DSS_DPI && I2C
+	help
+		LCD Panel used in TI's J6 evm board attachable on
+		LCDx interface.
+
 endmenu
 
 menu "Serializer Deserializer drivers"
