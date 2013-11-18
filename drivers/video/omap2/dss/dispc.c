@@ -40,6 +40,7 @@
 #include <linux/of.h>
 #include <linux/of_device.h>
 #include <linux/mfd/syscon.h>
+#include <linux/regmap.h>
 
 #include <plat/cpu.h>
 #include <mach-omap2/clockdomain.h>
@@ -98,6 +99,11 @@ struct dispc_features {
 	bool mstandby_workaround:1;
 
 	bool set_max_preload:1;
+
+	/* match onoff, rf, ipc bits of DISPC_POL_FREQ1 in CTRL_CORE_SMA_SW_1
+	   register on dra7xx
+	*/
+	bool update_sma_sw1_reg:1;
 };
 
 #define DISPC_MAX_NR_FIFOS 5
@@ -107,6 +113,7 @@ static struct clockdomain *l3_1_clkdm, *l3_2_clkdm;
 static struct {
 	struct platform_device *pdev;
 	void __iomem    *base;
+	void __iomem    *ctrl_core_sma_sw1;
 
 	int		ctx_loss_cnt;
 
@@ -2971,6 +2978,10 @@ static void _dispc_mgr_set_lcd_timings(enum omap_channel channel, int hsw,
 {
 	u32 timing_h, timing_v, l;
 	bool onoff, rf, ipc;
+	u32 onoff_shift, rf_shift, ipc_shift;
+	u32 mask = 0;
+	u32 val = 0;
+	int ret;
 
 	timing_h = FLD_VAL(hsw-1, dispc.feat->sw_start, 0) |
 			FLD_VAL(hfp-1, dispc.feat->fp_start, 8) |
@@ -3019,6 +3030,40 @@ static void _dispc_mgr_set_lcd_timings(enum omap_channel channel, int hsw,
 	l |= FLD_VAL(hsync_level, 13, 13);
 	l |= FLD_VAL(vsync_level, 12, 12);
 	dispc_write_reg(DISPC_POL_FREQ(channel), l);
+
+	/* onoff, rf, ipc values must match in CTRL_CORE_SMA_SW_1 regs */
+	if (dispc.feat->update_sma_sw1_reg) {
+		switch (channel) {
+		case OMAP_DSS_CHANNEL_LCD:
+			rf_shift = 16;
+			onoff_shift = 19;
+			ipc_shift = 22;
+			break;
+		case OMAP_DSS_CHANNEL_LCD2:
+			rf_shift = 17;
+			onoff_shift = 20;
+			ipc_shift = 23;
+			break;
+		case OMAP_DSS_CHANNEL_LCD3:
+			rf_shift = 18;
+			onoff_shift = 21;
+			ipc_shift = 24;
+			break;
+		default:
+			BUG();
+		}
+
+		mask = (1 << rf_shift) |
+			(1 << onoff_shift) |
+			(1 << ipc_shift);
+
+		val = (rf << rf_shift) |
+			(onoff << onoff_shift) |
+			(ipc << ipc_shift);
+		ret = regmap_update_bits(dispc.syscon, 0, mask, val);
+		if (ret < 0)
+			dev_dbg(&pdev->dev, "regmap_update_bits failed!\n");
+	}
 }
 
 /* change name to mode? */
@@ -3601,6 +3646,7 @@ static void _omap_dispc_initial_config(void)
 
 	if (dispc.feat->mstandby_workaround)
 		REG_FLD_MOD(DISPC_MSTANDBY_CTRL, 1, 0, 0);
+
 }
 
 static const struct dispc_features omap24xx_dispc_feats __initconst = {
@@ -3620,6 +3666,7 @@ static const struct dispc_features omap24xx_dispc_feats __initconst = {
 	.num_fifos		=	3,
 	.no_framedone_tv	=	true,
 	.set_max_preload	=	false,
+	.update_sma_sw1_reg	=	false,
 };
 
 static const struct dispc_features omap34xx_rev1_0_dispc_feats __initconst = {
@@ -3640,6 +3687,7 @@ static const struct dispc_features omap34xx_rev1_0_dispc_feats __initconst = {
 	.num_fifos		=	3,
 	.no_framedone_tv	=	true,
 	.set_max_preload	=	false,
+	.update_sma_sw1_reg	=	false,
 };
 
 static const struct dispc_features omap34xx_rev3_0_dispc_feats __initconst = {
@@ -3660,6 +3708,7 @@ static const struct dispc_features omap34xx_rev3_0_dispc_feats __initconst = {
 	.num_fifos		=	3,
 	.no_framedone_tv	=	true,
 	.set_max_preload	=	false,
+	.update_sma_sw1_reg	=	false,
 };
 
 static const struct dispc_features omap44xx_dispc_feats __initconst = {
@@ -3680,6 +3729,7 @@ static const struct dispc_features omap44xx_dispc_feats __initconst = {
 	.num_fifos		=	5,
 	.gfx_fifo_workaround	=	true,
 	.set_max_preload	=	true,
+	.update_sma_sw1_reg	=	false,
 };
 
 static const struct dispc_features omap54xx_dispc_feats __initconst = {
@@ -3701,6 +3751,29 @@ static const struct dispc_features omap54xx_dispc_feats __initconst = {
 	.gfx_fifo_workaround	=	true,
 	.mstandby_workaround	=	true,
 	.set_max_preload	=	true,
+	.update_sma_sw1_reg	=	false,
+};
+
+static const struct dispc_features dra7xx_dispc_feats __initconst = {
+	.sw_start		=	7,
+	.fp_start		=	19,
+	.bp_start		=	31,
+	.sw_max			=	256,
+	.vp_max			=	4095,
+	.hp_max			=	4096,
+	.mgr_width_start	=	11,
+	.mgr_height_start	=	27,
+	.mgr_width_max		=	4096,
+	.mgr_height_max		=	4096,
+	.max_lcd_pclk		=	170000000,
+	.max_tv_pclk		=	186000000,
+	.calc_scaling		=	dispc_ovl_calc_scaling_44xx,
+	.calc_core_clk		=	calc_core_clk_44xx,
+	.num_fifos		=	5,
+	.gfx_fifo_workaround	=	true,
+	.mstandby_workaround	=	true,
+	.set_max_preload	=	true,
+	.update_sma_sw1_reg	=	true,
 };
 
 static int __init dispc_init_features(struct platform_device *pdev)
@@ -3737,8 +3810,11 @@ static int __init dispc_init_features(struct platform_device *pdev)
 		break;
 
 	case OMAPDSS_VER_OMAP5:
-	case OMAPDSS_VER_DRA7xx:
 		src = &omap54xx_dispc_feats;
+		break;
+
+	case OMAPDSS_VER_DRA7xx:
+		src = &dra7xx_dispc_feats;
 		break;
 
 	default:
@@ -3804,13 +3880,15 @@ static int __init omap_dispchw_probe(struct platform_device *pdev)
 	if (r)
 		goto err_runtime_get;
 
-	syscon_np = of_parse_phandle(np, "syscon-dispc", 0);
-	if (!syscon_np)
-		return -ENODEV;
-	dispc.syscon = syscon_node_to_regmap(syscon_np);
-	of_node_put(syscon_np);
-	if (IS_ERR(dispc.syscon))
-		return PTR_ERR(dispc.syscon);
+	if (dispc.feat->update_sma_sw1_reg) {
+		syscon_np = of_parse_phandle(np, "syscon-dispc", 0);
+		if (!syscon_np)
+			return -ENODEV;
+		dispc.syscon = syscon_node_to_regmap(syscon_np);
+		of_node_put(syscon_np);
+		if (IS_ERR(dispc.syscon))
+			return PTR_ERR(dispc.syscon);
+	}
 
 	_omap_dispc_initial_config();
 
