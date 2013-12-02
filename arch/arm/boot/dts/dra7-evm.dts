@@ -466,19 +466,19 @@
 
 	mcasp3_pins: pinmux_mcasp3_pins {
 		pinctrl-single,pins = <
-			0x324 0x10000	/* mcasp3_aclkx.mcasp3_aclkx	Mode0.Output.PD */
-			0x328 0x10000	/* mcasp3_fsx.mcasp3_fsx	Mode0.Output.PD */
-			0x32c 0x10000	/* mcasp3_axr0.mcasp3_axr0	Mode0.Output.PD */
-			0x330 0x50000	/* mcasp3_axr1.mcasp3_axr1	Mode0.Input.PD */
+			0x324 0x10180	/* mcasp3_aclkx.mcasp3_aclkx	Mode0.Output.PD */
+			0x328 0x10180	/* mcasp3_fsx.mcasp3_fsx	Mode0.Output.PD */
+			0x32c 0x10180	/* mcasp3_axr0.mcasp3_axr0	Mode0.Output.PD */
+			0x330 0x50160	/* mcasp3_axr1.mcasp3_axr1	Mode0.Input.PD */
 		>;
 	};
 
 	mcasp6_pins: pinmux_mcasp6_pins {
 		pinctrl-single,pins = <
-			0x2d4 0x10000	/* mcasp6_aclkx.mcasp6aclkx	Mode0.Output.PD */
-			0x2d8 0x10000	/* mcasp6_fsx.mcasp6_fsx	Mode0.Output.PD */
-			0x2dc 0x10000	/* mcasp6_axr0.mcasp6_axr0	Mode0.Output.PD */
-			0x2e0 0x50000	/* mcasp6_axr1.mcasp6_axr1	Mode0.Input.PD */
+			0x2d4 0x101a0	/* mcasp6_aclkx.mcasp6aclkx	Mode0.Output.PD */
+			0x2d8 0x101a0	/* mcasp6_fsx.mcasp6_fsx	Mode0.Output.PD */
+			0x2dc 0x101a0	/* mcasp6_axr0.mcasp6_axr0	Mode0.Output.PD */
+			0x2e0 0x501a0	/* mcasp6_axr1.mcasp6_axr1	Mode0.Input.PD */
 		>;
 	};
 
