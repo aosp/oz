@@ -74,6 +74,7 @@ struct davinci_mcasp {
 	u8	rxnumevt;
 
 	bool	dat_port;
+	struct snd_pcm_substream *substreams[2];
 
 #ifdef CONFIG_PM_SLEEP
 	struct davinci_mcasp_context context;
@@ -170,6 +171,9 @@ static void mcasp_start_rx(struct davinci_mcasp *mcasp)
 
 	if (mcasp_is_synchronous(mcasp))
 		mcasp_set_ctl_reg(mcasp, DAVINCI_MCASP_GBLCTLX_REG, TXFSRST);
+
+	/* enable IRQ sources */
+	mcasp_set_bits(mcasp, DAVINCI_MCASP_EVTCTLR_REG, ROVRN);
 }
 
 static void mcasp_start_tx(struct davinci_mcasp *mcasp)
@@ -201,6 +205,9 @@ static void mcasp_start_tx(struct davinci_mcasp *mcasp)
 		cnt++;
 
 	mcasp_set_reg(mcasp, DAVINCI_MCASP_TXBUF_REG, 0);
+
+	/* enable IRQ sources */
+	mcasp_set_bits(mcasp, DAVINCI_MCASP_EVTCTLX_REG, XUNDRN);
 }
 
 static int davinci_mcasp_start(struct davinci_mcasp *mcasp, int stream)
@@ -257,6 +264,9 @@ static void mcasp_stop_rx(struct davinci_mcasp *mcasp)
 	if (mcasp_is_synchronous(mcasp) && !mcasp->streams)
 		mcasp_set_reg(mcasp, DAVINCI_MCASP_GBLCTLX_REG, 0);
 
+	/* disable IRQ sources */
+	mcasp_clr_bits(mcasp, DAVINCI_MCASP_EVTCTLR_REG, ROVRN);
+
 	mcasp_set_reg(mcasp, DAVINCI_MCASP_GBLCTLR_REG, 0);
 	mcasp_set_reg(mcasp, DAVINCI_MCASP_RXSTAT_REG, 0xFFFFFFFF);
 }
@@ -264,6 +274,9 @@ static void mcasp_stop_rx(struct davinci_mcasp *mcasp)
 static void mcasp_stop_tx(struct davinci_mcasp *mcasp)
 {
 	u32 val = 0;
+
+	/* disable IRQ sources */
+	mcasp_clr_bits(mcasp, DAVINCI_MCASP_EVTCTLX_REG, XUNDRN);
 
 	/*
 	 * In synchronous mode keep TX clocks running if the capture stream is
@@ -308,6 +321,52 @@ static void davinci_mcasp_stop(struct davinci_mcasp *mcasp, int stream)
 		}
 		mcasp_stop_rx(mcasp);
 	}
+}
+
+static irqreturn_t davinci_mcasp_tx_irq_handler(int irq, void *data)
+{
+	struct davinci_mcasp *mcasp = (struct davinci_mcasp *)data;
+	struct snd_pcm_substream *substream;
+		u32 stat;
+
+	stat = mcasp_get_reg(mcasp->base, DAVINCI_MCASP_TXSTAT_REG);
+	if (stat & XUNDRN) {
+		dev_dbg(mcasp->dev, "Transmit buffer underflow\n");
+		substream = mcasp->substreams[SNDRV_PCM_STREAM_PLAYBACK];
+		if (substream) {
+			snd_pcm_stream_lock_irq(substream);
+			if (snd_pcm_running(substream))
+				snd_pcm_stop(substream, SNDRV_PCM_STATE_XRUN);
+			snd_pcm_stream_unlock_irq(substream);
+		}
+	}
+
+	mcasp_set_reg(mcasp, DAVINCI_MCASP_TXSTAT_REG, stat);
+
+	return IRQ_HANDLED;
+}
+
+static irqreturn_t davinci_mcasp_rx_irq_handler(int irq, void *data)
+{
+	struct davinci_mcasp *mcasp = (struct davinci_mcasp *)data;
+	struct snd_pcm_substream *substream;
+	u32 stat;
+
+	stat = mcasp_get_reg(mcasp->base, DAVINCI_MCASP_RXSTAT_REG);
+	if (stat & ROVRN) {
+		dev_dbg(mcasp->dev, "Receive buffer overflow\n");
+		substream = mcasp->substreams[SNDRV_PCM_STREAM_CAPTURE];
+		if (substream) {
+			snd_pcm_stream_lock_irq(substream);
+			if (snd_pcm_running(substream))
+				snd_pcm_stop(substream, SNDRV_PCM_STATE_XRUN);
+			snd_pcm_stream_unlock_irq(substream);
+		}
+	}
+
+	mcasp_set_reg(mcasp->base, DAVINCI_MCASP_RXSTAT_REG, stat);
+
+	return IRQ_HANDLED;
 }
 
 static int davinci_mcasp_set_dai_fmt(struct snd_soc_dai *cpu_dai,
@@ -873,6 +932,8 @@ static int davinci_mcasp_startup(struct snd_pcm_substream *substream,
 					     mcasp->sample_bits,
 					     mcasp->sample_bits);
 
+	mcasp->substreams[substream->stream] = substream;
+
 	return 0;
 }
 
@@ -885,6 +946,8 @@ static void davinci_mcasp_shutdown(struct snd_pcm_substream *substream,
 		mcasp->channels = 0;
 		mcasp->sample_bits = 0;
 	}
+
+	mcasp->substreams[substream->stream] = NULL;
 }
 
 static const struct snd_soc_dai_ops davinci_mcasp_dai_ops = {
@@ -1210,6 +1273,7 @@ static int davinci_mcasp_probe(struct platform_device *pdev)
 	struct resource *mem, *ioarea, *res, *dat;
 	struct snd_platform_data *pdata;
 	struct davinci_mcasp *mcasp;
+	int irq;
 	int ret;
 
 	if (!pdev->dev.platform_data && !pdev->dev.of_node) {
@@ -1244,6 +1308,28 @@ static int davinci_mcasp_probe(struct platform_device *pdev)
 	if (!ioarea) {
 		dev_err(&pdev->dev, "Audio region already claimed\n");
 		return -EBUSY;
+	}
+
+	irq = platform_get_irq_byname(pdev, "rx");
+	if (irq >= 0) {
+		ret = devm_request_threaded_irq(&pdev->dev, irq, NULL,
+				davinci_mcasp_rx_irq_handler,
+				IRQF_ONESHOT, dev_name(&pdev->dev), mcasp);
+		if (ret) {
+			dev_err(&pdev->dev, "RX IRQ request failed\n");
+			return ret;
+		}
+	}
+
+	irq = platform_get_irq_byname(pdev, "tx");
+	if (irq >= 0) {
+		ret = devm_request_threaded_irq(&pdev->dev, irq, NULL,
+				davinci_mcasp_tx_irq_handler,
+				IRQF_ONESHOT, dev_name(&pdev->dev), mcasp);
+		if (ret) {
+			dev_err(&pdev->dev, "TX IRQ request failed\n");
+			return ret;
+		}
 	}
 
 	pm_runtime_enable(&pdev->dev);
