@@ -60,6 +60,9 @@
 		ti,always-on;
 		clocks = <&atl_clkin2_ck>;
 		clock-names = "ti,codec-clock";
+
+		gpios = <&pcf_hdmi 1 0>;
+
 		ti,audio-routing =
 			"Headphone Jack",       "HPLOUT",
 			"Headphone Jack",       "HPROUT",

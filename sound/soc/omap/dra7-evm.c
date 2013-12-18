@@ -22,6 +22,8 @@
 #include <linux/platform_device.h>
 #include <linux/module.h>
 #include <linux/of.h>
+#include <linux/of_gpio.h>
+#include <linux/gpio.h>
 #include <linux/clk.h>
 #include <sound/core.h>
 #include <sound/pcm.h>
@@ -537,6 +539,7 @@ static int dra7_snd_probe(struct platform_device *pdev)
 	struct device_node *node = pdev->dev.of_node;
 	struct snd_soc_card *card = &dra7_snd_card;
 	struct dra7_snd_data *card_data;
+	int gpio;
 	int ret;
 
 	card->dev = &pdev->dev;
@@ -548,6 +551,14 @@ static int dra7_snd_probe(struct platform_device *pdev)
 	if (!node) {
 		dev_err(card->dev, "missing of_node\n");
 		return -ENODEV;
+	}
+
+	gpio = of_get_gpio(node, 0);
+	if (gpio_is_valid(gpio)) {
+		ret = devm_gpio_request_one(card->dev, gpio,
+					    GPIOF_OUT_INIT_LOW, "snd_gpio");
+		if (ret)
+			dev_warn(card->dev, "DAI sel gpio is not available\n");
 	}
 
 	ret = snd_soc_of_parse_card_name(card, "ti,model");
