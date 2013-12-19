@@ -2430,7 +2430,8 @@ static int dispc_ovl_setup_common(enum omap_plane plane,
 	unsigned long pclk = dispc_plane_pclk_rate(plane);
 	unsigned long lclk = dispc_plane_lclk_rate(plane);
 
-	if (paddr == 0)
+	if (color_mode != OMAP_DSS_COLOR_NV12 &&
+	    paddr == 0)
 		return -EINVAL;
 
 	out_width = out_width == 0 ? width : out_width;
