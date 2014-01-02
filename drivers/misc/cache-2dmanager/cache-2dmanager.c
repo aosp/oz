@@ -64,11 +64,11 @@ void c2dm_l1cache(int count,		/* number of regions */
 			char *start = rgns[rgn].start;
 			for (line = 0; line < rgns[rgn].lines; line++) {
 				if (dir == DMA_BIDIRECTIONAL)
-					cpu_cache.dma_flush_range(
+					dmac_flush_range(
 						start,
 						start + rgns[rgn].span);
 				else
-					cpu_cache.dma_map_area(
+					dmac_map_area(
 						start,
 						rgns[rgn].span,
 						dir);
