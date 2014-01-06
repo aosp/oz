@@ -179,6 +179,8 @@ int vpdma_create_desc_list(struct vpdma_desc_list *list, size_t size, int type);
 void vpdma_reset_desc_list(struct vpdma_desc_list *list);
 void vpdma_free_desc_list(struct vpdma_desc_list *list);
 int vpdma_submit_descs(struct vpdma_data *vpdma, struct vpdma_desc_list *list);
+void vpdma_update_dma_addr(struct vpdma_data *vpdma,
+		struct vpdma_desc_list *list, dma_addr_t dma_addr, int drop);
 
 /* helpers for creating vpdma descriptors */
 void vpdma_add_cfd_block(struct vpdma_desc_list *list, int client,
