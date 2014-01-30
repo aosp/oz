@@ -1375,6 +1375,7 @@ static int vip_buf_prepare(struct vb2_buffer *vb)
 		return -EINVAL;
 	}
 
+	mdelay(33);
 	vb2_set_plane_payload(vb, 0, stream->sizeimage);
 
 	return 0;
@@ -1567,6 +1568,7 @@ int early_vip_open()
 	struct platform_device *pdev = dev->pdev;
 	int ret;
 
+	early_stream->open = 1;
 	if (vb2_is_busy(&stream->vb_vidq)) {
 		return -EBUSY;
 	}
@@ -1637,6 +1639,8 @@ int early_release()
 
 	dma_addr_global_complete = NULL;
 	dma_addr_global = NULL;
+
+	early_stream->open = 0;
 
 	mutex_unlock(&dev->mutex);
 
@@ -1727,7 +1731,10 @@ static int vip_release(struct file *file)
 	v4l2_fh_exit(&stream->fh);
 	vb2_queue_release(q);
 
-	mutex_unlock(&dev->mutex);
+	if (early_stream->open)
+		early_release();
+	else
+		mutex_unlock(&dev->mutex);
 
 	return 0;
 }
@@ -1814,6 +1821,7 @@ static int alloc_stream(struct vip_port *port, int stream_id, int vfl_type)
 
 do_free_stream:
 	kfree(stream);
+	kfree(early_stream);
 	return ret;
 }
 
