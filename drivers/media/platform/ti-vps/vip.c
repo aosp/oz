@@ -1501,6 +1501,7 @@ static void vip_release_dev(struct vip_dev *dev)
 {
 	vpdma_buf_unmap(dev->shared->vpdma, &dev->desc_list.buf);
 	vpdma_buf_free(&dev->desc_list.buf);
+	vpdma_free_desc_list(&dev->desc_list);
 
 	/*
 	 * On last close, disable clocks to conserve power
@@ -1624,6 +1625,9 @@ int early_release()
 	vip_release_port(stream->port);
 
 	vb2_queue_release(q);
+
+	dma_addr_global_complete = NULL;
+	dma_addr_global = NULL;
 
 	mutex_unlock(&dev->mutex);
 
