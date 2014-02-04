@@ -279,6 +279,7 @@ int __init dra7xx_clk_init(void)
 	struct clk *abe_dpll_mux, *sys_clkin2, *dpll_ck, *deshdcp_clk;
 	struct clk *dsp_dpll, *dsp_m2_dpll, *dsp_m3x2_dpll;
 	struct clk *atl_fck, *atl_parent;
+	struct clk *ipu1_gfclk, *ipu1_gfclk_parent;
 
 	of_clk_init(NULL);
 
@@ -349,6 +350,11 @@ int __init dra7xx_clk_init(void)
 	rc = clk_set_rate(atl_fck, DRA7_ATL2_DEFFREQ);
 	if (rc)
 		pr_err("%s: failed to set atl_clkin2_ck\n", __func__);
+	ipu1_gfclk = clk_get_sys(NULL, "ipu1_gfclk_mux");
+	ipu1_gfclk_parent = clk_get_sys(NULL, "dpll_core_h22x2_ck");
+	rc = clk_set_parent(ipu1_gfclk, ipu1_gfclk_parent);
+	if (rc)
+		pr_err("%s: failed to reparent ipu1_gfclk_mux\n", __func__);
 
 	return rc;
 }
