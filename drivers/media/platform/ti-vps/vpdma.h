@@ -199,9 +199,9 @@ void vpdma_add_in_dtd(struct vpdma_desc_list *list, int width,
 		int frame_height, int start_h, int start_v);
 
 /* vpdma list interrupt management */
-void vpdma_enable_list_complete_irq(struct vpdma_data *vpdma, int list_num,
-		bool enable);
-void vpdma_clear_list_stat(struct vpdma_data *vpdma);
+void vpdma_enable_list_complete_irq(struct vpdma_data *vpdma, int irq_num,
+		int list_num, bool enable);
+void vpdma_clear_list_stat(struct vpdma_data *vpdma, int irq_num);
 
 /* vpdma client configuration */
 void vpdma_set_line_mode(struct vpdma_data *vpdma, int line_mode,

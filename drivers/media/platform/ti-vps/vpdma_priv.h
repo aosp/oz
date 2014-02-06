@@ -39,6 +39,8 @@
 #define VPDMA_INT_LIST0_STAT		0x88
 #define VPDMA_INT_LIST0_MASK		0x8c
 
+#define VPDMA_INTX_OFFSET		0x50
+
 #define VPDMA_PERFMON(i)		(0x200 + i * 4)
 
 /* VPE specific client registers */
