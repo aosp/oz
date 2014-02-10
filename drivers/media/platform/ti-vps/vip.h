@@ -155,9 +155,9 @@ extern struct vip_stream *early_stream;
 extern dma_addr_t dma_addr_global;
 extern void *mem_priv;
 
-extern bool early_sensor_detect();
-extern int early_vip_open();
-extern int early_release();
+extern bool early_sensor_detect(void);
+extern int early_vip_open(void);
+extern int early_release(void);
 extern int early_reqbufs(struct v4l2_requestbuffers *p);
 extern int early_querybuf(struct v4l2_buffer *p);
 extern int early_qbuf(struct v4l2_buffer *p);
