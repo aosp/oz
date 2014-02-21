@@ -120,7 +120,7 @@ static int omap_rproc_start(struct rproc *rproc)
 	struct omap_rproc_pdata *pdata = pdev->dev.platform_data;
 	int ret;
 
-	if (pdata->set_bootaddr)
+	if (pdata->set_bootaddr && !pdata->late_attach)
 		pdata->set_bootaddr(rproc->bootaddr);
 
 	oproc->nb.notifier_call = omap_rproc_mbox_callback;
@@ -217,6 +217,8 @@ static int omap_rproc_probe(struct platform_device *pdev)
 				pdata->firmware, sizeof(*oproc));
 	if (!rproc)
 		return -ENOMEM;
+
+	rproc->late_attach = pdata->late_attach;
 
 	oproc = rproc->priv;
 	oproc->rproc = rproc;
