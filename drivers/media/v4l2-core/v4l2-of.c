@@ -103,6 +103,8 @@ static void v4l2_of_parse_parallel_bus(const struct device_node *node,
 	if (!of_property_read_u32(node, "sync-on-green-active", &v))
 		flags |= v ? V4L2_MBUS_VIDEO_SOG_ACTIVE_HIGH :
 			V4L2_MBUS_VIDEO_SOG_ACTIVE_LOW;
+	if (!of_property_read_u32(node, "num-channels", &v))
+		bus->num_channels = v;
 
 	bus->flags = flags;
 
