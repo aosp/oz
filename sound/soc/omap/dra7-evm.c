@@ -25,6 +25,7 @@
 #include <linux/of_gpio.h>
 #include <linux/gpio.h>
 #include <linux/clk.h>
+#include <linux/pm_runtime.h>
 #include <sound/core.h>
 #include <sound/pcm.h>
 #include <sound/soc.h>
@@ -40,6 +41,8 @@ struct dra7_snd_data {
 	unsigned int media_slots;
 	unsigned int multichannel_slots;
 	int always_on;
+	int media_shared;
+	int multichannel_shared;
 };
 
 static unsigned int dra7_get_bclk(struct snd_pcm_hw_params *params, int slots)
@@ -216,16 +219,44 @@ static int dra7_multichannel_hw_params_fixup(struct snd_soc_pcm_runtime *rtd,
 	return 0;
 }
 
-static int dra7_dai_init(struct snd_soc_pcm_runtime *rtd)
+static int dra7_snd_media_init(struct snd_soc_pcm_runtime *rtd)
 {
 	struct snd_soc_card *card = rtd->card;
 	struct dra7_snd_data *card_data = snd_soc_card_get_drvdata(card);
+	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
 
 	/* Minimize artifacts as much as possible if can be afforded */
 	if (card_data->always_on)
 		rtd->pmdown_time = INT_MAX;
 	else
 		rtd->pmdown_time = 0;
+
+	/* Forbid runtime PM if the DAI is shared with radio */
+	if (card_data->media_shared) {
+		dev_info(card->dev, "%s is shared with radio\n", cpu_dai->name);
+		pm_runtime_forbid(cpu_dai->dev);
+	}
+
+	return 0;
+}
+
+static int dra7_snd_multichannel_init(struct snd_soc_pcm_runtime *rtd)
+{
+	struct snd_soc_card *card = rtd->card;
+	struct dra7_snd_data *card_data = snd_soc_card_get_drvdata(card);
+	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
+
+	/* Minimize artifacts as much as possible if can be afforded */
+	if (card_data->always_on)
+		rtd->pmdown_time = INT_MAX;
+	else
+		rtd->pmdown_time = 0;
+
+	/* Forbid runtime PM if the DAI is shared with radio */
+	if (card_data->multichannel_shared) {
+		dev_info(card->dev, "%s is shared with radio\n", cpu_dai->name);
+		pm_runtime_forbid(cpu_dai->dev);
+	}
 
 	return 0;
 }
@@ -306,7 +337,7 @@ static struct snd_soc_dai_link dra7_snd_dai[] = {
 		.codec_dai_name = "tlv320aic3x-hifi",
 		.platform_name = "omap-pcm-audio",
 		.ops = &dra7_snd_media_ops,
-		.init = dra7_dai_init,
+		.init = dra7_snd_media_init,
 	},
 	{
 		/* Multichannel: McASP6 + 3 * tlv320aic3106 */
@@ -315,7 +346,7 @@ static struct snd_soc_dai_link dra7_snd_dai[] = {
 		.ops = &dra7_snd_multichannel_ops,
 		.codecs = dra7_snd_multichannel_codecs,
 		.num_codecs = ARRAY_SIZE(dra7_snd_multichannel_codecs),
-		.init = dra7_dai_init,
+		.init = dra7_snd_multichannel_init,
 	},
 	{
 		/* Bluetooth: McASP7 + dummy codec */
@@ -379,6 +410,10 @@ static int dra7_snd_add_dai_link(struct snd_soc_card *card,
 			dai_link->name);
 		return ret;
 	}
+
+	snprintf(prop, sizeof(prop), "%s-shared", prefix);
+	if (of_find_property(node, prop, NULL))
+		card_data->media_shared = 1;
 
 	return 0;
 }
@@ -464,6 +499,10 @@ static int dra7_snd_add_multichannel_dai_link(struct snd_soc_card *card,
 			dai_link->name);
 		return ret;
 	}
+
+	snprintf(prop, sizeof(prop), "%s-shared", prefix);
+	if (of_find_property(node, prop, NULL))
+		card_data->multichannel_shared = 1;
 
 	return 0;
 }
