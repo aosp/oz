@@ -204,6 +204,9 @@ void vpdma_enable_list_complete_irq(struct vpdma_data *vpdma, int irq_num,
 		int list_num, bool enable);
 void vpdma_clear_list_stat(struct vpdma_data *vpdma, int irq_num);
 
+void vpdma_set_bg_color(struct vpdma_data *vpdma,
+		struct vpdma_data_format *fmt, u32 color);
+
 /* vpdma client configuration */
 void vpdma_set_line_mode(struct vpdma_data *vpdma, int line_mode,
 		enum vpdma_channel chan);
