@@ -1502,10 +1502,18 @@ static struct omap_hwmod_class dra7xx_mmu_hwmod_class = {
 };
 
 /* DSP MMUs */
-static struct omap_mmu_dev_attr dra7xx_mmu_dsp_dev_attr = {
+static struct omap_mmu_dev_attr dra7xx_mmu0_dsp_dev_attr = {
 	.da_start	= 0x20000000,
 	.da_end		= 0xfffff000,
 	.nr_tlb_entries = 32,
+	.index		= 0,
+};
+
+static struct omap_mmu_dev_attr dra7xx_mmu1_dsp_dev_attr = {
+	.da_start	= 0x20000000,
+	.da_end		= 0xfffff000,
+	.nr_tlb_entries = 32,
+	.index		= 1,
 };
 
 static struct omap_hwmod_rst_info dra7xx_mmu_dsp_resets[] = {
@@ -1534,7 +1542,7 @@ static struct omap_hwmod dra7xx_mmu0_dsp1_hwmod = {
 			.modulemode   = MODULEMODE_HWCTRL,
 		},
 	},
-	.dev_attr	= &dra7xx_mmu_dsp_dev_attr,
+	.dev_attr	= &dra7xx_mmu0_dsp_dev_attr,
 };
 
 /* mmu1 - dsp1 */
@@ -1560,7 +1568,7 @@ static struct omap_hwmod dra7xx_mmu1_dsp1_hwmod = {
 			.modulemode   = MODULEMODE_HWCTRL,
 		},
 	},
-	.dev_attr	= &dra7xx_mmu_dsp_dev_attr,
+	.dev_attr	= &dra7xx_mmu1_dsp_dev_attr,
 };
 
 /* mmu0 - dsp2 */
@@ -1586,7 +1594,7 @@ static struct omap_hwmod dra7xx_mmu0_dsp2_hwmod = {
 			.modulemode   = MODULEMODE_HWCTRL,
 		},
 	},
-	.dev_attr	= &dra7xx_mmu_dsp_dev_attr,
+	.dev_attr	= &dra7xx_mmu0_dsp_dev_attr,
 };
 
 /* mmu1 - dsp2 */
@@ -1612,7 +1620,7 @@ static struct omap_hwmod dra7xx_mmu1_dsp2_hwmod = {
 			.modulemode   = MODULEMODE_HWCTRL,
 		},
 	},
-	.dev_attr	= &dra7xx_mmu_dsp_dev_attr,
+	.dev_attr	= &dra7xx_mmu1_dsp_dev_attr,
 };
 
 /* IPU MMUs */
