@@ -151,6 +151,8 @@ struct vip_stream {
 
 extern int vip_open(struct file *file);
 extern int vip_release(struct file *file);
+extern int vip_s_fmt_vid_cap(struct file *file, void *priv,
+			     struct v4l2_format *f);
 
 /*
  * VIP Enumerations
