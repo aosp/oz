@@ -16,6 +16,7 @@
 #include <linux/init.h>
 #include <linux/platform_data/dsp-omap.h>
 #include <linux/platform_data/remoteproc-omap.h>
+#include <linux/memblock.h>
 #include <asm/memblock.h>
 #include <asm/mach/map.h>
 
@@ -23,6 +24,16 @@
 #include "omap-secure.h"
 
 #define AM33XX_DRAM_SYNC_VA 0xfe600000
+
+#ifdef CONFIG_RADIO_CMEM_BUF
+/*
+ * Define the CMEM base address explicitly.
+ * Consider system memory map before changing this address
+ */
+#define DRA7_PHYS_ADDR_CMEM_BASE	(0x95400000)
+#define DRA7_CMEM_SIZE			(SZ_4M)
+
+#endif
 
 /*
  * Stub function for OMAP2 so that common files
@@ -47,6 +58,11 @@ void __init omap5_reserve(void)
 
 void __init dra7_reserve(void)
 {
+#ifdef CONFIG_RADIO_CMEM_BUF
+	/* Reserve memory for CMEM pool used by Radio application */
+	if (memblock_remove(DRA7_PHYS_ADDR_CMEM_BASE, DRA7_CMEM_SIZE))
+		pr_err("Failed to reserve memory pool for CMEM Allocator\n");
+#endif
 	omap_rproc_reserve_cma(RPROC_CMA_DRA7);
 	omap_reserve();
 }
