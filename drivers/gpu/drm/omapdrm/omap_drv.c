@@ -558,7 +558,7 @@ static int dev_unload(struct drm_device *dev)
 {
 	struct omap_drm_private *priv = dev->dev_private;
 	struct omap_drm_plugin *plugin;
-	int ret;
+	int i, ret;
 
 	DBG("unload: dev=%p", dev);
 
@@ -571,6 +571,11 @@ static int dev_unload(struct drm_device *dev)
 	omap_drm_irq_uninstall(dev);
 
 	omap_fbdev_free(dev);
+
+	/* flush crtcs so the fbs get released */
+	for (i = 0; i < priv->num_crtcs; i++)
+		omap_crtc_flush(priv->crtcs[i]);
+
 	omap_modeset_free(dev);
 	omap_gem_deinit(dev);
 
