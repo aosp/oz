@@ -198,6 +198,11 @@ void vpdma_add_in_dtd(struct vpdma_desc_list *list, int width,
 		const struct vpdma_data_format *fmt, dma_addr_t dma_addr,
 		enum vpdma_channel chan, int field, u32 flags, int frame_width,
 		int frame_height, int start_h, int start_v);
+int vpdma_list_busy(struct vpdma_data *vpdma, int list_num);
+
+void vpdma_enable_channel_3_irq(struct vpdma_data *vpdma, bool enable);
+void vpdma_set_max_size(struct vpdma_data *vpdma, int reg_addr,
+		u32 width, u32 height);
 
 /* vpdma list interrupt management */
 void vpdma_enable_list_complete_irq(struct vpdma_data *vpdma, int irq_num,
