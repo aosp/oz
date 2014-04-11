@@ -118,6 +118,30 @@ enum vpdma_frame_start_event {
 	VPDMA_FSEVENT_CHANNEL_ACTIVE,
 };
 
+/* max width configurations */
+enum vpdma_max_width {
+	MAX_OUT_WIDTH_UNLIMITED = 0,
+	MAX_OUT_WIDTH_REG1,
+	MAX_OUT_WIDTH_REG2,
+	MAX_OUT_WIDTH_REG3,
+	MAX_OUT_WIDTH_352,
+	MAX_OUT_WIDTH_768,
+	MAX_OUT_WIDTH_1280,
+	MAX_OUT_WIDTH_1920,
+};
+
+/* max height configurations */
+enum vpdma_max_height {
+	MAX_OUT_HEIGHT_UNLIMITED = 0,
+	MAX_OUT_HEIGHT_REG1,
+	MAX_OUT_HEIGHT_REG2,
+	MAX_OUT_HEIGHT_REG3,
+	MAX_OUT_HEIGHT_288,
+	MAX_OUT_HEIGHT_576,
+	MAX_OUT_HEIGHT_720,
+	MAX_OUT_HEIGHT_1080,
+};
+
 /*
  * VPDMA channel numbers
  */
@@ -192,6 +216,7 @@ void vpdma_add_sync_on_channel_ctd(struct vpdma_desc_list *list,
 		enum vpdma_channel chan);
 void vpdma_add_out_dtd(struct vpdma_desc_list *list, int width,
 		const struct vpdma_data_format *fmt, dma_addr_t dma_addr,
+		enum vpdma_max_width max_w, enum vpdma_max_height max_h,
 		enum vpdma_channel chan, u32 flags);
 void vpdma_add_in_dtd(struct vpdma_desc_list *list, int width,
 		const struct v4l2_rect *c_rect,

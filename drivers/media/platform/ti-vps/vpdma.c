@@ -675,11 +675,14 @@ static void dump_dtd(struct vpdma_dtd *dtd)
  * @width: width of the image in pixels in memory
  * @fmt: vpdma data format of the buffer
  * dma_addr: dma address as seen by VPDMA
+ * max_width: enum for maximum width of data transfer
+ * max_height: enum for maximum height of data transfer
  * chan: VPDMA channel
  * flags: VPDMA flags to configure some descriptor fileds
  */
 void vpdma_add_out_dtd(struct vpdma_desc_list *list, int width,
 		const struct vpdma_data_format *fmt, dma_addr_t dma_addr,
+		enum vpdma_max_width max_w, enum vpdma_max_height max_h,
 		enum vpdma_channel chan, u32 flags)
 {
 	int priority = 0;
@@ -713,8 +716,7 @@ void vpdma_add_out_dtd(struct vpdma_desc_list *list, int width,
 	dtd->pkt_ctl = dtd_pkt_ctl(!!(flags & VPDMA_DATA_MODE_TILED),
 				DTD_DIR_OUT, channel, priority, next_chan);
 	dtd->desc_write_addr = dtd_desc_write_addr(0, 0, 0, 0);
-	dtd->max_width_height = dtd_max_width_height(MAX_OUT_WIDTH_1920,
-					MAX_OUT_HEIGHT_1080);
+	dtd->max_width_height = dtd_set_max_width_height(dtd, max_w, max_h);
 	dtd->client_attr0 = 0;
 	dtd->client_attr1 = 0;
 
