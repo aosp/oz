@@ -362,7 +362,7 @@ static int omap_crtc_page_flip_locked(struct drm_crtc *crtc,
 	}
 
 	omap_crtc->event = event;
-	crtc->fb = fb;
+	omap_crtc->old_fb = crtc->fb = fb;
 
 	/*
 	 * Hold a reference temporarily until the crtc is updated
