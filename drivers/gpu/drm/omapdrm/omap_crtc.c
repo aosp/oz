@@ -352,17 +352,23 @@ static int omap_crtc_page_flip_locked(struct drm_crtc *crtc,
 	struct drm_device *dev = crtc->dev;
 	struct omap_crtc *omap_crtc = to_omap_crtc(crtc);
 	struct drm_gem_object *bo;
+	unsigned long flags;
 
 	DBG("%d -> %d (event=%p)", crtc->fb ? crtc->fb->base.id : -1,
 			fb->base.id, event);
 
+	spin_lock_irqsave(&dev->event_lock, flags);
+
 	if (omap_crtc->old_fb) {
+		spin_unlock_irqrestore(&dev->event_lock, flags);
 		dev_err(dev->dev, "already a pending flip\n");
 		return -EINVAL;
 	}
 
 	omap_crtc->event = event;
 	omap_crtc->old_fb = crtc->fb = fb;
+
+	spin_unlock_irqrestore(&dev->event_lock, flags);
 
 	/*
 	 * Hold a reference temporarily until the crtc is updated
