@@ -26,7 +26,7 @@ struct vpdma_buf {
 
 struct vpdma_desc_list {
 	struct vpdma_buf buf;
-	void *next;
+	void *next, *current_desc;
 	int type;
 };
 
@@ -205,7 +205,8 @@ void vpdma_free_desc_list(struct vpdma_desc_list *list);
 int vpdma_submit_descs(struct vpdma_data *vpdma,
 	struct vpdma_desc_list *list, int list_num);
 void vpdma_update_dma_addr(struct vpdma_data *vpdma,
-		struct vpdma_desc_list *list, dma_addr_t dma_addr, int drop);
+	struct vpdma_desc_list *list, dma_addr_t dma_addr,
+	struct vpdma_dtd *write_dtd, int drop);
 
 /* helpers for creating vpdma descriptors */
 void vpdma_add_cfd_block(struct vpdma_desc_list *list, int client,
