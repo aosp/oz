@@ -1056,9 +1056,10 @@ struct omap_gem_sync_waiter {
 	struct omap_gem_object *omap_obj;
 	enum omap_gem_op op;
 	uint32_t read_target, write_target;
-	/* notify called w/ sync_lock held */
+	/*notify will be called from a queued work*/
 	void (*notify)(void *arg);
 	void *arg;
+	struct work_struct notifier;
 };
 
 /* list of omap_gem_sync_waiter.. the notify fxn gets called back when
@@ -1090,13 +1091,26 @@ static inline bool is_waiting(struct omap_gem_sync_waiter *waiter)
 
 static void sync_op_update(void)
 {
+	struct omap_gem_object *omap_obj;
+	struct drm_gem_object *drm_obj;
+	struct drm_device *dev;
+
 	struct omap_gem_sync_waiter *waiter, *n;
 	list_for_each_entry_safe(waiter, n, &waiters, list) {
 		if (!is_waiting(waiter)) {
 			list_del(&waiter->list);
 			SYNC("notify: %p", waiter);
-			waiter->notify(waiter->arg);
-			kfree(waiter);
+
+			/* This is where we push the notify part to worker
+			 * thread. That way, we dont end up in a spinlock
+			 * recursion.
+			 */
+			omap_obj = waiter->omap_obj;
+			drm_obj = &omap_obj->base;
+			dev = drm_obj->dev;
+			queue_work(
+			((struct omap_drm_private *)dev->dev_private)->wq,
+			&waiter->notifier);
 		}
 	}
 }
@@ -1173,10 +1187,29 @@ static void sync_notify(void *arg)
 	wake_up_all(&sync_event);
 }
 
+void notify_worker(struct work_struct *work)
+{
+	/*here we do the actual notify work*/
+	struct omap_gem_sync_waiter *waiter = container_of(work,
+			struct omap_gem_sync_waiter, notifier);
+
+	/* We will list_del waiter and kfree it
+	 * Thus no memory leak and no racing
+	 * so lets first save notify callback and arg
+	 */
+	void *arg = waiter->arg;
+	void (*notify_func)(void *argument) = waiter->notify;
+
+	spin_lock(&sync_lock);
+	kfree(waiter);
+	spin_unlock(&sync_lock);
+
+	notify_func(arg);
+}
+
 int omap_gem_op_sync(struct drm_gem_object *obj, enum omap_gem_op op)
 {
 	struct omap_gem_object *omap_obj = to_omap_bo(obj);
-	int ret = 0;
 	if (omap_obj->sync) {
 		struct task_struct *waiter_task = current;
 		struct omap_gem_sync_waiter *waiter =
@@ -1191,31 +1224,24 @@ int omap_gem_op_sync(struct drm_gem_object *obj, enum omap_gem_op op)
 		waiter->write_target = omap_obj->sync->write_pending;
 		waiter->notify = sync_notify;
 		waiter->arg = &waiter_task;
+		INIT_WORK(&waiter->notifier, notify_worker);
 
 		spin_lock(&sync_lock);
 		if (is_waiting(waiter)) {
 			SYNC("waited: %p", waiter);
 			list_add_tail(&waiter->list, &waiters);
 			spin_unlock(&sync_lock);
-			ret = wait_event_interruptible(sync_event,
+			wait_event(sync_event,
 					(waiter_task == NULL));
-			spin_lock(&sync_lock);
-			if (waiter_task) {
-				SYNC("interrupted: %p", waiter);
-				/* we were interrupted */
-				list_del(&waiter->list);
-				waiter_task = NULL;
-			} else {
-				/* freed in sync_op_update() */
-				waiter = NULL;
-			}
+			return 0;
+
 		}
+
+		kfree(waiter);
 		spin_unlock(&sync_lock);
 
-		if (waiter)
-			kfree(waiter);
 	}
-	return ret;
+	return 0;
 }
 EXPORT_SYMBOL(omap_gem_op_sync);
 
@@ -1245,6 +1271,7 @@ int omap_gem_op_async(struct drm_gem_object *obj, enum omap_gem_op op,
 		waiter->write_target = omap_obj->sync->write_pending;
 		waiter->notify = fxn;
 		waiter->arg = arg;
+		INIT_WORK(&waiter->notifier, notify_worker);
 
 		spin_lock(&sync_lock);
 		if (is_waiting(waiter)) {
@@ -1260,6 +1287,7 @@ int omap_gem_op_async(struct drm_gem_object *obj, enum omap_gem_op op,
 		 * also, if added, the function will return, so this part is
 		 * not reached.
 		 */
+
 		kfree(waiter);
 
 		spin_unlock(&sync_lock);
