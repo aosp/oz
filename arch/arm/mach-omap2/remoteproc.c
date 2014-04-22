@@ -93,19 +93,27 @@ static void dra7_ctrl_write_dsp2_boot_addr(u32 bootaddr);
  * the timer as well as a matching logic to be used to lookup
  * the specific timer device node from the DT blob.
  */
-static struct omap_rproc_timers_info ipu_timers[] = {
+static struct omap_rproc_timers_info omap4_ipu_timers[] = {
 	{ .name = "timer3", },
 };
 
-static struct omap_rproc_timers_info dsp_timers[] = {
+static struct omap_rproc_timers_info omap4_dsp_timers[] = {
 	{ .name = "timer5", },
 };
 
-static struct omap_rproc_timers_info ipu1_timers[] = {
+static struct omap_rproc_timers_info dra7_ipu2_timers[] = {
+	{ .name = "timer3", },
+};
+
+static struct omap_rproc_timers_info dra7_dsp1_timers[] = {
+	{ .name = "timer5", },
+};
+
+static struct omap_rproc_timers_info dra7_ipu1_timers[] = {
 	{ .name = "timer11", },
 };
 
-static struct omap_rproc_timers_info dsp2_timers[] = {
+static struct omap_rproc_timers_info dra7_dsp2_timers[] = {
 	{ .name = "timer6", },
 };
 
@@ -119,8 +127,8 @@ static struct omap_rproc_pdata omap4_rproc_data[] = {
 		.firmware	= "tesla-dsp.xe64T",
 		.mbox_name	= "mbox-dsp",
 		.oh_name	= "dsp",
-		.timers		= dsp_timers,
-		.timers_cnt	= ARRAY_SIZE(dsp_timers),
+		.timers		= omap4_dsp_timers,
+		.timers_cnt	= ARRAY_SIZE(omap4_dsp_timers),
 		.set_bootaddr	= omap_ctrl_write_dsp_boot_addr,
 	},
 	{
@@ -128,8 +136,8 @@ static struct omap_rproc_pdata omap4_rproc_data[] = {
 		.firmware	= "ducati-m3-core0.xem3",
 		.mbox_name	= "mbox-ipu",
 		.oh_name	= "ipu",
-		.timers		= ipu_timers,
-		.timers_cnt	= ARRAY_SIZE(ipu_timers),
+		.timers		= omap4_ipu_timers,
+		.timers_cnt	= ARRAY_SIZE(omap4_ipu_timers),
 	},
 };
 
@@ -139,8 +147,8 @@ static struct omap_rproc_pdata dra7_rproc_data[] = {
 		.firmware	= "dra7-dsp1-fw.xe66",
 		.mbox_name	= "mbox-dsp1",
 		.oh_name	= "dsp1",
-		.timers		= dsp_timers,
-		.timers_cnt	= ARRAY_SIZE(dsp_timers),
+		.timers		= dra7_dsp1_timers,
+		.timers_cnt	= ARRAY_SIZE(dra7_dsp1_timers),
 		.set_bootaddr	= dra7_ctrl_write_dsp1_boot_addr,
 	},
 	{
@@ -148,16 +156,16 @@ static struct omap_rproc_pdata dra7_rproc_data[] = {
 		.firmware	= "dra7-ipu2-fw.xem4",
 		.mbox_name	= "mbox-ipu2",
 		.oh_name	= "ipu2",
-		.timers		= ipu_timers,
-		.timers_cnt	= ARRAY_SIZE(ipu_timers),
+		.timers		= dra7_ipu2_timers,
+		.timers_cnt	= ARRAY_SIZE(dra7_ipu2_timers),
 	},
 	{
 		.name		= "dsp2",
 		.firmware	= "dra7-dsp2-fw.xe66",
 		.mbox_name	= "mbox-dsp2",
 		.oh_name	= "dsp2",
-		.timers		= dsp2_timers,
-		.timers_cnt	= ARRAY_SIZE(dsp2_timers),
+		.timers		= dra7_dsp2_timers,
+		.timers_cnt	= ARRAY_SIZE(dra7_dsp2_timers),
 		.set_bootaddr	= dra7_ctrl_write_dsp2_boot_addr,
 	},
 	{
@@ -165,8 +173,8 @@ static struct omap_rproc_pdata dra7_rproc_data[] = {
 		.firmware	= "dra7-ipu1-fw.xem4",
 		.mbox_name	= "mbox-ipu1",
 		.oh_name	= "ipu1",
-		.timers		= ipu1_timers,
-		.timers_cnt	= ARRAY_SIZE(ipu1_timers),
+		.timers		= dra7_ipu1_timers,
+		.timers_cnt	= ARRAY_SIZE(dra7_ipu1_timers),
 	},
 };
 
