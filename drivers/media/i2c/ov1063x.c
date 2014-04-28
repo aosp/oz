@@ -106,6 +106,9 @@ struct ov1063x_priv {
 	int			cam_fpd_mux_s0_gpio;
 	int			vin2_s0_gpio;
 	int			ov_pwdn_gpio;
+	int			demux_fpd_a_gpio;
+	int			demux_fpd_b_gpio;
+	int			demux_fpd_c_gpio;
 };
 
 static int ov1063x_init_sensor(struct i2c_client *client);
@@ -1575,6 +1578,26 @@ static int ov1063x_set_gpios(struct i2c_client *client, int vin2_s0_val,
 		idx++;
 	}
 
+	if (priv->sensor_connector == VIS_SERDES) {
+		/* For LVDS Vision board cameras, demux_fpd_a/b/c decide the
+		 * method for demultiplexing the signals */
+
+		gpios[idx].gpio   = priv->demux_fpd_a_gpio;
+		gpios[idx].flags  = GPIOF_OUT_INIT_HIGH;
+		gpios[idx].label  = "demux_fpd_a";
+		idx++;
+
+		gpios[idx].gpio   = priv->demux_fpd_b_gpio;
+		gpios[idx].flags  = GPIOF_OUT_INIT_LOW;
+		gpios[idx].label  = "demux_fpd_b";
+		idx++;
+
+		gpios[idx].gpio   = priv->demux_fpd_c_gpio;
+		gpios[idx].flags  = GPIOF_OUT_INIT_HIGH;
+		gpios[idx].label  = "demux_fpd_c";
+		idx++;
+	}
+
 	ret = gpio_request_array(gpios, idx);
 	if (ret)
 		return ret;
@@ -1707,6 +1730,30 @@ static int sensor_get_gpios(struct device_node *node, struct i2c_client *client)
 		priv->ov_pwdn_gpio = gpio;
 	} else {
 		dev_err(&client->dev, "failed to parse OV_PWDN gpio\n");
+		return -EINVAL;
+	}
+
+	gpio = of_get_gpio(node, 7);
+	if (gpio_is_valid(gpio)) {
+		priv->demux_fpd_a_gpio = gpio;
+	} else {
+		dev_err(&client->dev, "failed to parse DEMUX_FPD_A gpio\n");
+		return -EINVAL;
+	}
+
+	gpio = of_get_gpio(node, 8);
+	if (gpio_is_valid(gpio)) {
+		priv->demux_fpd_b_gpio = gpio;
+	} else {
+		dev_err(&client->dev, "failed to parse DEMUX_FPD_B gpio\n");
+		return -EINVAL;
+	}
+
+	gpio = of_get_gpio(node, 9);
+	if (gpio_is_valid(gpio)) {
+		priv->demux_fpd_c_gpio = gpio;
+	} else {
+		dev_err(&client->dev, "failed to parse DEMUX_FPD_C gpio\n");
 		return -EINVAL;
 	}
 
