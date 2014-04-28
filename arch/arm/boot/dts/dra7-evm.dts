@@ -835,13 +835,16 @@
 
 	camera_ov10633: camera_ov10633 {
 		compatible = "ti,camera-ov10633";
-		gpios = <&pcf_hdmi 2 0>,
-			<&pcf_hdmi 3 0>,
-			<&gpio4 13 0>,
-			<&gpio4 14 0>,
-			<&gpio4 15 0>,
-			<&gpio4 16 0>,
-			<&gpio6 17 0>;
+		gpios = <&pcf_hdmi 2 0>,	/* VIN2_S0 */
+			<&pcf_hdmi 3 0>,	/* CAM_FPD_MUX_S0 */
+			<&gpio4 13 0>,		/* MUX1_SEL0 */
+			<&gpio4 14 0>,		/* MUX1_SEL1 */
+			<&gpio4 15 0>,		/* MUX2_SEL0 */
+			<&gpio4 16 0>,		/* MUX2_SEL1 */
+			<&gpio6 17 0>,		/* OV_PWDN */
+			<&gpio2 29 0>,		/* DEMUX_FPD_A */
+			<&gpio1 4 0>,		/* DEMUX_FPD_B */
+			<&gpio6 7 0>;		/* DEMUX_FPD_C */
 		ovnode = <&i2c2>;
 	};
 
@@ -859,13 +862,16 @@
 
 	camera_ov10635: camera_ov10635 {
 		compatible = "ti,camera-ov10635";
-		gpios = <&pcf_hdmi 2 0>,
-			<&pcf_hdmi 3 0>,
-			<&gpio4 13 0>,
-			<&gpio4 14 0>,
-			<&gpio4 15 0>,
-			<&gpio4 16 0>,
-			<&gpio6 17 0>;
+		gpios = <&pcf_hdmi 2 0>,	/* VIN2_S0 */
+			<&pcf_hdmi 3 0>,	/* CAM_FPD_MUX_S0 */
+			<&gpio4 13 0>,		/* MUX1_SEL0 */
+			<&gpio4 14 0>,		/* MUX1_SEL1 */
+			<&gpio4 15 0>,		/* MUX2_SEL0 */
+			<&gpio4 16 0>,		/* MUX2_SEL1 */
+			<&gpio6 17 0>,		/* OV_PWDN */
+			<&gpio2 29 0>,		/* DEMUX_FPD_A */
+			<&gpio1 4 0>,		/* DEMUX_FPD_B */
+			<&gpio6 7 0>;		/* DEMUX_FPD_C */
 		ovnode = <&i2c2>;
 	};
 
