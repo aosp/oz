@@ -965,6 +965,7 @@ static void vip_process_buffer_complete(struct vip_stream *stream)
 	if (buf) {
 		vb = &buf->vb;
 		vb->v4l2_buf.field = stream->field;
+		vb->v4l2_buf.sequence = stream->sequence;
 		do_gettimeofday(&vb->v4l2_buf.timestamp);
 
 		if (buf->drop_count-- == 0) {
@@ -980,6 +981,8 @@ static void vip_process_buffer_complete(struct vip_stream *stream)
 	} else {
 		BUG();
 	}
+
+	stream->sequence++;
 }
 
 static irqreturn_t vip_irq(int irq_vip, void *data)
@@ -1513,6 +1516,7 @@ static int vip_start_streaming(struct vb2_queue *vq, unsigned int count)
 	buf->allow_dq = true;
 
 	stream->cur_buf = buf;
+	stream->sequence = 0;
 	stream->field = V4L2_FIELD_TOP;
 
 	populate_desc_list(stream);
