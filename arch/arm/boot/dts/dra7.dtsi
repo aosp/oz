@@ -187,7 +187,7 @@
 		avs_dspeve: regulator-avs@0x4A0025D8 {
 			compatible = "ti,avsclass0";
 			reg = <0x4A0025D8 20>;
-			efuse-settings = <1055000 8
+			efuse-settings = <1060000 8
 			1150000 12
 			1250000 16>;
 		};
@@ -195,7 +195,7 @@
 		avs_iva: regulator-avs@0x4A0025C4 {
 			compatible = "ti,avsclass0";
 			reg = <0x4A0025C4 20>;
-			efuse-settings = <1055000 8
+			efuse-settings = <1060000 8
 			1150000 12
 			1250000 16>;
 		};
