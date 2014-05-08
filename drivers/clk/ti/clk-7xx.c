@@ -23,9 +23,13 @@
 #define DRA7_DPLL_DSP_GFCLK_NOMFREQ			600000000
 #define DRA7_DPLL_EVE_GCLK_NOMFREQ			400000000
 #define DRA7_ATL2_DEFFREQ				5644800
+#ifdef CONFIG_IVA_OPP_HIGH
+#define DRA7_DPLL_IVA_DEFFREQ				1064000000
+#define DRA7_DPLL_IVA_GFCLK_NOMFREQ			532000000
+#else
 #define DRA7_DPLL_IVA_DEFFREQ				776666666
 #define DRA7_DPLL_IVA_GFCLK_NOMFREQ			388333333
-
+#endif
 
 static struct omap_dt_clk dra7xx_clks[] = {
 	DT_CLK(NULL, "atl_clkin0_ck", "atl_clkin0_ck"),
