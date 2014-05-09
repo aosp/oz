@@ -139,7 +139,7 @@ struct vpe_dei_regs {
  */
 static const struct vpe_dei_regs dei_regs = {
 	0x020C0804u,
-	0x0118100Fu,
+	0x0118100Cu,
 	0x08040200u,
 	0x1010100Cu,
 	0x10101010u,
@@ -821,6 +821,23 @@ static void set_dei_shadow_registers(struct vpe_ctx *ctx)
 	ctx->load_mmrs = true;
 }
 
+static void config_edi_input_mode(struct vpe_ctx *ctx, int mode)
+{
+	struct vpe_mmr_adb *mmr_adb = ctx->mmr_adb.addr;
+	u32 *edi_config_reg = &mmr_adb->dei_regs[3];
+
+	if (mode & 0x2)
+		write_field(edi_config_reg, 1, 1, 2);	/* EDI_ENABLE_3D */
+
+	if (mode & 0x3)
+		write_field(edi_config_reg, 1, 1, 3);	/* EDI_CHROMA_3D  */
+
+	write_field(edi_config_reg, mode, VPE_EDI_INP_MODE_MASK,
+		VPE_EDI_INP_MODE_SHIFT);
+
+	ctx->load_mmrs = true;
+}
+
 /*
  * Set the shadow registers whose values are modified when either the
  * source or destination format is changed.
@@ -1122,11 +1139,22 @@ static void add_in_dtd(struct vpe_ctx *ctx, int port)
 				height /= 2;
 
 			dma_addr += field ? q_data->width * height * bpp : 0;
-		} else {
-			vb = ctx->src_vbs[p_data->vb_index];
+		} else if (q_data->flags & Q_DATA_INTERLACED_ALTERNATE) {
+			/* line average for the first 2 frames */
+			if (ctx->sequence == 0)
+				vb = ctx->src_vbs[2];
+			else if (ctx->sequence == 1)
+				vb = ctx->src_vbs[1];
+			else
+				vb = ctx->src_vbs[p_data->vb_index];
+
 			field = vb->v4l2_buf.field == V4L2_FIELD_BOTTOM;
 			dma_addr = vb2_dma_addr_plus_data_offset(vb, plane);
+		} else {
+			vb = ctx->src_vbs[p_data->vb_index];
+			dma_addr = vb2_dma_addr_plus_data_offset(vb, plane);
 		}
+
 		if (!dma_addr) {
 			vpe_err(ctx->dev,
 				"acquiring input buffer(%d) dma_addr failed\n",
@@ -1193,6 +1221,14 @@ static void device_run(void *priv)
 					v4l2_m2m_src_buf_remove(ctx->m2m_ctx);
 				WARN_ON(ctx->src_vbs[1] == NULL);
 			}
+
+		/*
+		 * we have output the first 2 frames through line average, we
+		 * now switch to EDI de-interlacer
+		 */
+		if (ctx->sequence == 2)
+			config_edi_input_mode(ctx, 0x3); /* EDI (Y + UV) */
+
 		/* SEQ_TB */
 		} else {
 			if (ctx->src_vbs[1] == NULL) {
@@ -1205,7 +1241,8 @@ static void device_run(void *priv)
 
 	if (!ctx->deinterlacing || ((s_q_data->flags &
 		Q_DATA_INTERLACED_SEQ_TB) && (ctx->sequence % 2 == 0)) ||
-			(s_q_data->flags & Q_DATA_INTERLACED_ALTERNATE)) {
+			((s_q_data->flags & Q_DATA_INTERLACED_ALTERNATE) &&
+			(ctx->sequence != 1 && ctx->sequence != 2))) {
 		ctx->src_vbs[0] = v4l2_m2m_src_buf_remove(ctx->m2m_ctx);
 		WARN_ON(ctx->src_vbs[0] == NULL);
 	}
@@ -1416,10 +1453,13 @@ static irqreturn_t vpe_irq(int irq_vpe, void *data)
 	s_q_data = &ctx->q_data[Q_DATA_SRC];
 
 	if (ctx->deinterlacing) {
-		if (s_q_data->flags & Q_DATA_INTERLACED_ALTERNATE)
-			s_vb = ctx->src_vbs[2];
-		else
+		if (s_q_data->flags & Q_DATA_INTERLACED_ALTERNATE) {
+			if (ctx->sequence > 2)
+				s_vb = ctx->src_vbs[2];
+		} else {
+			/* Q_DATA_INTERLACED_SEQ_TB */
 			s_vb = ctx->src_vbs[1];
+		}
 	}
 
 	spin_lock_irqsave(&dev->lock, flags);
@@ -1428,7 +1468,8 @@ static irqreturn_t vpe_irq(int irq_vpe, void *data)
 		if (((ctx->sequence % 2) == 0))
 			v4l2_m2m_buf_done(s_vb, VB2_BUF_STATE_DONE);
 	} else {
-		v4l2_m2m_buf_done(s_vb, VB2_BUF_STATE_DONE);
+		if (s_vb)
+			v4l2_m2m_buf_done(s_vb, VB2_BUF_STATE_DONE);
 	}
 
 	v4l2_m2m_buf_done(d_vb, VB2_BUF_STATE_DONE);
@@ -1437,8 +1478,10 @@ static irqreturn_t vpe_irq(int irq_vpe, void *data)
 
 	if (ctx->deinterlacing) {
 		if (s_q_data->flags & Q_DATA_INTERLACED_ALTERNATE) {
-			ctx->src_vbs[2] = ctx->src_vbs[1];
-			ctx->src_vbs[1] = ctx->src_vbs[0];
+			if (ctx->sequence > 2) {
+				ctx->src_vbs[2] = ctx->src_vbs[1];
+				ctx->src_vbs[1] = ctx->src_vbs[0];
+			}
 		} else {
 			if (((ctx->sequence % 2) == 0))
 				ctx->src_vbs[1] = ctx->src_vbs[0];
