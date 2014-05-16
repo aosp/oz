@@ -24,6 +24,7 @@ Required properties:
 		"ti,omap4-dpll-j-type-clock",
 		"ti,omap4-dpll-no-gate-clock",
 		"ti,omap4-dpll-no-gate-j-type-clock",
+		"ti,omap5-mpu-dpll-clock",
 
 - #clock-cells : from common clock binding; shall be set to 0.
 - clocks : link phandles of parent clocks, first entry lists reference clock
