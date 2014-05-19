@@ -1299,6 +1299,16 @@
 			};
 		};
 
+		bb2d {
+			compatible = "ti,bb2d";
+			ti,hwmods = "bb2d";
+			clocks = <&dpll_core_h24x2_ck>;
+			clock-names = "fck";
+			reg = <0x59000000 0x0700>;
+			/* check reg-names */
+			interrupts = <0 125 0x4>;
+		};
+
 		vpe {
 			compatible = "ti,vpe";
 			ti,hwmods = "vpe";

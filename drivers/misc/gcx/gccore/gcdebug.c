@@ -310,6 +310,7 @@ void gc_debug_dump_status(const char *function, int line)
 
 	GCDBG_FLUSHDUMP(NULL);
 }
+EXPORT_SYMBOL(gc_debug_dump_status);
 
 static int gc_debug_show_gpu_status(struct seq_file *s, void *data)
 {

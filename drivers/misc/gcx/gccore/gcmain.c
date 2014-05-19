@@ -20,9 +20,10 @@
 #include <linux/delay.h>
 #include <linux/opp.h>
 #include <linux/io.h>
+#include <linux/of.h>
+#include <linux/of_device.h>
 #include <linux/platform_data/omap_gcx.h>
 #include "gcmain.h"
-
 
 
 #define GCZONE_NONE		0
@@ -57,8 +58,61 @@ GCDBG_FILTERDEF(core, GCZONE_NONE,
 
 /* Driver private data. */
 static struct gccorecontext g_context;
+static int gc_probe(struct platform_device *pdev);
+static int gc_remove(struct platform_device *pdev);
+static int gc_suspend(struct platform_device *pdev, pm_message_t s);
+static int gc_resume(struct platform_device *pdev);
+static int gcxxx_scale_dev(struct device *dev, unsigned long val);
+static int gcxxx_set_l3_bw(struct device *dev, unsigned long val);
+static int gcxxx_get_context_loss_count(struct device *dev);
 
+static struct omap_gcx_platform_data omap_gcxxx = {
+	.get_context_loss_count = gcxxx_get_context_loss_count,
+	.scale_dev = gcxxx_scale_dev,
+	.set_bw = gcxxx_set_l3_bw,
+};
 
+static int gcxxx_get_context_loss_count(struct device *dev)
+{
+	/*
+		omap_pm_get_context_loss_count not supported:
+		returning with default 1
+	*/
+	return 1;
+}
+static int gcxxx_scale_dev(struct device *dev, unsigned long val)
+{
+	/*omap_device_scale(dev, val) is not supported, returning with no-op
+	 * for now. */
+	return 0;
+}
+
+static int gcxxx_set_l3_bw(struct device *dev, unsigned long val)
+{
+	return 0; /*omap_pm_set_min_bus_tput(dev, OCP_INITIATOR_AGENT, val);*/
+}
+
+static const struct of_device_id bb2d_of_match[] = {
+	{
+		.compatible = "ti,bb2d",
+		.data = &omap_gcxxx,
+	},
+	{},
+};
+
+static struct platform_driver plat_drv = {
+	.probe = gc_probe,
+	.remove = gc_remove,
+#if GC_ENABLE_SUSPEND
+	.suspend = gc_suspend,
+	.resume = gc_resume,
+#endif
+	.driver = {
+		.owner = THIS_MODULE,
+		.name = "gccore",
+		.of_match_table = bb2d_of_match,
+	},
+};
 /*******************************************************************************
  * Context management.
  */
@@ -206,9 +260,7 @@ static void gcpwr_enable_clock(struct gccorecontext *gccorecontext)
 		/* Clock enabled. */
 		gccorecontext->clockenabled = true;
 	} else if (ctxlost) {
-		GCDBG(GCZONE_POWER, "hardware context lost.\n");
 		if (gc_read_reg(GC_GP_OUT0_Address)) {
-			GCDBG(GCZONE_POWER, "reset idle register.\n");
 			gc_write_reg(GC_GP_OUT0_Address, 0);
 		}
 	}
@@ -508,6 +560,7 @@ bool gc_is_hw_present(void)
 	struct gccorecontext *gccorecontext = &g_context;
 	return gccorecontext->plat->is_hw_present;
 }
+EXPORT_SYMBOL(gc_is_hw_present);
 
 
 void gc_caps(struct gcicaps *gcicaps)
@@ -528,6 +581,7 @@ void gc_caps(struct gcicaps *gcicaps)
 	/* Success. */
 	gcicaps->gcerror = GCERR_NONE;
 }
+EXPORT_SYMBOL(gc_caps);
 
 void gc_commit(struct gcicommit *gcicommit, bool fromuser)
 {
@@ -683,22 +737,6 @@ struct gc_dma_buf {
 	int fd;
 };
 
-static int idr_alloc(struct idr *idr, void *ptr)
-{
-	int id;
-	int ret;
-
-	do {
-		if (!idr_pre_get(idr, GFP_KERNEL))
-			return -ENOMEM;
-
-		ret = idr_get_new(idr, ptr, &id);
-		if (!ret)
-			return id;
-	} while (ret == -EAGAIN);
-
-	return ret;
-}
 
 static int find_dma_by_handle(int handle, void *p, void *data)
 {
@@ -794,7 +832,7 @@ static int _import_dma_buf(int fd, struct gcmmuphysmem *mem)
 	gcdmabuf->sgtable = sgt;
 
 	mutex_lock(&g_context.idr_mutex);
-	id = idr_alloc(&g_context.idr, gcdmabuf);
+	id = idr_alloc(&g_context.idr, gcdmabuf, 1, 0, GFP_NOWAIT);
 	mutex_unlock(&g_context.idr_mutex);
 	if (id < 0) {
 		retval = GCERR_DMABUF_GETIDR_FAIL;
@@ -1033,7 +1071,12 @@ static int gc_probe_opp(struct platform_device *pdev)
 	/* Query supported OPPs. */
 	rcu_read_lock();
 
+	/*
 	gccorecontext->opp_count = opp_get_opp_count(&pdev->dev);
+	Setting it to 0 in the absence of the above API on K3.12
+	*/
+	gccorecontext->opp_count = 0;
+
 	if (gccorecontext->opp_count <= 0) {
 		gccorecontext->opp_count = 0;
 		goto done;
@@ -1070,23 +1113,45 @@ done:
 static int gc_probe(struct platform_device *pdev)
 {
 	struct gccorecontext *gccorecontext = &g_context;
+	struct resource *res_ptr = NULL;
 	int ret;
+	struct of_device_id *match;
 
 	GCENTER(GCZONE_PROBE);
 
 	gccorecontext->bb2ddevice = &pdev->dev;
 	gccorecontext->plat = (struct omap_gcx_platform_data *)
-			       pdev->dev.platform_data;
+		dev_get_platdata(&pdev->dev);
 
-	if (!gccorecontext->plat->is_hw_present) {
+	match = (struct of_device_id *)
+			 of_match_device(of_match_ptr(bb2d_of_match),
+							 &pdev->dev);
+	if (match) {
+		gccorecontext->plat =
+			(struct omap_gcx_platform_data *) match->data;
+		gccorecontext->plat->is_hw_present =
+			 (of_machine_is_compatible("ti, omap54xx")	||
+				of_machine_is_compatible("ti,dra7"));
+	}
+
+
+	if (!gc_is_hw_present()) {
 		GCERR("gc_probe failed. gcx hardware is not present\n");
 		return -ENODEV;
 	}
 
-	gccorecontext->regbase = gccorecontext->plat->regbase;
-	gccorecontext->irqline = platform_get_irq(pdev, pdev->id);
+	res_ptr = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	if (!res_ptr) {
+		GCERR("can't get IORESOURCE_MEM BB2D\n");
+		return -EINVAL;
+	}
+	gccorecontext->regbase = devm_ioremap_resource(&pdev->dev, res_ptr);
+	if (!gccorecontext->regbase) {
+		GCERR("can't ioremap BB2D\n");
+		return -ENOMEM;
+	}
+	gccorecontext->irqline = platform_get_irq(pdev, 0);
 	gccorecontext->device = &pdev->dev;
-
 
 	pm_runtime_enable(gccorecontext->device);
 	gccorecontext->plat->get_context_loss_count(gccorecontext->device);
@@ -1145,18 +1210,6 @@ static int gc_resume(struct platform_device *pdev)
 }
 #endif
 
-static struct platform_driver plat_drv = {
-	.probe = gc_probe,
-	.remove = gc_remove,
-#if GC_ENABLE_SUSPEND
-	.suspend = gc_suspend,
-	.resume = gc_resume,
-#endif
-	.driver = {
-		.owner = THIS_MODULE,
-		.name = "gccore",
-	},
-};
 
 #if CONFIG_HAS_EARLYSUSPEND
 #include <linux/earlysuspend.h>
