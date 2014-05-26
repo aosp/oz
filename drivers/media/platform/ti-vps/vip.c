@@ -14,12 +14,10 @@
 #include <linux/slab.h>
 
 #include <linux/pinctrl/consumer.h>
-#include <linux/of_i2c.h>
 #include <linux/of_device.h>
 
 #include <media/dra7xx_vip.h>
 
-#include <linux/of_i2c.h>
 #include "vip.h"
 
 #define VIP_MODULE_NAME "dra7xx-vip"
@@ -1106,12 +1104,12 @@ static int vip_g_std(struct file *file, void *fh, v4l2_std_id *std)
 	return 0;
 }
 
-static int vip_s_std(struct file *file, void *fh, v4l2_std_id *std)
+static int vip_s_std(struct file *file, void *fh, v4l2_std_id std)
 {
 	struct vip_stream *stream = file2stream(file);
 	struct vip_dev *dev = stream->port->dev;
 
-	v4l2_subdev_call(dev->sensor, video, s_std_output, *std);
+	v4l2_subdev_call(dev->sensor, video, s_std_output, std);
 	return 0;
 }
 
@@ -1399,7 +1397,7 @@ static int vip_s_selection(struct file *file, void *fh,
 }
 
 static long vip_ioctl_default(struct file *file, void *fh, bool valid_prio,
-			      int cmd, void *arg)
+			      unsigned int cmd, void *arg)
 {
 	switch (cmd) {
 	default:
@@ -1888,6 +1886,7 @@ static int alloc_stream(struct vip_port *port, int stream_id, int vfl_type)
 	q->buf_struct_size = sizeof(struct vip_buffer);
 	q->ops = &vip_video_qops;
 	q->mem_ops = &vb2_dma_contig_memops;
+	q->timestamp_type = V4L2_BUF_FLAG_TIMESTAMP_COPY;
 
 	ret = vb2_queue_init(q);
 	if (ret)
@@ -2084,7 +2083,7 @@ static int vip_async_bound(struct v4l2_async_notifier *notifier,
 		return -EINVAL;
 
 	if (dev->sensor) {
-		if (asd < dev->sensor->asdl.asd) {
+		if (asd < dev->sensor->asd) {
 			/* Notified of a subdev earlier in the array */
 			v4l2_info(&dev->v4l2_dev, "Switching to subdev i2c address %x (High priority)",
 				asd->match.i2c.address);
@@ -2110,7 +2109,7 @@ static int vip_async_complete(struct v4l2_async_notifier *notifier)
 }
 
 static struct v4l2_async_subdev vip_sensor_subdev = {
-	.bus_type = V4L2_ASYNC_BUS_I2C,
+	.match_type = V4L2_ASYNC_MATCH_I2C,
 	.match.i2c = {
 		.adapter_id = 1,
 		.address = 0x30,
@@ -2167,7 +2166,7 @@ static int vip_of_probe(struct platform_device *pdev, struct vip_dev *dev)
 
 	if (i > 0) {
 		dev->config->asd_sizes = i;
-		dev->notifier.subdev = dev->config->asd_list;
+		dev->notifier.subdevs = dev->config->asd_list;
 		dev->notifier.num_subdevs = dev->config->asd_sizes;
 		dev->notifier.bound = vip_async_bound;
 		dev->notifier.complete = vip_async_complete;
