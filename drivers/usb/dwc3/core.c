@@ -37,6 +37,8 @@
 #include <linux/usb/gadget.h>
 #include <linux/usb/of.h>
 #include <linux/usb/otg.h>
+#include <linux/gpio.h>
+#include <linux/of_gpio.h>
 
 #include "platform_data.h"
 #include "core.h"
@@ -571,6 +573,19 @@ static int dwc3_probe(struct platform_device *pdev)
 
 	if (dwc->dr_mode == USB_DR_MODE_UNKNOWN)
 		dwc->dr_mode = USB_DR_MODE_OTG;
+
+	if (dwc->dr_mode != USB_DR_MODE_PERIPHERAL) {
+		dwc->gpio_count = of_gpio_count(node);
+		if (dwc->gpio_count < 1) {
+			dev_err(dev, "No gpio to configure\n");
+			goto err1;
+		}
+		dwc->gpio = of_get_gpio(node, 0);
+		if (gpio_is_valid(dwc->gpio)) {
+			gpio_request(dwc->gpio, NULL);
+			gpio_direction_output(dwc->gpio, 1);
+		}
+	}
 
 	switch (dwc->dr_mode) {
 	case USB_DR_MODE_PERIPHERAL:
