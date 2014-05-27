@@ -27,6 +27,7 @@ static void xhci_plat_quirks(struct device *dev, struct xhci_hcd *xhci)
 	 * dev struct in order to setup MSI
 	 */
 	xhci->quirks |= XHCI_PLAT;
+	xhci->quirks |= XHCI_DWC3_OTG;
 }
 
 /* called during probe() after chip reset completes */
@@ -82,6 +83,7 @@ static const struct hc_driver xhci_plat_xhci_driver = {
 	.hub_status_data =	xhci_hub_status_data,
 	.bus_suspend =		xhci_bus_suspend,
 	.bus_resume =		xhci_bus_resume,
+	.start_port_reset =	xhci_start_port_reset,
 };
 
 static int xhci_plat_probe(struct platform_device *pdev)
@@ -160,6 +162,26 @@ static int xhci_plat_probe(struct platform_device *pdev)
 	if (ret)
 		goto put_usb3_hcd;
 
+	xhci->loaded = 1;
+
+#ifdef CONFIG_USB_OTG
+	hcd->phy = usb_get_phy(USB_PHY_TYPE_USB3);
+	if (!IS_ERR(hcd->phy)) {
+		if (hcd->phy && hcd->phy->otg) {
+			dev_dbg(&pdev->dev, "%s otg support available\n",
+					__func__);
+			ret = otg_set_host(hcd->phy->otg, &hcd->self);
+			if (!ret) {
+				xhci->shared_hcd->phy = hcd->phy;
+				goto otg_done;
+			}
+		}
+		usb_put_phy(hcd->phy);
+	}
+	hcd->phy = NULL;
+otg_done:
+#endif
+
 	return 0;
 
 put_usb3_hcd:
@@ -185,10 +207,28 @@ static int xhci_plat_remove(struct platform_device *dev)
 	struct usb_hcd	*hcd = platform_get_drvdata(dev);
 	struct xhci_hcd	*xhci = hcd_to_xhci(hcd);
 
-	usb_remove_hcd(xhci->shared_hcd);
-	usb_put_hcd(xhci->shared_hcd);
+#ifdef CONFIG_USB_OTG
+	if (hcd->phy) {
+		if (!IS_ERR(hcd->phy)) {
+			if (hcd->phy->otg)
+				otg_set_host(hcd->phy->otg, NULL);
+			usb_put_phy(hcd->phy);
+		}
+		hcd->phy = NULL;
+		if (xhci->shared_hcd)
+			xhci->shared_hcd->phy = NULL;
+	}
+#endif
 
-	usb_remove_hcd(hcd);
+	if (xhci->shared_hcd) {
+		if (xhci->loaded)
+			usb_remove_hcd(xhci->shared_hcd);
+		usb_put_hcd(xhci->shared_hcd);
+	}
+
+	if (xhci->loaded)
+		usb_remove_hcd(hcd);
+
 	iounmap(hcd->regs);
 	release_mem_region(hcd->rsrc_start, hcd->rsrc_len);
 	usb_put_hcd(hcd);
