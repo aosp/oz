@@ -1123,7 +1123,7 @@
 			usb1: usb@48890000 {
 				compatible = "synopsys,dwc3";
 				reg = <0x48890000 0x17000>;
-				interrupts = <0 76 4>;
+				interrupts = <0 76 4>, <0 77 4>;
 				phys = <&usb2_phy1>, <&usb3_phy1>;
 				phy-names = "usb2-phy", "usb3-phy";
 				tx-fifo-resize;
@@ -1146,7 +1146,7 @@
 			usb2: usb@488d0000 {
 				compatible = "synopsys,dwc3";
 				reg = <0x488d0000 0x17000>;
-				interrupts = <0 78 4>;
+				interrupts = <0 78 4>, <0 92 4>;
 				phys = <&usb2_phy2>;
 				phy-names = "usb2-phy";
 				tx-fifo-resize;
