@@ -793,7 +793,7 @@ static void dwc3_prepare_one_trb(struct dwc3_ep *dep,
 	if (usb_endpoint_xfer_isoc(dep->endpoint.desc)) {
 		trb->ctrl |= DWC3_TRB_CTRL_ISP_IMI;
 		trb->ctrl |= DWC3_TRB_CTRL_CSP;
-	} else if (last) {
+	} else {
 		trb->ctrl |= DWC3_TRB_CTRL_LST;
 	}
 
