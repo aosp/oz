@@ -737,6 +737,10 @@ struct dwc3 {
 
 	u8			test_mode;
 	u8			test_mode_nr;
+	u8			drd_state;
+	u32			oevt;
+	u8			xhci_loaded;
+	u8			gadget_loaded;
 };
 
 /* -------------------------------------------------------------------------- */
@@ -880,11 +884,14 @@ void dwc3_gadget_stop_peripheral(struct dwc3 *dwc);
 #if IS_ENABLED(CONFIG_USB_DWC3_HOST) || IS_ENABLED(CONFIG_USB_DWC3_DUAL_ROLE)
 int dwc3_host_init(struct dwc3 *dwc);
 void dwc3_host_exit(struct dwc3 *dwc);
+int dwc3_otg_init(struct dwc3 *dwc);
 #else
 static inline int dwc3_host_init(struct dwc3 *dwc)
 { return 0; }
 static inline void dwc3_host_exit(struct dwc3 *dwc)
 { }
+static inline int dwc3_otg_init(struct dwc3 *dwc)
+{ return 0; }
 #endif
 
 int dwc3_event_buffers_setup(struct dwc3 *dwc);
