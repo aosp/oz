@@ -275,6 +275,22 @@ static void dwc3_omap_set_mailbox(struct dwc3_omap *omap,
 	}
 }
 
+int dwc3_omap_usbvbus_id_handler(struct device *dev,
+	enum omap_dwc3_vbus_id_status status)
+{
+	struct platform_device *pdev;
+	struct dwc3_omap *omap;
+
+	pdev = to_platform_device(dev);
+	omap = platform_get_drvdata(pdev);
+	if (!omap)
+		return -ENODEV;
+
+	dwc3_omap_set_mailbox(omap, status);
+	return 0;
+}
+EXPORT_SYMBOL_GPL(dwc3_omap_usbvbus_id_handler);
+
 static irqreturn_t dwc3_omap_interrupt(int irq, void *_omap)
 {
 	struct dwc3_omap	*omap = _omap;

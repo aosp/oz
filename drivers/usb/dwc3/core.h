@@ -875,11 +875,20 @@ union dwc3_event {
 #define DWC3_HAS_XHCI			BIT(1)
 #define DWC3_HAS_OTG			BIT(3)
 
+enum omap_dwc3_vbus_id_status {
+	OMAP_DWC3_ID_FLOAT,
+	OMAP_DWC3_ID_GROUND,
+	OMAP_DWC3_VBUS_OFF,
+	OMAP_DWC3_VBUS_VALID,
+};
+
 /* prototypes */
 void dwc3_set_mode(struct dwc3 *dwc, u32 mode);
 int dwc3_gadget_resize_tx_fifos(struct dwc3 *dwc);
 int dwc3_gadget_start_peripheral(struct dwc3 *dwc);
 void dwc3_gadget_stop_peripheral(struct dwc3 *dwc);
+int dwc3_omap_usbvbus_id_handler(struct device *dev,
+	enum omap_dwc3_vbus_id_status status);
 
 #if IS_ENABLED(CONFIG_USB_DWC3_HOST) || IS_ENABLED(CONFIG_USB_DWC3_DUAL_ROLE)
 int dwc3_host_init(struct dwc3 *dwc);
