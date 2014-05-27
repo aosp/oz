@@ -375,7 +375,8 @@ static int dwc3_mode_show(struct seq_file *s, void *unused)
 		seq_printf(s, "device\n");
 		break;
 	case DWC3_GCTL_PRTCAP_OTG:
-		seq_printf(s, "OTG\n");
+		seq_printf(s, "OTG DRD %s\n",
+			dwc->drd_state ? "device" : "host");
 		break;
 	default:
 		seq_printf(s, "UNKNOWN %08x\n", DWC3_GCTL_PRTCAP(reg));
@@ -412,7 +413,15 @@ static ssize_t dwc3_mode_write(struct file *file,
 
 	if (mode) {
 		spin_lock_irqsave(&dwc->lock, flags);
-		dwc3_set_mode(dwc, mode);
+		if (mode & DWC3_GCTL_PRTCAP_HOST) {
+			dwc3_omap_usbvbus_id_handler(dwc->dev->parent,
+				OMAP_DWC3_ID_GROUND);
+			mode = 0;
+		} else if (mode & DWC3_GCTL_PRTCAP_DEVICE) {
+			dwc3_omap_usbvbus_id_handler(dwc->dev->parent,
+				OMAP_DWC3_VBUS_VALID);
+			mode = 1;
+		}
 		spin_unlock_irqrestore(&dwc->lock, flags);
 	}
 	return count;
