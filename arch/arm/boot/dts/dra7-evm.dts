@@ -707,14 +707,14 @@
 };
 
 &usb1 {
-	dr_mode = "peripheral";
+	dr_mode = "host";
 	pinctrl-names = "default";
 	pinctrl-0 = <&usb1_pins>;
 	gpios = <&gpio6 12 0>;
 };
 
 &usb2 {
-	dr_mode = "host";
+	dr_mode = "otg";
 	pinctrl-names = "default";
 	pinctrl-0 = <&usb2_pins>;
 	gpios = <&gpio6 13 0>;
