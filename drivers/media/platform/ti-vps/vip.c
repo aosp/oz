@@ -876,7 +876,7 @@ static void populate_desc_list(struct vip_stream *stream)
 	add_stream_dtds(stream);
 
 	list_length = dev->desc_next - dev->desc_list.buf.addr;
-	vpdma_buf_map(dev->shared->vpdma, &dev->desc_list.buf);
+	vpdma_map_desc_buf(dev->shared->vpdma, &dev->desc_list.buf);
 }
 
 /*
@@ -887,7 +887,6 @@ static void populate_desc_list(struct vip_stream *stream)
 static void start_dma(struct vip_dev *dev, struct vip_buffer *buf)
 {
 	struct vpdma_data *vpdma = dev->shared->vpdma;
-	struct vpdma_dtd *write_dtd;
 	dma_addr_t dma_addr;
 	int drop_data;
 
@@ -900,17 +899,17 @@ static void start_dma(struct vip_dev *dev, struct vip_buffer *buf)
 		dma_addr = vb2_dma_contig_plane_dma_addr(&buf->vb, 0);
 		drop_data = 0;
 	} else {
-		dma_addr = NULL;
+		dma_addr = (dma_addr_t)NULL;
 		drop_data = 1;
 	}
 
 	enable_irqs(dev, dev->slice_id);
 
-	vpdma_buf_unmap(dev->shared->vpdma, &dev->desc_list.buf);
+	vpdma_unmap_desc_buf(dev->shared->vpdma, &dev->desc_list.buf);
 
 	vpdma_update_dma_addr(dev->shared->vpdma, &dev->desc_list,
 		dma_addr, dev->write_desc, drop_data);
-	vpdma_buf_map(dev->shared->vpdma, &dev->desc_list.buf);
+	vpdma_map_desc_buf(dev->shared->vpdma, &dev->desc_list.buf);
 
 	vpdma_submit_descs(dev->shared->vpdma, &dev->desc_list, dev->slice_id);
 }
@@ -956,12 +955,12 @@ static void vip_process_buffer_complete(struct vip_stream *stream)
 	buf = list_first_entry(&dev->vip_bufs, struct vip_buffer, dq_list);
 
 	if (stream->port->flags & FLAG_INTERLACED) {
-		vpdma_buf_unmap(dev->shared->vpdma, &dev->desc_list.buf);
+		vpdma_unmap_desc_buf(dev->shared->vpdma, &dev->desc_list.buf);
 
 		fld = dtd_get_field(dev->write_desc);
 		stream->field = fld ? V4L2_FIELD_TOP : V4L2_FIELD_BOTTOM;
 
-		vpdma_buf_map(dev->shared->vpdma, &dev->desc_list.buf);
+		vpdma_map_desc_buf(dev->shared->vpdma, &dev->desc_list.buf);
 	}
 
 	if (buf) {
@@ -1275,7 +1274,6 @@ int vip_s_fmt_vid_cap(struct file *file, void *priv,
 	struct vip_stream *stream = file2stream(file);
 	struct vip_port *port = stream->port;
 	struct vip_dev *dev = port->dev;
-	struct vb2_queue *vq = &stream->vb_vidq;
 	struct v4l2_subdev_format sfmt;
 	struct v4l2_mbus_framefmt *mf;
 	int ret;
@@ -1505,7 +1503,7 @@ static int vip_start_streaming(struct vb2_queue *vq, unsigned int count)
 	struct vip_port *port = stream->port;
 	struct vip_dev *dev = port->dev;
 	struct vip_buffer *buf;
-	unsigned long flags, i;
+	unsigned long flags;
 
 	if (count <= VIP_VPDMA_FIFO_SIZE) {
 		vip_dprintk(dev, "Less buffers queued, at least %d needed\n",
@@ -1527,7 +1525,7 @@ static int vip_start_streaming(struct vb2_queue *vq, unsigned int count)
 	spin_lock_irqsave(&dev->slock, flags);
 	if (vpdma_list_busy(dev->shared->vpdma, dev->slice_id)) {
 		spin_unlock_irqrestore(&dev->slock, flags);
-		vpdma_buf_unmap(dev->shared->vpdma, &dev->desc_list.buf);
+		vpdma_unmap_desc_buf(dev->shared->vpdma, &dev->desc_list.buf);
 		vpdma_reset_desc_list(&dev->desc_list);
 		return -EBUSY;
 	}
@@ -1554,7 +1552,7 @@ static int vip_stop_streaming(struct vb2_queue *vq)
 	if (!vb2_is_streaming(vq))
 		return 0;
 
-	vpdma_buf_unmap(dev->shared->vpdma, &dev->desc_list.buf);
+	vpdma_unmap_desc_buf(dev->shared->vpdma, &dev->desc_list.buf);
 	vpdma_reset_desc_list(&dev->desc_list);
 
 	disable_irqs(dev, dev->slice_id);
@@ -1627,7 +1625,7 @@ done:
 
 static void vip_release_dev(struct vip_dev *dev)
 {
-	vpdma_buf_free(&dev->desc_list.buf);
+	vpdma_free_desc_buf(&dev->desc_list.buf);
 	vpdma_free_desc_list(&dev->desc_list);
 
 	/*
@@ -1713,6 +1711,7 @@ static int vip_setup_parser(struct vip_port *port)
 
 	vip_set_data_interface(port, iface);
 	vip_sync_type(port, sync_type);
+	return 0;
 }
 
 static int vip_init_port(struct vip_port *port)
@@ -1966,6 +1965,11 @@ static int get_field(u32 value, u32 mask, int shift)
 	return (value & (mask << shift)) >> shift;
 }
 
+static void vip_vpdma_fw_cb(struct platform_device *pdev)
+{
+	dev_info(&pdev->dev, "VPDMA firmware loaded\n");
+}
+
 static int find_or_alloc_shared(struct platform_device *pdev, struct vip_dev *dev,
 		struct resource *res)
 {
@@ -1993,6 +1997,7 @@ static int find_or_alloc_shared(struct platform_device *pdev, struct vip_dev *de
 	}
 
 	shared->res = res;
+	dev->shared = shared;
 
 	if (devm_request_mem_region(&pdev->dev, res->start,
 	    resource_size(res), VIP_MODULE_NAME) == NULL) {
@@ -2007,13 +2012,7 @@ static int find_or_alloc_shared(struct platform_device *pdev, struct vip_dev *de
 		goto rel_mem_region;
 	}
 
-	vpdma = shared->vpdma = &shared->vpdma_storage;
-	vpdma->base = shared->base + VIP_VPDMA_REG_OFFSET;
-
-	dev->shared = shared;
-
 	pid = read_sreg(shared, VIP_PID);
-
 	tmp = get_field(pid, VIP_PID_FUNC_MASK, VIP_PID_FUNC_SHIFT);
 
 	if (tmp != VIP_PID_FUNC) {
@@ -2025,7 +2024,14 @@ static int find_or_alloc_shared(struct platform_device *pdev, struct vip_dev *de
 
 	vip_top_vpdma_reset(shared);
 
-	ret = vpdma_init(pdev, &shared->vpdma);
+	vpdma = vpdma_create(pdev, vip_vpdma_fw_cb);
+	if (!vpdma) {
+		dev_err(&pdev->dev, "Creating VPDMA failed");
+		goto do_iounmap;
+	}
+	shared->vpdma = vpdma;
+
+	vpdma->base = shared->base + VIP_VPDMA_REG_OFFSET;
 
 	shared->devs[0] = dev;
 	atomic_set(&shared->devs_allocated, 1);

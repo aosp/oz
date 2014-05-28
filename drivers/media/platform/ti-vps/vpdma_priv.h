@@ -56,6 +56,8 @@
 #define VPDMA_DEI_CHROMA3_CSTAT		0x0314
 #define VPDMA_DEI_MV_IN_CSTAT		0x0330
 #define VPDMA_DEI_MV_OUT_CSTAT		0x033c
+#define VPDMA_VIP_LO_Y_CSTAT		0x0388
+#define VPDMA_VIP_LO_UV_CSTAT		0x038c
 #define VPDMA_VIP_UP_Y_CSTAT		0x0390
 #define VPDMA_VIP_UP_UV_CSTAT		0x0394
 #define VPDMA_VPI_CTL_CSTAT		0x03d0
@@ -121,6 +123,14 @@
 #define	VPE_CHAN_NUM_LUMA_OUT		102
 #define	VPE_CHAN_NUM_CHROMA_OUT		103
 #define	VPE_CHAN_NUM_RGB_OUT		106
+
+/* VPDMA channel numbers(VIP specific) */
+#define VIP1_CHAN_NUM_MULT_PORT_A_SRC0	38
+#define VIP1_CHAN_NUM_MULT_ANC_A_SRC0	70
+#define VIP1_CHAN_NUM_PORT_B_LUMA	104
+#define VIP1_CHAN_NUM_PORT_B_CHROMA	105
+#define VIP1_CHAN_NUM_PORT_A_RGB	106
+#define VIP1_CHAN_NUM_PORT_B_RGB	107
 
 /*
  * a VPDMA address data block payload for a configuration descriptor needs to

@@ -161,6 +161,12 @@ enum vpdma_channel {
 	VPE_CHAN_RGB_OUT,
 };
 
+#define VIP_CHAN_VIP2_OFFSET		70
+#define VIP_CHAN_MULT_PORTB_OFFSET	16
+#define VIP_CHAN_YUV_PORTB_OFFSET	2
+#define VIP_CHAN_RGB_PORTB_OFFSET	1
+
+
 /* flags for VPDMA data descriptors */
 #define VPDMA_DATA_ODD_LINE_SKIP	(1 << 0)
 #define VPDMA_DATA_EVEN_LINE_SKIP	(1 << 1)

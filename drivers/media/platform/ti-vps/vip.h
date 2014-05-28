@@ -53,7 +53,6 @@ struct vip_shared {
 	void __iomem		*base;
 	atomic_t		devs_allocated;	/* count of devs being shared */
 	struct vpdma_data	*vpdma;
-	struct vpdma_data	vpdma_storage;
 	struct vip_dev		*devs[VIP_NUM_SLICES];
 };
 
