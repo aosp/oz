@@ -591,13 +591,8 @@ static int dwc3_probe(struct platform_device *pdev)
 		break;
 	case USB_DR_MODE_OTG:
 		dwc3_set_mode(dwc, DWC3_GCTL_PRTCAP_OTG);
-		ret = dwc3_host_init(dwc);
-		if (ret) {
-			dev_err(dev, "failed to initialize host\n");
-			goto err2;
-		}
 
-		ret = dwc3_gadget_init(dwc);
+		ret = dwc3_otg_init(dwc);
 		if (ret) {
 			dev_err(dev, "failed to initialize gadget\n");
 			goto err2;
@@ -627,9 +622,6 @@ err3:
 		dwc3_host_exit(dwc);
 		break;
 	case USB_DR_MODE_OTG:
-		dwc3_host_exit(dwc);
-		dwc3_gadget_exit(dwc);
-		break;
 	default:
 		/* do nothing */
 		break;
