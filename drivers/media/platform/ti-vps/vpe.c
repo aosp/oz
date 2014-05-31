@@ -921,31 +921,18 @@ static struct vpe_ctx *file2ctx(struct file *file)
 static int job_ready(void *priv)
 {
 	struct vpe_ctx *ctx = priv;
-	struct vpe_q_data *s_q_data = &ctx->q_data[Q_DATA_SRC];
-	int needed = ctx->bufs_per_job;
 
-	if (ctx->deinterlacing) {
-
-		if ((s_q_data->flags & Q_DATA_INTERLACED_ALTERNATE) &&
-				ctx->src_vbs[2] == NULL)
-			/* need additional two most recent fields */
-			needed += 2;
-		else if ((s_q_data->flags & Q_DATA_INTERLACED_SEQ_TB) &&
-				ctx->src_vbs[1] == NULL)
-			/*
-			 * need additional two most recent fields, which are in
-			 * one buffer
-			 */
-			needed += 1;
-	}
-
-	if (v4l2_m2m_num_src_bufs_ready(ctx->m2m_ctx) < needed)
+	/*
+	 * This check is needed as this might be called directly from driver
+	 * When called by m2m framework, this will always satisy, but when
+	 * called from vpe_irq, this would stop processing buffers for this
+	 * context if src/dst buffer isn't available
+	 */
+	if (v4l2_m2m_num_src_bufs_ready(ctx->m2m_ctx) > 0 &&
+		v4l2_m2m_num_dst_bufs_ready(ctx->m2m_ctx) > 0)
+		return 1;
+	else
 		return 0;
-
-	if (v4l2_m2m_num_dst_bufs_ready(ctx->m2m_ctx) < needed)
-		return 0;
-
-	return 1;
 }
 
 static void job_abort(void *priv)
@@ -1091,68 +1078,35 @@ static void add_in_dtd(struct vpe_ctx *ctx, int port)
 		dma_addr = ctx->mv_buf_dma[mv_buf_selector];
 	} else {
 		/* to incorporate interleaved formats */
-		int plane = fmt->coplanar ? p_data->vb_part : 0;
 		struct vb2_buffer *vb;
+		int plane = fmt->coplanar ? p_data->vb_part : 0;
 
 		vpdma_fmt = fmt->vpdma_fmt[plane];
 
-		if (q_data->flags & Q_DATA_INTERLACED_SEQ_TB) {
-			bool tbt = ctx->sequence % 2 == 0;
-			int field_id = p_data->vb_index;
-			int bpp = fmt->fourcc == V4L2_PIX_FMT_NV12 ?
-					1 : (vpdma_fmt->depth >> 3);
-			int height = q_data->height / 2;
+		vb = ctx->src_vbs[p_data->vb_index];
+		field = vb->v4l2_buf.field == V4L2_FIELD_BOTTOM;
+		dma_addr = vb2_dma_addr_plus_data_offset(vb, plane);
 
-			if (tbt) {
-				if (field_id == 0) {
-					/* f */
-					vb = ctx->src_vbs[0];
-					field = 0;
-				} else if (field_id == 1) {
-					/* f - 1 */
-					vb = ctx->src_vbs[1];
-					field = 1;
-				} else {
-					/* f - 2 */
-					vb = ctx->src_vbs[1];
-					field = 0;
-				}
+		if (q_data->flags & Q_DATA_INTERLACED_SEQ_TB) {
+			if (ctx->sequence % 2 == 0) {
+				/* f = TOP, f-1 = BOTTOM, f-2 = TOP */
+				field = p_data->vb_index % 2;
 			} else {
-				if (field_id == 0) {
-					/* f */
-					vb = ctx->src_vbs[0];
-					field = 1;
-				} else if (field_id == 1) {
-					/* f - 1 */
-					vb = ctx->src_vbs[0];
-					field = 0;
-				} else {
-					/* f - 2 */
-					vb = ctx->src_vbs[1];
-					field = 1;
-				}
+				/* f = BOTTOM, f-1 = TOP, f-2 = BOTTOM */
+				field = (p_data->vb_index + 1) % 2;
 			}
 
-			dma_addr = vb2_dma_addr_plus_data_offset(vb, plane);
-
-			if (plane)
-				height /= 2;
-
-			dma_addr += field ? q_data->width * height * bpp : 0;
-		} else if (q_data->flags & Q_DATA_INTERLACED_ALTERNATE) {
-			/* line average for the first 2 frames */
-			if (ctx->sequence == 0)
-				vb = ctx->src_vbs[2];
-			else if (ctx->sequence == 1)
-				vb = ctx->src_vbs[1];
-			else
-				vb = ctx->src_vbs[p_data->vb_index];
-
-			field = vb->v4l2_buf.field == V4L2_FIELD_BOTTOM;
-			dma_addr = vb2_dma_addr_plus_data_offset(vb, plane);
-		} else {
-			vb = ctx->src_vbs[p_data->vb_index];
-			dma_addr = vb2_dma_addr_plus_data_offset(vb, plane);
+			if (field) {
+				/* Increment dma_addr of same buffer to use
+				 * bottom field */
+				int height = q_data->height / 2;
+				int bpp = fmt->fourcc == V4L2_PIX_FMT_NV12 ?
+						1 : (vpdma_fmt->depth >> 3);
+				if (plane)
+					height /= 2;
+				field = !field;
+				dma_addr += q_data->width * height * bpp;
+			}
 		}
 
 		if (!dma_addr) {
@@ -1211,16 +1165,27 @@ static void device_run(void *priv)
 	struct vpe_q_data *d_q_data = &ctx->q_data[Q_DATA_DST];
 	struct vpe_q_data *s_q_data = &ctx->q_data[Q_DATA_SRC];
 
+	if (ctx->deinterlacing && s_q_data->flags & Q_DATA_INTERLACED_SEQ_TB &&
+		ctx->sequence % 2 == 0) {
+		/* When using SEQ_TB buffers, When using it first time,
+		 * No need to remove the buffer as the next field is present
+		 * in the same buffer. (so that job_ready won't fail)
+		 * It will be removed when using bottom field
+		 */
+		ctx->src_vbs[0] = v4l2_m2m_next_src_buf(ctx->m2m_ctx);
+		WARN_ON(ctx->src_vbs[0] == NULL);
+	} else {
+		ctx->src_vbs[0] = v4l2_m2m_src_buf_remove(ctx->m2m_ctx);
+		WARN_ON(ctx->src_vbs[0] == NULL);
+	}
+
 	if (ctx->deinterlacing) {
-		if (s_q_data->flags & Q_DATA_INTERLACED_ALTERNATE) {
-			if (ctx->src_vbs[2] == NULL) {
-				ctx->src_vbs[2] =
-					v4l2_m2m_src_buf_remove(ctx->m2m_ctx);
-				WARN_ON(ctx->src_vbs[2] == NULL);
-				ctx->src_vbs[1] =
-					v4l2_m2m_src_buf_remove(ctx->m2m_ctx);
-				WARN_ON(ctx->src_vbs[1] == NULL);
-			}
+		if (ctx->src_vbs[2] == NULL) {
+			ctx->src_vbs[2] = ctx->src_vbs[0];
+			WARN_ON(ctx->src_vbs[2] == NULL);
+			ctx->src_vbs[1] = ctx->src_vbs[0];
+			WARN_ON(ctx->src_vbs[1] == NULL);
+		}
 
 		/*
 		 * we have output the first 2 frames through line average, we
@@ -1228,23 +1193,6 @@ static void device_run(void *priv)
 		 */
 		if (ctx->sequence == 2)
 			config_edi_input_mode(ctx, 0x3); /* EDI (Y + UV) */
-
-		/* SEQ_TB */
-		} else {
-			if (ctx->src_vbs[1] == NULL) {
-				ctx->src_vbs[1] =
-					v4l2_m2m_src_buf_remove(ctx->m2m_ctx);
-				WARN_ON(ctx->src_vbs[1] == NULL);
-			}
-		}
-	}
-
-	if (!ctx->deinterlacing || ((s_q_data->flags &
-		Q_DATA_INTERLACED_SEQ_TB) && (ctx->sequence % 2 == 0)) ||
-			((s_q_data->flags & Q_DATA_INTERLACED_ALTERNATE) &&
-			(ctx->sequence != 1 && ctx->sequence != 2))) {
-		ctx->src_vbs[0] = v4l2_m2m_src_buf_remove(ctx->m2m_ctx);
-		WARN_ON(ctx->src_vbs[0] == NULL);
 	}
 
 	ctx->dst_vb = v4l2_m2m_dst_buf_remove(ctx->m2m_ctx);
@@ -1452,44 +1400,29 @@ static irqreturn_t vpe_irq(int irq_vpe, void *data)
 
 	s_q_data = &ctx->q_data[Q_DATA_SRC];
 
-	if (ctx->deinterlacing) {
-		if (s_q_data->flags & Q_DATA_INTERLACED_ALTERNATE) {
-			if (ctx->sequence > 2)
-				s_vb = ctx->src_vbs[2];
-		} else {
-			/* Q_DATA_INTERLACED_SEQ_TB */
-			s_vb = ctx->src_vbs[1];
-		}
+	if (ctx->deinterlacing && ctx->sequence > 2) {
+		if (ctx->src_vbs[2] != ctx->src_vbs[1])
+			s_vb = ctx->src_vbs[2];
+		else
+			s_vb = NULL;
 	}
 
 	spin_lock_irqsave(&dev->lock, flags);
 
-	if (s_q_data->flags & Q_DATA_INTERLACED_SEQ_TB) {
-		if (((ctx->sequence % 2) == 0))
-			v4l2_m2m_buf_done(s_vb, VB2_BUF_STATE_DONE);
-	} else {
-		if (s_vb)
-			v4l2_m2m_buf_done(s_vb, VB2_BUF_STATE_DONE);
-	}
+	if (s_vb)
+		v4l2_m2m_buf_done(s_vb, VB2_BUF_STATE_DONE);
 
 	v4l2_m2m_buf_done(d_vb, VB2_BUF_STATE_DONE);
 
 	spin_unlock_irqrestore(&dev->lock, flags);
 
 	if (ctx->deinterlacing) {
-		if (s_q_data->flags & Q_DATA_INTERLACED_ALTERNATE) {
-			if (ctx->sequence > 2) {
-				ctx->src_vbs[2] = ctx->src_vbs[1];
-				ctx->src_vbs[1] = ctx->src_vbs[0];
-			}
-		} else {
-			if (((ctx->sequence % 2) == 0))
-				ctx->src_vbs[1] = ctx->src_vbs[0];
-		}
+		ctx->src_vbs[2] = ctx->src_vbs[1];
+		ctx->src_vbs[1] = ctx->src_vbs[0];
 	}
 
 	ctx->bufs_completed++;
-	if (ctx->bufs_completed < ctx->bufs_per_job) {
+	if (ctx->bufs_completed < ctx->bufs_per_job && job_ready(ctx)) {
 		device_run(ctx);
 		goto handled;
 	}
