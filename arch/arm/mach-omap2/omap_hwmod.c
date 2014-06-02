@@ -899,6 +899,7 @@ static int _init_opt_clks_dt(struct omap_hwmod *oh, struct device_node *np)
 		oh->opt_clks[i].role = opt_clk_names[i];
 		clk_prepare(oh->opt_clks[i]._clk);
 	}
+	kfree(opt_clk_names);
 	return ret;
 }
 
