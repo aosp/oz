@@ -68,6 +68,13 @@
 			"LINE1L",               "Line In",
 			"LINE1R",               "Line In";
 	};
+
+	ocp {
+		gpu: gpu@0x56000000 {
+			gpu-supply = <&avs_gpu>;
+		};
+	};
+
 };
 
 &dra7_pmx_core {
