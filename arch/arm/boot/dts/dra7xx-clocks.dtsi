@@ -1170,6 +1170,14 @@ l3_iclk_div: l3_iclk_div {
 	clock-div = <1>;
 };
 
+gpu_l3_iclk: gpu_l3_iclk {
+	#clock-cells = <0>;
+	compatible = "fixed-factor-clock";
+	clocks = <&l3_iclk_div>;
+	clock-mult = <1>;
+	clock-div = <1>;
+};
+
 l3init_60m_fclk: l3init_60m_fclk@4a008104 {
 	#clock-cells = <0>;
 	compatible = "divider-clock";
@@ -1539,6 +1547,7 @@ gpu_core_gclk_mux: gpu_core_gclk_mux@4a009220 {
 	bit-shift = <24>;
 	reg = <0x4a009220 0x4>;
 	bit-mask = <0x3>;
+	ti,set-rate-parent;
 };
 
 gpu_hyd_gclk_mux: gpu_hyd_gclk_mux@4a009220 {
@@ -1548,6 +1557,7 @@ gpu_hyd_gclk_mux: gpu_hyd_gclk_mux@4a009220 {
 	bit-shift = <26>;
 	reg = <0x4a009220 0x4>;
 	bit-mask = <0x3>;
+	ti,set-rate-parent;
 };
 
 ipu1_gfclk_mux: ipu1_gfclk_mux@4a005520 {

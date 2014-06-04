@@ -171,6 +171,7 @@ static struct omap_dt_clk dra7xx_clks[] = {
 	DT_CLK(NULL, "hdmi_div_clk", "hdmi_div_clk"),
 	DT_CLK(NULL, "hdmi_dpll_clk_mux", "hdmi_dpll_clk_mux"),
 	DT_CLK(NULL, "l3_iclk_div", "l3_iclk_div"),
+	DT_CLK(NULL, "gpu_l3_iclk", "gpu_l3_iclk"),
 	DT_CLK(NULL, "l3init_60m_fclk", "l3init_60m_fclk"),
 	DT_CLK(NULL, "l4_root_clk_div", "l4_root_clk_div"),
 	DT_CLK(NULL, "mlb_clk", "mlb_clk"),
