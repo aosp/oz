@@ -782,7 +782,8 @@ static struct omap_hwmod dra7xx_gpio7_hwmod = {
 	.name		= "gpio7",
 	.class		= &dra7xx_gpio_hwmod_class,
 	.clkdm_name	= "l4per_clkdm",
-	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET,
+	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET |
+		HWMOD_INIT_NO_IDLE | HWMOD_INIT_NO_RESET,
 	.prcm = {
 		.omap4 = {
 			.clkctrl_offs = DRA7XX_CM_L4PER_GPIO7_CLKCTRL_OFFSET,
