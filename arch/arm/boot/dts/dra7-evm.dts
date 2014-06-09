@@ -236,6 +236,110 @@
 		>;
 	};
 
+	vin1a_pins: pinmux_vin1a_pins {
+		pinctrl-single,pins = <
+			0x0DC	(PIN_INPUT | MUX_MODE0)	/* vin1a_clk0  */
+			0x0E4	(PIN_INPUT | MUX_MODE0)	/* vin1a_de0  */
+			0x0E8	(PIN_INPUT | MUX_MODE0)	/* vin1a_fld0  */
+			0x0EC	(PIN_INPUT | MUX_MODE0)	/* vin1a_hsync0	 */
+			0x0F0	(PIN_INPUT | MUX_MODE0)	/* vin1a_vsync0  */
+			0x0F4	(PIN_INPUT | MUX_MODE0)	/* vin1a_d0	 */
+			0x0F8	(PIN_INPUT | MUX_MODE0)	/* vin1a_d1	 */
+			0x0FC	(PIN_INPUT | MUX_MODE0)	/* vin1a_d2	 */
+			0x100	(PIN_INPUT | MUX_MODE0)	/* vin1a_d3 	 */
+			0x104	(PIN_INPUT | MUX_MODE0)	/* vin1a_d4 	 */
+			0x108	(PIN_INPUT | MUX_MODE0)	/* vin1a_d5	 */
+			0x10C	(PIN_INPUT | MUX_MODE0)	/* vin1a_d6	 */
+			0x110	(PIN_INPUT | MUX_MODE0)	/* vin1a_d7	 */
+			0x114	(PIN_INPUT | MUX_MODE0)	/* vin1a_d8	 */
+			0x118	(PIN_INPUT | MUX_MODE0)	/* vin1a_d9	 */
+			0x11C	(PIN_INPUT | MUX_MODE0)	/* vin1a_d10	 */
+			0x120	(PIN_INPUT | MUX_MODE0)	/* vin1a_d11	 */
+			0x124	(PIN_INPUT | MUX_MODE0)	/* vin1a_d12	 */
+			0x128	(PIN_INPUT | MUX_MODE0)	/* vin1a_d13	 */
+			0x12C	(PIN_INPUT | MUX_MODE0)	/* vin1a_d14	 */
+			0x130	(PIN_INPUT | MUX_MODE0)	/* vin1a_d15	 */
+		>;
+	};
+
+	vin1a_d16_d23_pins: pinmux_vin1a_d16_d23_pins {
+		pinctrl-single,pins = <
+			0x134   (PIN_INPUT | MUX_MODE0)	/* vin1a_d16  */
+			0x138   (PIN_INPUT | MUX_MODE0)	/* vin1a_d17  */
+			0x13C   (PIN_INPUT | MUX_MODE0)	/* vin1a_d18  */
+			0x140   (PIN_INPUT | MUX_MODE0)	/* vin1a_d19  */
+			0x144   (PIN_INPUT | MUX_MODE0)	/* vin1a_d20  */
+			0x148   (PIN_INPUT | MUX_MODE0)	/* vin1a_d21  */
+			0x14C   (PIN_INPUT | MUX_MODE0)	/* vin1a_d22  */
+			0x150   (PIN_INPUT | MUX_MODE0)	/* vin1a_d23  */
+
+		>;
+	};
+
+	vin2a_pins: pinmux_vin2a_pins {
+		pinctrl-single,pins = <
+			0x154	(PIN_INPUT | MUX_MODE0)	/* vin2a_clk0  */
+			0x160	(PIN_INPUT | MUX_MODE0)	/* vin2a_hsync0  */
+			0x164	(PIN_INPUT | MUX_MODE0)	/* vin2a_vsync0  */
+			0x168	(PIN_INPUT | MUX_MODE0)	/* vin2a_d0	 */
+			0x16c	(PIN_INPUT | MUX_MODE0)	/* vin2a_d1	 */
+			0x170	(PIN_INPUT | MUX_MODE0)	/* vin2a_d2	 */
+			0x174	(PIN_INPUT | MUX_MODE0)	/* vin2a_d3	 */
+			0x178	(PIN_INPUT | MUX_MODE0)	/* vin2a_d4	 */
+			0x17c	(PIN_INPUT | MUX_MODE0)	/* vin2a_d5	 */
+			0x180	(PIN_INPUT | MUX_MODE0)	/* vin2a_d6	 */
+			0x184	(PIN_INPUT | MUX_MODE0)	/* vin2a_d7	 */
+		>;
+	};
+
+        vin3a_pins: pinmux_vin3a_pins {
+		pinctrl-single,pins = <
+			0x0E0	(PIN_INPUT | MUX_MODE6)	/* vin3a_clk0  */
+			0x1C0	(PIN_INPUT | MUX_MODE5)	/* vin3a_hsync0  */
+			0x1C4	(PIN_INPUT | MUX_MODE5)	/* vin3a_vsync0  */
+			0x134	(PIN_INPUT | MUX_MODE6)	/* vin3a_d0	 */
+			0x138	(PIN_INPUT | MUX_MODE6)	/* vin3a_d1	 */
+			0x13C	(PIN_INPUT | MUX_MODE6)	/* vin3a_d2	 */
+			0x140	(PIN_INPUT | MUX_MODE6)	/* vin3a_d3 	 */
+			0x144	(PIN_INPUT | MUX_MODE6)	/* vin3a_d4 	 */
+			0x148	(PIN_INPUT | MUX_MODE6)	/* vin3a_d5	 */
+			0x14C	(PIN_INPUT | MUX_MODE6)	/* vin3a_d6	 */
+			0x150	(PIN_INPUT | MUX_MODE6)	/* vin3a_d7	 */
+                >;
+        };
+
+	vin5a_pins: pinmux_vin5a_pins {
+		pinctrl-single,pins = <
+			0x374	(PIN_INPUT | MUX_MODE9)	/* vin5a_clk0  */
+			0x39c	(PIN_INPUT | MUX_MODE9)	/* vin5a_hsync0  */
+			0x3a0	(PIN_INPUT | MUX_MODE9)	/* vin5a_vsync0  */
+			0x398	(PIN_INPUT | MUX_MODE9)	/* vin5a_d0	 */
+			0x394	(PIN_INPUT | MUX_MODE9)	/* vin5a_d1	 */
+			0x390	(PIN_INPUT | MUX_MODE9)	/* vin5a_d2	 */
+			0x38c	(PIN_INPUT | MUX_MODE9)	/* vin5a_d3 	 */
+			0x388	(PIN_INPUT | MUX_MODE9)	/* vin5a_d4 	 */
+			0x384	(PIN_INPUT | MUX_MODE9)	/* vin5a_d5	 */
+			0x380	(PIN_INPUT | MUX_MODE9)	/* vin5a_d6	 */
+			0x37c	(PIN_INPUT | MUX_MODE9)	/* vin5a_d7	 */
+                >;
+        };
+
+	vin6a_pins: pinmux_vin6a_pins {
+		pinctrl-single,pins = <
+			0x298	(PIN_INPUT | MUX_MODE7)	/* vin6a_clk0  */
+			0x2B8	(PIN_INPUT | MUX_MODE7)	/* vin6a_hsync0  */
+			0x2B4	(PIN_INPUT | MUX_MODE7)	/* vin6a_vsync0  */
+			0x330	(PIN_INPUT | MUX_MODE7)	/* vin6a_d0	 */
+			0x32C	(PIN_INPUT | MUX_MODE7)	/* vin6a_d1	 */
+			0x328	(PIN_INPUT | MUX_MODE7)	/* vin6a_d2	 */
+			0x324	(PIN_INPUT | MUX_MODE7)	/* vin6a_d3	 */
+			0x310	(PIN_INPUT | MUX_MODE7)	/* vin6a_d4	 */
+			0x30C	(PIN_INPUT | MUX_MODE7)	/* vin6a_d5	 */
+			0x2F8	(PIN_INPUT | MUX_MODE7)	/* vin6a_d6	 */
+			0x2F4	(PIN_INPUT | MUX_MODE7)	/* vin6a_d7	 */
+		>;
+	};
+
 	cpsw_default: cpsw_default {
 		pinctrl-single,pins = <
 			/* Slave 1 */
@@ -608,6 +712,70 @@
 		gpio-controller;
 		#gpio-cells = <2>;
 	};
+
+	camera_ov10633: camera_ov10633 {
+		compatible = "ti,camera-ov10633";
+		gpios = <&pcf_hdmi 2 0>,
+			<&pcf_hdmi 3 0>,
+			<&gpio4 13 0>,
+			<&gpio4 14 0>,
+			<&gpio4 15 0>,
+			<&gpio4 16 0>,
+			<&gpio6 17 0>;
+		ovnode = <&i2c2>;
+	};
+
+	camera_tvp5158: camera_tvp5158 {
+		compatible = "ti,tvp5158";
+		reg = <0x58>;
+		gpios = <&pcf_hdmi 3 0>,
+		       <&gpio21 8 0>;
+		port {
+			tvp5158: endpoint {
+			// No props incase of BT656
+			};
+		};
+       };
+
+	camera_ov10635: camera_ov10635 {
+		compatible = "ti,camera-ov10635";
+		gpios = <&pcf_hdmi 2 0>,
+			<&pcf_hdmi 3 0>,
+			<&gpio4 13 0>,
+			<&gpio4 14 0>,
+			<&gpio4 15 0>,
+			<&gpio4 16 0>,
+			<&gpio6 17 0>;
+		ovnode = <&i2c2>;
+	};
+
+	fpdlink_camera {
+		compatible = "ti,fpdlink";
+		reg = <0x20>;
+		gpios =	<&pcf_hdmi 3 0>,
+			<&gpio21 8 0>;
+		port {
+			cam_fpdlink: endpoint {
+				hsync-active = <1>;
+				vsync-active = <1>;
+				pclk-sample = <0>;
+				bus-width = <24>;
+			};
+		};
+       };
+
+	ov10633@37 {
+		compatible = "omnivision,ov10633";
+		reg = <0x37>;
+
+		port {
+			onboardLI: endpoint {
+				hsync-active = <1>;
+				vsync-active = <1>;
+				pclk-sample = <1>;
+			};
+		};
+	};
 };
 
 &i2c3 {
@@ -747,6 +915,39 @@
 	bus-width = <8>;
 	ti,non-removable;
 	cap-mmc-dual-data-rate;
+};
+
+&vip1 {
+	pinctrl-names = "default";
+	/*
+		Pinmux conflict between 1a:16-23 & 2a:0-8
+		Either use full 32bit of vin1a or use 16bit vin1a and 8bitvin2a
+		TO enable RGB camera, uncomment this
+		pinctrl-0 = <&vin1a_pins &vin1a_d16_d23_pins>;
+	*/
+	pinctrl-0 = <&vin1a_pins &vin1a_d16_d23_pins>;
+};
+
+&vip2 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&vin3a_pins>;
+};
+
+&vip3 {
+	pinctrl-names = "default";
+	//pinctrl-0 = <&vin5a_pins &vin6a_pins>;
+	pinctrl-0 = <&vin5a_pins>;
+};
+
+&vin1a {
+	endpoint@0 {
+		slave-mode;
+		remote-endpoint = <&onboardLI>;
+	};
+	endpoint@1 {
+		slave-mode;
+		remote-endpoint = <&tvp5158>;
+	};
 };
 
 &dss {

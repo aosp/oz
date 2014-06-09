@@ -118,6 +118,12 @@
 					 "mpu-irq", "mailbox6", <0x8d 0xff 0x10a>,
 					 "mpu-irq", "qspi", <0x7c 0x157 0x0ec>,
 					 "mpu-irq", "vpe", <0x9c 0x162 0x128>,
+					 "mpu-irq", "vip1s0", <0x98 0x15F 0x120>,
+					 "mpu-irq", "vip1s1", <0x99 0x188 0x122>,
+					 "mpu-irq", "vip2s0", <0x96 0x160 0x11C>,
+					 "mpu-irq", "vip2s1", <0x97 0x189 0x11E>,
+					 "mpu-irq", "vip3s0", <0x94 0x161 0x118>,
+					 "mpu-irq", "vip3s1", <0x95 0x18A 0x11A>,
 					 "mpu-irq", "cpsw-rx-thresh", <0x32 0x14e 0x58>,
 					 "mpu-irq", "cpsw-rx", <0x33 0x14f 0x5a>,
 					 "mpu-irq", "cpsw-tx", <0x34 0x150 0x5c>,
@@ -1287,6 +1293,81 @@
 			interrupts = <0 0x9c 0x4>;
 			#address-cells = <1>;
 			#size-cells = <0>;
+		};
+
+		vip1: vip@0x48970000 {
+                        compatible = "ti,vip1";
+                        ti,hwmods = "vip1";
+			reg = <0x48970000 0x10000>,
+			      <0x4897d000 0x1000>;
+			reg-names = "vip","vpdma";
+			interrupts = <0 0x98 0x4>,
+				     <0 0x99 0x4>;
+			clocks = <&vip1_gclk_mux>;
+			clock-names = "fck";
+                        #address-cells = <1>;
+                        #size-cells = <0>;
+
+			vin1a: port@0A {
+				#address-cells = <1>;
+				#size-cells = <0>;
+				reg = <0>;
+			};
+			vin2a: port@1A {
+				#address-cells = <1>;
+				#size-cells = <0>;
+				reg = <1>;
+			};
+		};
+
+		vip2: vip@0x48990000 {
+                        compatible = "ti,vip2";
+                        ti,hwmods = "vip2";
+			reg = <0x48990000 0x10000>,
+			      <0x4899d000 0x1000>;
+			reg-names = "vip","vpdma";
+			interrupts = <0 0x96 0x4>,
+				     <0 0x97 0x4>;
+			clocks = <&vip2_gclk_mux>;
+			clock-names = "fck";
+                        #address-cells = <1>;
+                        #size-cells = <0>;
+
+			vin3a: port@0A {
+				#address-cells = <1>;
+				#size-cells = <0>;
+				reg = <0>;
+			};
+			vin4a: port@1A {
+				#address-cells = <1>;
+				#size-cells = <0>;
+				reg = <1>;
+			};
+                };
+
+		vip3: vip@0x489b0000 {
+                        compatible = "ti,vip3";
+                        ti,hwmods = "vip3";
+			reg = <0x489b0000 0x10000>,
+			      <0x489bd000 0x1000>;
+			reg-names = "vip","vpdma";
+			interrupts = <0 0x94 0x4>,
+				     <0 0x95 0x4>;
+			clocks = <&vip3_gclk_mux>;
+			clock-names = "fck";
+                        #address-cells = <1>;
+                        #size-cells = <0>;
+
+			vin5a: port@0A {
+				#address-cells = <1>;
+				#size-cells = <0>;
+				reg = <0>;
+			};
+			vin6a: port@1A {
+				#address-cells = <1>;
+				#size-cells = <0>;
+				reg = <1>;
+			};
 		};
 
 		mac: ethernet@4a100000 {
