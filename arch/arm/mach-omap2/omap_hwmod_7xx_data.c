@@ -2481,6 +2481,73 @@ static struct omap_hwmod dra7xx_wd_timer2_hwmod = {
 };
 
 /*
+ * 'vip' class
+ *
+ */
+
+static struct omap_hwmod_class_sysconfig dra7xx_vip_sysc = {
+	.sysc_offs	= 0x0010,
+	.sysc_flags	= (SYSC_HAS_MIDLEMODE | SYSC_HAS_SIDLEMODE),
+	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
+			   SIDLE_SMART_WKUP | MSTANDBY_FORCE | MSTANDBY_NO |
+			   MSTANDBY_SMART | MSTANDBY_SMART_WKUP),
+	.sysc_fields	= &omap_hwmod_sysc_type2,
+};
+
+static struct omap_hwmod_class dra7xx_vip_hwmod_class = {
+	.name	= "vip",
+	.sysc	= &dra7xx_vip_sysc,
+};
+
+/* vip1 */
+static struct omap_hwmod dra7xx_vip1_hwmod = {
+	.name		= "vip1",
+	.class		= &dra7xx_vip_hwmod_class,
+	.clkdm_name	= "cam_clkdm",
+	.main_clk	= "vip1_gclk_mux",
+	.prcm = {
+		.omap4 = {
+			.clkctrl_offs = DRA7XX_CM_CAM_VIP1_CLKCTRL_OFFSET,
+			.context_offs = DRA7XX_RM_CAM_VIP1_CONTEXT_OFFSET,
+			.modulemode   = MODULEMODE_HWCTRL,
+		},
+	},
+#ifdef CONFIG_EARLYCAMERA_IPU
+	.flags		= HWMOD_INIT_NO_IDLE | HWMOD_INIT_NO_RESET,
+#endif
+};
+
+/* vip2 */
+static struct omap_hwmod dra7xx_vip2_hwmod = {
+	.name		= "vip2",
+	.class		= &dra7xx_vip_hwmod_class,
+	.clkdm_name	= "cam_clkdm",
+	.main_clk	= "vip2_gclk_mux",
+	.prcm = {
+		.omap4 = {
+			.clkctrl_offs = DRA7XX_CM_CAM_VIP2_CLKCTRL_OFFSET,
+			.context_offs = DRA7XX_RM_CAM_VIP2_CONTEXT_OFFSET,
+			.modulemode   = MODULEMODE_HWCTRL,
+		},
+	},
+};
+
+/* vip3 */
+static struct omap_hwmod dra7xx_vip3_hwmod = {
+	.name		= "vip3",
+	.class		= &dra7xx_vip_hwmod_class,
+	.clkdm_name	= "cam_clkdm",
+	.main_clk	= "vip3_gclk_mux",
+	.prcm = {
+		.omap4 = {
+			.clkctrl_offs = DRA7XX_CM_CAM_VIP3_CLKCTRL_OFFSET,
+			.context_offs = DRA7XX_RM_CAM_VIP3_CONTEXT_OFFSET,
+			.modulemode   = MODULEMODE_HWCTRL,
+		},
+	},
+};
+
+/*
  * 'vpe' class
  *
  */
@@ -3622,6 +3689,168 @@ static struct omap_hwmod_ocp_if dra7xx_l4_wkup__wd_timer2 = {
 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
 };
 
+static struct omap_hwmod_addr_space dra7xx_vip1_addrs[] = {
+	{
+		.name		= "vip_top_level",
+		.pa_start	= 0x48970000,
+		.pa_end		= 0x489701ff,
+		.flags		= ADDR_TYPE_RT
+	},
+	{
+		.name		= "vip_slice0_parser",
+		.pa_start	= 0x48975500,
+		.pa_end		= 0x489755ff,
+	},
+	{
+		.name		= "vip_slice0_csc",
+		.pa_start	= 0x48975700,
+		.pa_end		= 0x4897571f,
+	},
+	{
+		.name		= "vip_slice0_sc",
+		.pa_start	= 0x48975800,
+		.pa_end		= 0x4897587f,
+	},
+	{
+		.name		= "vip_slice1_parser",
+		.pa_start	= 0x48975a00,
+		.pa_end		= 0x48975aff,
+	},
+	{
+		.name		= "vip_slice1_csc",
+		.pa_start	= 0x48975c00,
+		.pa_end		= 0x48975c1f,
+	},
+	{
+		.name		= "vip_slice1_sc",
+		.pa_start	= 0x48975d00,
+		.pa_end		= 0x48975d7f,
+	},
+	{
+		.name		= "vip_vpdma",
+		.pa_start	= 0x4897d000,
+		.pa_end		= 0x4897d3ff,
+	},
+	{ }
+};
+
+/* l4_per3 -> vip1 */
+static struct omap_hwmod_ocp_if dra7xx_l4_per3__vip1 = {
+	.master		= &dra7xx_l4_per3_hwmod,
+	.slave		= &dra7xx_vip1_hwmod,
+	.clk		= "l3_iclk_div",
+	.addr		= dra7xx_vip1_addrs,
+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+};
+
+static struct omap_hwmod_addr_space dra7xx_vip2_addrs[] = {
+	{
+		.name		= "vip_top_level",
+		.pa_start	= 0x48990000,
+		.pa_end		= 0x489901ff,
+		.flags		= ADDR_TYPE_RT
+	},
+	{
+		.name		= "vip_slice0_parser",
+		.pa_start	= 0x48995500,
+		.pa_end		= 0x489955ff,
+	},
+	{
+		.name		= "vip_slice0_csc",
+		.pa_start	= 0x48995700,
+		.pa_end		= 0x4899571f,
+	},
+	{
+		.name		= "vip_slice0_sc",
+		.pa_start	= 0x48995800,
+		.pa_end		= 0x4899587f,
+	},
+	{
+		.name		= "vip_slice1_parser",
+		.pa_start	= 0x48995a00,
+		.pa_end		= 0x48995aff,
+	},
+	{
+		.name		= "vip_slice1_csc",
+		.pa_start	= 0x48995c00,
+		.pa_end		= 0x48995c1f,
+	},
+	{
+		.name		= "vip_slice1_sc",
+		.pa_start	= 0x48995d00,
+		.pa_end		= 0x48995d7f,
+	},
+	{
+		.name		= "vip_vpdma",
+		.pa_start	= 0x4899d000,
+		.pa_end		= 0x4899d3ff,
+	},
+	{ }
+};
+
+/* l4_per3 -> vip2 */
+static struct omap_hwmod_ocp_if dra7xx_l4_per3__vip2 = {
+	.master		= &dra7xx_l4_per3_hwmod,
+	.slave		= &dra7xx_vip2_hwmod,
+	.clk		= "l3_iclk_div",
+	.addr		= dra7xx_vip2_addrs,
+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+};
+
+static struct omap_hwmod_addr_space dra7xx_vip3_addrs[] = {
+	{
+		.name		= "vip_top_level",
+		.pa_start	= 0x489b0000,
+		.pa_end		= 0x489b01ff,
+		.flags		= ADDR_TYPE_RT
+	},
+	{
+		.name		= "vip_slice0_parser",
+		.pa_start	= 0x489b5500,
+		.pa_end		= 0x489b55ff,
+	},
+	{
+		.name		= "vip_slice0_csc",
+		.pa_start	= 0x489b5700,
+		.pa_end		= 0x489b571f,
+	},
+	{
+		.name		= "vip_slice0_sc",
+		.pa_start	= 0x489b5800,
+		.pa_end		= 0x489b587f,
+	},
+	{
+		.name		= "vip_slice1_parser",
+		.pa_start	= 0x489b5a00,
+		.pa_end		= 0x489b5aff,
+	},
+	{
+		.name		= "vip_slice1_csc",
+		.pa_start	= 0x489b5c00,
+		.pa_end		= 0x489b5c1f,
+	},
+	{
+		.name		= "vip_slice1_sc",
+		.pa_start	= 0x489b5d00,
+		.pa_end		= 0x489b5d7f,
+	},
+	{
+		.name		= "vip_vpdma",
+		.pa_start	= 0x489bd000,
+		.pa_end		= 0x489bd3ff,
+	},
+	{ }
+};
+
+/* l4_per3 -> vip3 */
+static struct omap_hwmod_ocp_if dra7xx_l4_per3__vip3 = {
+	.master		= &dra7xx_l4_per3_hwmod,
+	.slave		= &dra7xx_vip3_hwmod,
+	.clk		= "l3_iclk_div",
+	.addr		= dra7xx_vip3_addrs,
+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+};
+
 /* l4_per3 -> vpe */
 static struct omap_hwmod_ocp_if dra7xx_l4_per3__vpe = {
 	.master		= &dra7xx_l4_per3_hwmod,
@@ -3742,6 +3971,9 @@ static struct omap_hwmod_ocp_if *dra7xx_hwmod_ocp_ifs[] __initdata = {
 	&dra7xx_l3_main_1__vcp2,
 	&dra7xx_l4_per2__vcp2,
 	&dra7xx_l4_wkup__wd_timer2,
+	&dra7xx_l4_per3__vip1,
+	&dra7xx_l4_per3__vip2,
+	&dra7xx_l4_per3__vip3,
 	&dra7xx_l4_per3__vpe,
 	NULL,
 };
