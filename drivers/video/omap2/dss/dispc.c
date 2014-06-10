@@ -1119,6 +1119,7 @@ static void dispc_mgr_set_size(enum omap_channel channel, u16 width,
 	dispc_write_reg(DISPC_SIZE_MGR(channel), val);
 }
 
+
 static void dispc_init_fifos(void)
 {
 	u32 size;
@@ -1276,6 +1277,48 @@ void dispc_ovl_compute_fifo_thresholds(enum omap_plane plane,
 	}
 }
 EXPORT_SYMBOL(dispc_ovl_compute_fifo_thresholds);
+
+static void dispc_ovl_set_mflag_attribute(enum dispc_mflag_ctrl ctrl)
+{
+	REG_FLD_MOD(DISPC_GLOBAL_MFLAG, ctrl, 1, 0);
+}
+
+static void dispc_ovl_set_mflag_start(enum dispc_mflag_start start)
+{
+	REG_FLD_MOD(DISPC_GLOBAL_MFLAG, start, 2, 2);
+}
+
+void dispc_ovl_set_global_mflag(enum omap_plane plane, bool mflag)
+{
+	u32 fifosize;
+	u8 bit;
+
+	/* Set the ARBITRATION bit to give
+	 * highest priority to the pipeline.
+	 * MFLAG is applicable only to high
+	 * priority pipes.
+	 */
+	 if (plane == OMAP_DSS_GFX)
+		bit = 14;
+	 else
+		bit = 23;
+
+	 REG_FLD_MOD(DISPC_OVL_ATTRIBUTES(plane), mflag, bit, bit);
+
+	 dispc_ovl_set_mflag_attribute(DISPC_MFLAG_CTRL_ENABLE);
+	 /* Allows the mflag signal to start at the beginning of each
+	  * frame even if the DMA buffer is empty */
+	 dispc_ovl_set_mflag_start(DISPC_MFLAG_START_ENABLE);
+
+	 fifosize = dispc_ovl_get_fifo_size(plane);
+	 /* As per the simultaion team suggestion, below thesholds are set:
+	  * HT = fifosize * 5/8;
+	  * LT = fifosize * 4/8;
+	  */
+	 dispc_write_reg(DISPC_OVL_MFLAG_THRESHOLD(plane),
+		FLD_VAL((fifosize*5)/8, 31, 16) |
+		FLD_VAL((fifosize*4)/8, 15, 0));
+}
 
 static void dispc_ovl_set_fir(enum omap_plane plane,
 				int hinc, int vinc,
@@ -2439,6 +2482,7 @@ static int dispc_ovl_setup_common(enum omap_plane plane,
 	unsigned long pclk = dispc_plane_pclk_rate(plane);
 	unsigned long lclk = dispc_plane_lclk_rate(plane);
 	enum omap_channel channel = dispc_ovl_get_channel_out(plane);
+	bool mflag_en;
 
 	if (color_mode != OMAP_DSS_COLOR_NV12 &&
 	    paddr == 0)
@@ -2541,6 +2585,11 @@ static int dispc_ovl_setup_common(enum omap_plane plane,
 	if (OMAP_DSS_COLOR_NV12 == color_mode) {
 		dispc_ovl_set_ba0_uv(plane, p_uv_addr + offset0);
 		dispc_ovl_set_ba1_uv(plane, p_uv_addr + offset1);
+	}
+
+	if (dss_has_feature(FEAT_MFLAG)) {
+		mflag_en = true;
+		dispc_ovl_set_global_mflag(plane, mflag_en);
 	}
 
 	dispc_ovl_set_row_inc(plane, row_inc);
