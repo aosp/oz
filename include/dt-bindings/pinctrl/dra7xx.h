@@ -21,6 +21,14 @@
 #define MUX_MODE5	5
 #define MUX_MODE6	6
 #define MUX_MODE7	7
+#define MUX_MODE8	8
+#define MUX_MODE9	9
+#define MUX_MODE10	10
+#define MUX_MODE11	11
+#define MUX_MODE12	12
+#define MUX_MODE13	13
+#define MUX_MODE14	14
+#define MUX_MODE15	15
 
 #define PULL_ENA		(1 << 16)
 #define PULL_UP			(1 << 17)
