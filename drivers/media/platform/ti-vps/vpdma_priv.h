@@ -28,6 +28,10 @@
 #define VPDMA_MAX_SIZE1		0x34
 #define VPDMA_MAX_SIZE2		0x38
 #define VPDMA_MAX_SIZE3		0x3c
+#define VPDMA_MAX_SIZE_WIDTH_MASK	0xffff
+#define VPDMA_MAX_SIZE_WIDTH_SHFT	16
+#define VPDMA_MAX_SIZE_HEIGHT_MASK	0xffff
+#define VPDMA_MAX_SIZE_HEIGHT_SHFT	0
 
 /* Interrupts */
 #define VPDMA_INT_CHAN_STAT(grp)	(0x40 + grp * 8)

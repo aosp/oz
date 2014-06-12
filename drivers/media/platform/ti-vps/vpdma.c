@@ -429,7 +429,7 @@ void vpdma_free_desc_list(struct vpdma_desc_list *list)
 }
 EXPORT_SYMBOL(vpdma_free_desc_list);
 
-static bool vpdma_list_busy(struct vpdma_data *vpdma, int list_num)
+int vpdma_list_busy(struct vpdma_data *vpdma, int list_num)
 {
 	return read_reg(vpdma, VPDMA_LIST_STAT_SYNC) & BIT(list_num + 16);
 }
@@ -468,7 +468,7 @@ void vpdma_update_dma_addr(struct vpdma_data *vpdma,
 	dma_addr_t write_desc_addr;
 	int offset;
 
-	dtd_set_start_addr(dtd, dma_addr);
+	dtd->start_addr = (u32) dma_addr;
 
 	/* Calculate write address from the offset of write_dtd from start
 	 * of the list->buf
@@ -477,28 +477,27 @@ void vpdma_update_dma_addr(struct vpdma_data *vpdma,
 	write_desc_addr = list->buf.dma_addr + offset;
 
 	if (drop)
-		dtd_set_desc_write_addr(dtd, write_desc_addr, 1, 1, 0);
+		dtd->desc_write_addr = dtd_desc_write_addr(
+					write_desc_addr, 1, 1, 0);
 	else
-		dtd_set_desc_write_addr(dtd, write_desc_addr, 1, 0, 0);
+		dtd->desc_write_addr = dtd_desc_write_addr(
+					write_desc_addr, 1, 0, 0);
 }
 EXPORT_SYMBOL(vpdma_update_dma_addr);
 
 void vpdma_set_max_size(struct vpdma_data *vpdma, int reg_addr,
 		u32 width, u32 height)
 {
-	u32 val = 0;
-
-	insert_field(&val, width - 1 ,
-		VPDMA_MAX_SIZE_WIDTH_MASK, VPDMA_MAX_SIZE_WIDTH_SHFT);
-
-	insert_field(&val, height - 1 ,
-		VPDMA_MAX_SIZE_HEIGHT_MASK, VPDMA_MAX_SIZE_HEIGHT_SHFT);
-
 	if (reg_addr != VPDMA_MAX_SIZE1 && reg_addr != VPDMA_MAX_SIZE2
 		&& reg_addr != VPDMA_MAX_SIZE3)
 			reg_addr = VPDMA_MAX_SIZE1;
 
-	write_reg(vpdma, reg_addr, val);
+	write_field_reg(vpdma, reg_addr, width - 1 ,
+		VPDMA_MAX_SIZE_WIDTH_MASK, VPDMA_MAX_SIZE_WIDTH_SHFT);
+
+	write_field_reg(vpdma, reg_addr, height - 1 ,
+		VPDMA_MAX_SIZE_HEIGHT_MASK, VPDMA_MAX_SIZE_HEIGHT_SHFT);
+
 }
 EXPORT_SYMBOL(vpdma_set_max_size);
 
@@ -718,7 +717,7 @@ void vpdma_add_out_dtd(struct vpdma_desc_list *list, int width,
 	dtd->pkt_ctl = dtd_pkt_ctl(!!(flags & VPDMA_DATA_MODE_TILED),
 				DTD_DIR_OUT, channel, priority, next_chan);
 	dtd->desc_write_addr = dtd_desc_write_addr(0, 0, 0, 0);
-	dtd->max_width_height = dtd_set_max_width_height(dtd, max_w, max_h);
+	dtd->max_width_height = dtd_max_width_height(max_w, max_h);
 	dtd->client_attr0 = 0;
 	dtd->client_attr1 = 0;
 
@@ -828,7 +827,7 @@ void vpdma_clear_list_stat(struct vpdma_data *vpdma, int irq_num)
 EXPORT_SYMBOL(vpdma_clear_list_stat);
 
 void vpdma_set_bg_color(struct vpdma_data *vpdma,
-		struct vpdma_data_format *fmt, u32 color)
+		const struct vpdma_data_format *fmt, u32 color)
 {
 	if (fmt->type == VPDMA_DATA_FMT_TYPE_RGB)
 		write_reg(vpdma, VPDMA_BG_RGB, color);
