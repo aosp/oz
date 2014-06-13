@@ -37,6 +37,9 @@
 #include <linux/pm_runtime.h>
 #include <linux/sizes.h>
 #include <linux/regmap.h>
+#include <linux/of.h>
+#include <linux/of_device.h>
+#include <linux/mfd/syscon.h>
 
 #include <plat/cpu.h>
 #include <mach-omap2/clockdomain.h>
@@ -120,6 +123,10 @@ static struct {
 	u32		ctx[DISPC_SZ_REGS / sizeof(u32)];
 
 	const struct dispc_features *feat;
+
+	/* syscon for dispc */
+	struct regmap *syscon;
+
 } dispc;
 
 enum omap_color_component {
@@ -3760,6 +3767,8 @@ EXPORT_SYMBOL(dispc_free_irq);
 /* DISPC HW IP initialisation */
 static int __init omap_dispchw_probe(struct platform_device *pdev)
 {
+	struct device_node *np = pdev->dev.of_node;
+	struct device_node *syscon_np;
 	u32 rev;
 	int r = 0;
 	struct resource *dispc_mem;
@@ -3794,6 +3803,14 @@ static int __init omap_dispchw_probe(struct platform_device *pdev)
 	r = dispc_runtime_get();
 	if (r)
 		goto err_runtime_get;
+
+	syscon_np = of_parse_phandle(np, "syscon-dispc", 0);
+	if (!syscon_np)
+		return -ENODEV;
+	dispc.syscon = syscon_node_to_regmap(syscon_np);
+	of_node_put(syscon_np);
+	if (IS_ERR(dispc.syscon))
+		return PTR_ERR(dispc.syscon);
 
 	_omap_dispc_initial_config();
 
