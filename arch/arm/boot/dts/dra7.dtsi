@@ -1237,6 +1237,11 @@
 					"gpu_hyd";
 		};
 
+		tisyscon_dispc: tisyscon_dispc@4A002534 {
+			compatible = "ti,control-syscon", "syscon", "simple-bus";
+			reg = <0x4A002534 0x4>;
+		};
+
 		dss: dss@58000000 {
 			compatible = "ti,omap4-dss", "simple-bus";
 			reg = <0x58000000 0x80>,
@@ -1259,6 +1264,7 @@
 				interrupts = <0 25 0x4>;
 				ti,hwmods = "dss_dispc";
 				clocks = <&dss_dss_clk>;
+				syscon-dispc = <&tisyscon_dispc>;
 				clock-names = "fck";
 			};
 
