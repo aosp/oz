@@ -36,6 +36,7 @@
 #include <linux/platform_device.h>
 #include <linux/pm_runtime.h>
 #include <linux/sizes.h>
+#include <linux/regmap.h>
 
 #include <plat/cpu.h>
 #include <mach-omap2/clockdomain.h>
@@ -163,7 +164,7 @@ static const struct {
 			[DISPC_MGR_FLD_ENABLE]		= { DISPC_CONTROL,  0,  0 },
 			[DISPC_MGR_FLD_STNTFT]		= { DISPC_CONTROL,  3,  3 },
 			[DISPC_MGR_FLD_GO]		= { DISPC_CONTROL,  5,  5 },
-			[DISPC_MGR_FLD_TFTDATALINES]	= { DISPC_CONTROL,  9,  8 },
+			[DISPC_MGR_FLD_TFTDATALINES]	= { DISPC_CONTROL,  8,  9 },
 			[DISPC_MGR_FLD_STALLMODE]	= { DISPC_CONTROL, 11, 11 },
 			[DISPC_MGR_FLD_TCKENABLE]	= { DISPC_CONFIG,  10, 10 },
 			[DISPC_MGR_FLD_TCKSELECTION]	= { DISPC_CONFIG,  11, 11 },
@@ -197,7 +198,7 @@ static const struct {
 			[DISPC_MGR_FLD_ENABLE]		= { DISPC_CONTROL2,  0,  0 },
 			[DISPC_MGR_FLD_STNTFT]		= { DISPC_CONTROL2,  3,  3 },
 			[DISPC_MGR_FLD_GO]		= { DISPC_CONTROL2,  5,  5 },
-			[DISPC_MGR_FLD_TFTDATALINES]	= { DISPC_CONTROL2,  9,  8 },
+			[DISPC_MGR_FLD_TFTDATALINES]	= { DISPC_CONTROL2,  8,  9 },
 			[DISPC_MGR_FLD_STALLMODE]	= { DISPC_CONTROL2, 11, 11 },
 			[DISPC_MGR_FLD_TCKENABLE]	= { DISPC_CONFIG2,  10, 10 },
 			[DISPC_MGR_FLD_TCKSELECTION]	= { DISPC_CONFIG2,  11, 11 },
@@ -214,7 +215,7 @@ static const struct {
 			[DISPC_MGR_FLD_ENABLE]		= { DISPC_CONTROL3,  0,  0 },
 			[DISPC_MGR_FLD_STNTFT]		= { DISPC_CONTROL3,  3,  3 },
 			[DISPC_MGR_FLD_GO]		= { DISPC_CONTROL3,  5,  5 },
-			[DISPC_MGR_FLD_TFTDATALINES]	= { DISPC_CONTROL3,  9,  8 },
+			[DISPC_MGR_FLD_TFTDATALINES]	= { DISPC_CONTROL3,  8,  9 },
 			[DISPC_MGR_FLD_STALLMODE]	= { DISPC_CONTROL3, 11, 11 },
 			[DISPC_MGR_FLD_TCKENABLE]	= { DISPC_CONFIG3,  10, 10 },
 			[DISPC_MGR_FLD_TCKSELECTION]	= { DISPC_CONFIG3,  11, 11 },
@@ -245,13 +246,13 @@ static inline u32 dispc_read_reg(const u16 idx)
 static u32 mgr_fld_read(enum omap_channel channel, enum mgr_reg_fields regfld)
 {
 	const struct reg_field rfld = mgr_desc[channel].reg_desc[regfld];
-	return REG_GET(rfld.reg, rfld.high, rfld.low);
+	return REG_GET(rfld.reg, rfld.msb, rfld.lsb);
 }
 
 static void mgr_fld_write(enum omap_channel channel,
 					enum mgr_reg_fields regfld, int val) {
 	const struct reg_field rfld = mgr_desc[channel].reg_desc[regfld];
-	REG_FLD_MOD(rfld.reg, val, rfld.high, rfld.low);
+	REG_FLD_MOD(rfld.reg, val, rfld.msb, rfld.lsb);
 }
 
 #define SR(reg) \
