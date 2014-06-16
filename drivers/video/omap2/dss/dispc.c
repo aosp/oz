@@ -3062,7 +3062,7 @@ static void _dispc_mgr_set_lcd_timings(enum omap_channel channel, int hsw,
 			(ipc << ipc_shift);
 		ret = regmap_update_bits(dispc.syscon, 0, mask, val);
 		if (ret < 0)
-			dev_dbg(&pdev->dev, "regmap_update_bits failed!\n");
+			DSSDBG("regmap_update_bits failed!\n");
 	}
 }
 
