@@ -681,20 +681,20 @@ static void dump_dtd(struct vpdma_dtd *dtd)
  * chan: VPDMA channel
  * flags: VPDMA flags to configure some descriptor fileds
  */
-void vpdma_add_out_dtd(struct vpdma_desc_list *list, int width,
+void vpdma_add_out_dtd_rawchan(struct vpdma_desc_list *list, int width,
 		const struct vpdma_data_format *fmt, dma_addr_t dma_addr,
 		enum vpdma_max_width max_w, enum vpdma_max_height max_h,
-		enum vpdma_channel chan, u32 flags)
+		int channel, u32 flags)
 {
 	int priority = 0;
 	int field = 0;
 	int notify = 1;
-	int channel, next_chan;
+	int next_chan;
 	int depth = fmt->depth;
 	int stride;
 	struct vpdma_dtd *dtd;
 
-	channel = next_chan = chan_info[chan].num;
+	next_chan = channel;
 
 	if (fmt->type == VPDMA_DATA_FMT_TYPE_YUV &&
 			fmt->data_type == DATA_TYPE_C420)
@@ -725,8 +725,17 @@ void vpdma_add_out_dtd(struct vpdma_desc_list *list, int width,
 
 	dump_dtd(dtd);
 }
-EXPORT_SYMBOL(vpdma_add_out_dtd);
+EXPORT_SYMBOL(vpdma_add_out_dtd_rawchan);
 
+void vpdma_add_out_dtd(struct vpdma_desc_list *list, int width,
+		const struct vpdma_data_format *fmt, dma_addr_t dma_addr,
+		enum vpdma_max_width max_w, enum vpdma_max_height max_h,
+		enum vpdma_channel chan, u32 flags)
+{
+	vpdma_add_out_dtd_rawchan(list, width, fmt, dma_addr, max_w, max_h,
+			chan_info[chan].num, flags);
+}
+EXPORT_SYMBOL(vpdma_add_out_dtd);
 /*
  * append an inbound data transfer descriptor to the given descriptor list,
  * this sets up a 'memory to client' VPDMA transfer for the given VPDMA channel

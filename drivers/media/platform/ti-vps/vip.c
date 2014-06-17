@@ -809,7 +809,7 @@ static int add_out_dtd(struct vip_stream *stream, int srce_type)
 		vpdma_max_height = MAX_OUT_HEIGHT_REG2;
 	}
 
-	vpdma_add_out_dtd(&dev->desc_list, c_rect->width,
+	vpdma_add_out_dtd_rawchan(&dev->desc_list, c_rect->width,
 		fmt->vpdma_fmt[plane], dma_addr,
 		vpdma_max_width, vpdma_max_height, channel, flags);
 

@@ -223,6 +223,10 @@ void vpdma_add_cfd_adb(struct vpdma_desc_list *list, int client,
 		struct vpdma_buf *adb);
 void vpdma_add_sync_on_channel_ctd(struct vpdma_desc_list *list,
 		enum vpdma_channel chan);
+void vpdma_add_out_dtd_rawchan(struct vpdma_desc_list *list, int width,
+		const struct vpdma_data_format *fmt, dma_addr_t dma_addr,
+		enum vpdma_max_width max_w, enum vpdma_max_height max_h,
+		int channel, u32 flags);
 void vpdma_add_out_dtd(struct vpdma_desc_list *list, int width,
 		const struct vpdma_data_format *fmt, dma_addr_t dma_addr,
 		enum vpdma_max_width max_w, enum vpdma_max_height max_h,
