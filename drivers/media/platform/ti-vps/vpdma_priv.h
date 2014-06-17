@@ -62,8 +62,6 @@
 #define VPDMA_VIP_UP_UV_CSTAT		0x0394
 #define VPDMA_VPI_CTL_CSTAT		0x03d0
 
-#define VPDMA_VIP2_LO_Y_CSTAT		0x0398
-
 /* Reg field info for VPDMA_CLIENT_CSTAT registers */
 #define VPDMA_CSTAT_LINE_MODE_MASK	0x03
 #define VPDMA_CSTAT_LINE_MODE_SHIFT	8
@@ -133,8 +131,6 @@
 #define VIP1_CHAN_NUM_PORT_B_CHROMA	105
 #define VIP1_CHAN_NUM_PORT_A_RGB	106
 #define VIP1_CHAN_NUM_PORT_B_RGB	107
-
-#define VIP2_CHAN_NUM_PORT_B_LUMA	174
 
 /*
  * a VPDMA address data block payload for a configuration descriptor needs to

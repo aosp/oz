@@ -240,14 +240,6 @@ static const struct vpdma_channel_info chan_info[] = {
 		.num		= VPE_CHAN_NUM_RGB_OUT,
 		.cstat_offset	= VPDMA_VIP_UP_Y_CSTAT,
 	},
-	[VIP_CHAN_PORTB_LUMA] = {
-		.num		= VIP1_CHAN_NUM_PORT_B_LUMA,
-		.cstat_offset	= VPDMA_VIP_LO_Y_CSTAT,
-	},
-	[VIP2_CHAN_PORTB_LUMA] = {
-		.num		= VIP2_CHAN_NUM_PORT_B_LUMA,
-		.cstat_offset	= VPDMA_VIP2_LO_Y_CSTAT,
-	},
 };
 
 static u32 read_reg(struct vpdma_data *vpdma, int offset)
