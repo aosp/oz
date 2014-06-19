@@ -568,9 +568,10 @@
 				ldo3_reg: ldo3 {
 						/* VDDA_1V8_PHY */
 						regulator-name = "ldo3";
-						regulator-min-microvolt = <1800000>;
-						regulator-max-microvolt = <1800000>;
+						regulator-min-microvolt = <2000000>;
+						regulator-max-microvolt = <2000000>;
 						regulator-boot-on;
+						regulator-always-on;
 					};
 
 				ldo9_reg: ldo9 {
