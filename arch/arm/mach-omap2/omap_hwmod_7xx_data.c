@@ -1091,6 +1091,9 @@ static struct omap_hwmod dra7xx_ipu1_hwmod = {
 			.modulemode   = MODULEMODE_HWCTRL,
 		},
 	},
+#ifdef CONFIG_OMAP_REMOTEPROC_LATE_ATTACH_IPU1
+	.flags          = HWMOD_INIT_NO_RESET | HWMOD_INIT_NO_IDLE,
+#endif
 };
 
 /* ipu2 processor */
@@ -1109,6 +1112,9 @@ static struct omap_hwmod dra7xx_ipu2_hwmod = {
 			.modulemode   = MODULEMODE_HWCTRL,
 		},
 	},
+#ifdef CONFIG_OMAP_REMOTEPROC_LATE_ATTACH_IPU2
+	.flags          = HWMOD_INIT_NO_RESET | HWMOD_INIT_NO_IDLE,
+#endif
 };
 
 /*
@@ -1807,6 +1813,9 @@ static struct omap_hwmod dra7xx_mmu_ipu1_hwmod = {
 		},
 	},
 	.dev_attr	= &dra7xx_mmu_ipu_dev_attr,
+#ifdef CONFIG_OMAP_REMOTEPROC_LATE_ATTACH_IPU1
+	.flags          = HWMOD_INIT_NO_RESET | HWMOD_INIT_NO_IDLE,
+#endif
 };
 
 /* mmu ipu2 */
@@ -1833,6 +1842,9 @@ static struct omap_hwmod dra7xx_mmu_ipu2_hwmod = {
 		},
 	},
 	.dev_attr	= &dra7xx_mmu_ipu_dev_attr,
+#ifdef CONFIG_OMAP_REMOTEPROC_LATE_ATTACH_IPU2
+	.flags          = HWMOD_INIT_NO_RESET | HWMOD_INIT_NO_IDLE,
+#endif
 };
 
 /*
@@ -2253,6 +2265,9 @@ static struct omap_hwmod dra7xx_timer3_hwmod = {
 			.modulemode   = MODULEMODE_SWCTRL,
 		},
 	},
+#ifdef CONFIG_OMAP_REMOTEPROC_LATE_ATTACH_IPU2
+	.flags          = HWMOD_INIT_NO_RESET | HWMOD_INIT_NO_IDLE,
+#endif
 };
 
 /* timer4 */
@@ -2369,6 +2384,9 @@ static struct omap_hwmod dra7xx_timer11_hwmod = {
 			.modulemode   = MODULEMODE_SWCTRL,
 		},
 	},
+#ifdef CONFIG_OMAP_REMOTEPROC_LATE_ATTACH_IPU1
+	.flags          = HWMOD_INIT_NO_RESET | HWMOD_INIT_NO_IDLE,
+#endif
 };
 
 /*
