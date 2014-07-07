@@ -1111,6 +1111,7 @@ static void mod_exit(void)
 {
 	GCDBG(GCZONE_INIT, "cleaning up resources.\n");
 
+	driver_remove_file(&gcx_drv.driver, &driver_attr_version);
 	if ((dev_object != NULL) && !IS_ERR(dev_object)) {
 		device_destroy(dev_class, MKDEV(dev_major, 0));
 		dev_object = NULL;
@@ -1127,7 +1128,6 @@ static void mod_exit(void)
 	}
 
 	platform_driver_unregister(&gcx_drv);
-	driver_remove_file(&gcx_drv.driver, &driver_attr_version);
 
 	free_vacant_buffers();
 	free_vacant_fixups();
