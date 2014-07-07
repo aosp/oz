@@ -564,6 +564,12 @@ static int gccmdthread(void *_gccorecontext)
 
 	/* Main thread loop. */
 	while (true) {
+		/* Is termination requested? */
+		if (try_wait_for_completion(&gcqueue->stop)) {
+			GCDBG(GCZONE_THREAD,
+				  "terminating command queue thread.\n");
+			break;
+		}
 		/* Wait for ready signal. If 'ready' is signaled before the
 		 * call times out, signaled is set to a value greater then
 		 * zero. If the call times out, signaled is set to zero. */
@@ -876,12 +882,6 @@ static int gccmdthread(void *_gccorecontext)
 
 			GCUNLOCK(&gcqueue->queuelock);
 
-			/* Is termination requested? */
-			if (try_wait_for_completion(&gcqueue->stop)) {
-				GCDBG(GCZONE_THREAD,
-				      "terminating command queue thread.\n");
-				break;
-			}
 		}
 	}
 
