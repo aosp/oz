@@ -68,7 +68,7 @@
 
 	memory {
 		device_type = "memory";
-		reg = <0x80000000 0x20000000>; /* 512 MB */
+		reg = <0x80000000 0x60000000>; /* 512 + 1024 MB */
 	};
 
 	vmmc2_fixed: fixedregulator-mmc2 {
@@ -547,7 +547,7 @@
 	dcan1_pins: pinmux_dcan1_pins {
 		pinctrl-single,pins = <
 			0x3d0	0x00000000	/* DCAN1_TX: MODE0 */
-			0x3d4	0x00060000	/* DCAN1_RX: MODE0 | INPUTENABLE | PULLUP */
+			0x418	0x00000001	/* WAKEUP0: MODE1 */
 		>;
 	};
 
@@ -1079,6 +1079,18 @@
 		pinctrl-0 = <&vin1a_pins &vin2a>;
 	*/
 	pinctrl-0 = <&vin1a_pins &vin1a_d16_d23_pins>;
+
+	vin1a: port@0A {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		reg = <0>;
+	};
+
+	vin2a: port@1A {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		reg = <1>;
+	};
 };
 
 &vip2 {
@@ -1089,6 +1101,19 @@
 		and remove Slave 2 section from cpsw_default_pins
 		pinctrl-0 = <&vin3a_pins>;
 	*/
+	pinctrl-0 = <&vin3a_pins>;
+
+	vin3a: port@0A {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		reg = <0>;
+	};
+
+	vin4a: port@1A {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		reg = <1>;
+	};
 };
 
 &vip3 {
@@ -1100,6 +1125,18 @@
 		pinctrl-0 = <&vin5a_pins &vin6a_pins>;
 	*/
 	pinctrl-0 = <&vin5a_pins>;
+
+	vin5a: port@0A {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		reg = <0>;
+	};
+
+	vin6a: port@1A {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		reg = <1>;
+	};
 };
 
 &vin1a {

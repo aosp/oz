@@ -272,6 +272,20 @@
 		>;
 	};
 
+	dcan1_pins: pinmux_dcan1_pins {
+		pinctrl-single,pins = <
+			0x3d0	0x00000000	/* DCAN1_TX: MODE0 */
+			0x418	0x00000001	/* WAKEUP0: MODE1 */
+		>;
+	};
+
+	dcan2_pins: pinmux_dcan2_pins {
+		pinctrl-single,pins = <
+			0x288	0x00000002	/* DCAN2_TX: MODE2 */
+			0x28C	0x00060002	/* DCAN2_RX: MODE2 | INPUTENABLE | PULLUP */
+		>;
+	};
+
 	radio_pins: pinmux_radio_pins {
 		pinctrl-single,pins = <
 			0x02F4   0x40000        /* MCASP2_ACLKX: MODE0 */
@@ -399,6 +413,31 @@
 		>;
 	};
 
+	cpsw_default_pins: pinmux_cpsw_default_pins {
+		pinctrl-single,pins = <
+			/* Slave 1 */
+			0x250	0x0 /* rgmii1_tclk PIN_OUTPUT | MUX_MODE0 */
+			0x254	0x0 /* rgmii1_tctl PIN_OUTPUT | MUX_MODE0 */
+			0x258	0x0 /* rgmii1_td3 PIN_OUTPUT | MUX_MODE0 */
+			0x25c	0x0 /* rgmii1_td2 PIN_OUTPUT | MUX_MODE0 */
+			0x260	0x0 /* rgmii1_td1 PIN_OUTPUT | MUX_MODE0 */
+			0x264	0x0 /* rgmii1_td0 PIN_OUTPUT | MUX_MODE0 */
+			0x268	0x00040000 /* rgmii1_rclk PIN_INPUT | MUX_MODE0 */
+			0x26c	0x00040000 /* rgmii1_rctl PIN_INPUT | MUX_MODE0 */
+			0x270	0x00040000 /* rgmii1_rd3 PIN_INPUT | MUX_MODE0 */
+			0x274	0x00040000 /* rgmii1_rd2 PIN_INPUT | MUX_MODE0 */
+			0x278	0x00040000 /* rgmii1_rd1 PIN_INPUT | MUX_MODE0 */
+			0x27c	0x00040000 /* rgmii1_rd0 PIN_INPUT | MUX_MODE0 */
+		>;
+	};
+
+	davinci_mdio_default_pins: pinmux_davinci_mdio_default_pins {
+		pinctrl-single,pins = <
+			0x23C	0x30000 /* mdio_data PIN_OUTPUT_PULLUP | MUX_MODE0 */
+			0x240	0x70000 /* mdio_clk PIN_INPUT_PULLUP | MUX_MODE0 */
+		>;
+	};
+
 	mcasp3_pins: pinmux_mcasp3_pins {
 		pinctrl-single,pins = <
 			0x324 0x00000180	/* mcasp3_aclkx.mcasp3_aclkx OUTPUT | MODE0 */
@@ -452,7 +491,7 @@
 		reg = <0x21>;
 		gpio-controller;
 		#gpio-cells = <2>;
-		n_latch = <0x1408>;
+		n_latch = <0x1418>;
 		interrupt-parent = <&gpio6>;
 		interrupts = <14 2>;
 		interrupt-controller;
@@ -605,7 +644,7 @@
 		reg = <0x26>;
 		gpio-controller;
 		#gpio-cells = <2>;
-		n_latch = <0xfffb>;
+		n_latch = <0xff7b>;
 	};
 
 	tlv320aic3106a: tlv320aic3106@18 {
@@ -643,7 +682,8 @@
 			<&gpio4 14 0>,
 			<&gpio4 15 0>,
 			<&gpio4 16 0>,
-			<&gpio6 17 0>;
+			<&gpio6 17 0>,
+			<&pcf_hdmi 6 0>;
 	};
 
 	ov10633@37 {
@@ -658,6 +698,20 @@
 			};
 		};
 	};
+
+	camera_tvp5158: camera_tvp5158 {
+		compatible = "ti,tvp5158";
+		reg = <0x58>;
+		gpios = <&pcf_hdmi 3 0>,
+			<&pcf_lcd3 8 0>,
+			<&pcf_hdmi 2 0>,
+			<&pcf_hdmi 6 0>;
+		port {
+			tvp5158: endpoint {
+			// No props incase of BT656
+			};
+		};
+       };
 
 };
 
@@ -679,10 +733,28 @@
 	clock-frequency = <400000>;
 };
 
+&dcan1 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&dcan1_pins>;
+	status = "okay";
+};
+
+&dcan2 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&dcan2_pins>;
+	status = "okay";
+};
+
 
 &vip1 {
 	pinctrl-names = "default";
 	pinctrl-0 = <&vin1a_pins &vin2a_pins>;
+
+	vin2a: port@1A {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		reg = <1>;
+	};
 };
 
 &vin2a {
@@ -690,6 +762,30 @@
 		slave-mode;
 		remote-endpoint = <&onboardLI>;
 	};
+
+	endpoint@1 {
+		slave-mode;
+		remote-endpoint = <&tvp5158>;
+	};
+};
+
+&gmac {
+	status="okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&cpsw_default_pins>;
+};
+
+&davinci_mdio {
+	pinctrl-names = "default";
+	pinctrl-0 = <&davinci_mdio_default_pins>;
+};
+
+&cpsw_emac0 {
+	phy_id = <&davinci_mdio>, <3>;
+};
+
+&cpsw_emac1 {
+	phy_id = <&davinci_mdio>, <2>;
 };
 
 &mmc1 {
