@@ -294,7 +294,6 @@ static unsigned int rpmsg_sock_poll(struct file *file, struct socket *sock,
 
 	return mask;
 }
-EXPORT_SYMBOL(rpmsg_sock_poll);
 
 /* return bound socket address information, either local or remote
  * note: len is just an output parameter, doesn't carry any input value
