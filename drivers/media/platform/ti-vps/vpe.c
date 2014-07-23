@@ -1400,7 +1400,13 @@ static irqreturn_t vpe_irq(int irq_vpe, void *data)
 
 	s_q_data = &ctx->q_data[Q_DATA_SRC];
 
-	if (ctx->deinterlacing && ctx->sequence > 2) {
+	if (ctx->deinterlacing) {
+		/* Allow source buffer to be dequeued only if it won't be used
+		 * in the next iteration. All vbs are initialized to first
+		 * buffer and we are shifting buffers every iteration, for the
+		 * first two iterations, no buffer will be dequeued.
+		 * This ensures that driver will keep (n-2)th (n-1)th and (n)th
+		 * field when deinterlacing is enabled */
 		if (ctx->src_vbs[2] != ctx->src_vbs[1])
 			s_vb = ctx->src_vbs[2];
 		else
