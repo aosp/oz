@@ -440,7 +440,6 @@ static struct omap_hwmod dra7xx_dsp1_hwmod = {
 			.clkctrl_offs = DRA7XX_CM_DSP1_DSP1_CLKCTRL_OFFSET,
 			.rstctrl_offs = DRA7XX_RM_DSP1_RSTCTRL_OFFSET,
 			.context_offs = DRA7XX_RM_DSP1_DSP1_CONTEXT_OFFSET,
-			.modulemode   = MODULEMODE_HWCTRL,
 		},
 	},
 };
@@ -458,7 +457,6 @@ static struct omap_hwmod dra7xx_dsp2_hwmod = {
 			.clkctrl_offs = DRA7XX_CM_DSP2_DSP2_CLKCTRL_OFFSET,
 			.rstctrl_offs = DRA7XX_RM_DSP2_RSTCTRL_OFFSET,
 			.context_offs = DRA7XX_RM_DSP2_DSP2_CONTEXT_OFFSET,
-			.modulemode   = MODULEMODE_HWCTRL,
 		},
 	},
 };
@@ -1088,7 +1086,6 @@ static struct omap_hwmod dra7xx_ipu1_hwmod = {
 			.clkctrl_offs = DRA7XX_CM_IPU1_IPU1_CLKCTRL_OFFSET,
 			.rstctrl_offs = DRA7XX_RM_IPU1_RSTCTRL_OFFSET,
 			.context_offs = DRA7XX_RM_IPU1_IPU1_CONTEXT_OFFSET,
-			.modulemode   = MODULEMODE_HWCTRL,
 		},
 	},
 #ifdef CONFIG_OMAP_REMOTEPROC_LATE_ATTACH_IPU1
@@ -1109,7 +1106,6 @@ static struct omap_hwmod dra7xx_ipu2_hwmod = {
 			.clkctrl_offs = DRA7XX_CM_IPU2_IPU2_CLKCTRL_OFFSET,
 			.rstctrl_offs = DRA7XX_RM_IPU2_RSTCTRL_OFFSET,
 			.context_offs = DRA7XX_RM_IPU2_IPU2_CONTEXT_OFFSET,
-			.modulemode   = MODULEMODE_HWCTRL,
 		},
 	},
 #ifdef CONFIG_OMAP_REMOTEPROC_LATE_ATTACH_IPU2
