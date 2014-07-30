@@ -743,12 +743,12 @@ static struct channel_map_table map_tables[] = {
 	{ SNDRV_CHMAP_RC,	RC },
 	{ SNDRV_CHMAP_FLC,	FLC },
 	{ SNDRV_CHMAP_FRC,	FRC },
-	{ SNDRV_CHMAP_FLH,	FLH },
-	{ SNDRV_CHMAP_FRH,	FRH },
+	{ SNDRV_CHMAP_TFL,	FLH },
+	{ SNDRV_CHMAP_TFR,	FRH },
 	{ SNDRV_CHMAP_FLW,	FLW },
 	{ SNDRV_CHMAP_FRW,	FRW },
 	{ SNDRV_CHMAP_TC,	TC },
-	{ SNDRV_CHMAP_FCH,	FCH },
+	{ SNDRV_CHMAP_TFC,	FCH },
 	{} /* terminator */
 };
 
@@ -1023,8 +1023,10 @@ static void hdmi_setup_audio_infoframe(struct hda_codec *codec,
 					    AMP_OUT_UNMUTE);
 
 	eld = &per_pin->sink_eld;
-	if (!eld->monitor_present)
+	if (!eld->monitor_present) {
+		hdmi_set_channel_count(codec, per_pin->cvt_nid, channels);
 		return;
+	}
 
 	if (!non_pcm && per_pin->chmap_set)
 		ca = hdmi_manual_channel_allocation(channels, per_pin->chmap);
