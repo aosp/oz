@@ -504,10 +504,10 @@
 
 	mcasp6_pins: pinmux_mcasp6_pins {
 		pinctrl-single,pins = <
-			0x2d4 0x101a0	/* mcasp6_aclkx.mcasp6aclkx	Mode0.Output.PD */
-			0x2d8 0x101a0	/* mcasp6_fsx.mcasp6_fsx	Mode0.Output.PD */
-			0x2dc 0x101a0	/* mcasp6_axr0.mcasp6_axr0	Mode0.Output.PD */
-			0x2e0 0x501a0	/* mcasp6_axr1.mcasp6_axr1	Mode0.Input.PD */
+			0x2d4 0x001a1	/* mcasp1_axr8.mcasp6_axr0	Mode1.Output.PD */
+			0x2d8 0x401a1	/* mcasp1_axr9.mcasp6_axr1	Mode1.Input.PD */
+			0x2dc 0x001a1	/* mcasp1_axr10.mcasp6_clkx	Mode1.Output.PD */
+			0x2e0 0x001a1	/* mcasp1_axr11.mcasp6_fsx	Mode1.Output.PD */
 		>;
 	};
 
