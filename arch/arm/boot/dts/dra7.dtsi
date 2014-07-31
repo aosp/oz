@@ -115,6 +115,8 @@
 			crossbar-lines = "mpu-irq", "rtc-ss-alarm", <0x9f 0xd9 0x12e>,
 					 "mpu-irq", "mcasp3-arevt", <0x9e 0x96 0x12c>,
 					 "mpu-irq", "mcasp3-axevt", <0x9d 0x97 0x12a>,
+					 "mpu-irq", "mcasp6-arevt", <0x9b 0x9C 0x126>,
+					 "mpu-irq", "mcasp6-axevt", <0x9a 0x9D 0x124>,
 					 "mpu-irq", "mcasp7-arevt", <0x92 0x9E 0x114>,
 					 "mpu-irq", "mcasp7-axevt", <0x93 0x9F 0x116>,
 					 "mpu-irq", "mailbox5", <0x88 0xfb 0x100>,
@@ -146,6 +148,8 @@
 			reg-width = <16>;
 			crossbar-lines = "dma-req", "mcasp3-tx", <124 133 0xf8>,
 					 "dma-req", "mcasp3-rx", <125 132 0xfa>,
+					 "dma-req", "mcasp6-tx", <121 139 0xf2>,
+					 "dma-req", "mcasp6-rx", <120 138 0xf0>,
 					 "dma-req", "mcasp7-tx", <122 141 0xf4>,
 					 "dma-req", "mcasp7-rx", <123 140 0xf6>;
 		};
@@ -1677,6 +1681,23 @@
 				<&sdma 126>;		/* Crossbar 132 */
 			dma-names = "tx", "rx";
 			clocks = <&mcasp3_ahclkx_mux>;
+			clock-names = "fck";
+			status = "disabled";
+		};
+
+		mcasp6: mcasp@48474000 {
+			compatible = "ti,dra7-mcasp-audio";
+			ti,hwmods = "mcasp6";
+			reg = <0x48474000 0x2000>,
+				<0x4844c000 0x1000>;
+			reg-names = "mpu","dat";
+			interrupts = <0 154 0x4>,	/* Crossbar 157 */
+				     <0 155 0x4>;	/* Crossbar 156 */
+			interrupts-names = "tx", "rx";
+			dmas =	<&sdma 122>,		/* Crossbar 139 */
+				<&sdma 121>;		/* Crossbar 138 */
+			dma-names = "tx", "rx";
+			clocks = <&mcasp6_ahclkx_mux>;
 			clock-names = "fck";
 			status = "disabled";
 		};
