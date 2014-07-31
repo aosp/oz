@@ -118,6 +118,17 @@
 		};
 	};
 
+       kim {
+               compatible = "kim";
+               nshutdown_gpio = <132>;
+               dev_name = "/dev/ttyO2";
+               flow_cntrl = <1>;
+               baud_rate = <3686400>;
+       };
+
+       btwilink {
+               compatible = "btwilink";
+       };
 };
 
 &dra7_pmx_core {
@@ -229,10 +240,13 @@
 		>;
 	};
 
-	uart3_pins: pinmux_uart3_pins {
+	bt_uart3_pins: pinmux_bt_uart3_pins {
 		pinctrl-single,pins = <
-			0x248 0xc0000 /* uart3_rxd */
-			0x24c 0xc0000 /* uart3_txd */
+                        0x3c0 0x60001       /* uart3_rx.spi2_sclk:  INPUT | PULLUP | MODE 1 */
+                        0x3c4 0x1           /* uart3_tx.spi2.d1:    OUTPUT |  MODE 1 */
+                        0x3c8 0x40001       /* uart3_rts.spi2.c0:   OUTPUT | PULLUP | MODE 1 */
+                        0x3cc 0x60001       /* uart3_cts.spi2.d0:   INPUT | MODE 1 */
+                        0x2bc 0xE           /* BT_EN.gp5_4:         OUTPUT | MODE 14 */
 		>;
 	};
 
@@ -919,7 +933,7 @@
 &uart3 {
         status = "okay";
         pinctrl-names = "default";
-        pinctrl-0 = <&uart3_pins>;
+        pinctrl-0 = <&bt_uart3_pins>;
 };
 
 &qspi {
