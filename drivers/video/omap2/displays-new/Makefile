@@ -13,3 +13,5 @@ obj-$(CONFIG_DISPLAY_PANEL_SHARP_LS037V7DW01) += panel-sharp-ls037v7dw01.o
 obj-$(CONFIG_DISPLAY_PANEL_TPO_TD043MTEA1) += panel-tpo-td043mtea1.o
 obj-$(CONFIG_DISPLAY_PANEL_NEC_NL8048HL11) += panel-nec-nl8048hl11.o
 obj-$(CONFIG_DISPLAY_PANEL_TFCS9700) += panel-tfcs9700.o
+obj-$(CONFIG_VIDEO_DSERLINK) += lvds-de-serlink.o
+obj-$(CONFIG_VIDEO_SERLINK) += lvds-serlink.o

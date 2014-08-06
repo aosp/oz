@@ -93,3 +93,26 @@ config DISPLAY_PANEL_TFCS9700
 		of Vayu EVM
 
 endmenu
+
+menu "Serializer Deserializer drivers"
+
+config VIDEO_SERLINK
+	tristate "SERLINK"
+	depends on I2C
+	help
+		This driver is used for configuring video serializer.
+		This is needed when capturing video from LVDS camera
+		or displaying to FPDlink display.
+		This driver won't configure the device directly, the
+		camera driver sends I2C commands for configuration.
+
+config VIDEO_DSERLINK
+	tristate "DSERLINK"
+	depends on I2C
+	help
+		This driver is used for configuring video deserializer.
+		This is needed when capturing video from LVDS camera or
+		displaying to FPDlink display.
+		This driver won't configure the device directly, the
+		camera driver sends I2C commands for configuration.
+endmenu
