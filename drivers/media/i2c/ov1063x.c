@@ -1736,6 +1736,14 @@ static int setup_deserializer(struct i2c_client *client)
 		return 0;
 	}
 
+#ifndef CONFIG_VIDEO_DSERLINK
+	dev_err(&client->dev, "deserializer found but no driver for it! enable CONFIG_VIDEO_DSERLINK");
+	return -ENODEV;
+#endif
+
+	if (!deser_i2c_client)
+		return -EPROBE_DEFER;
+
 	dev_err(&client->dev, "deserializer client addr = %x",
 		deser_i2c_client->addr);
 
@@ -1763,6 +1771,14 @@ static int setup_serializer(struct i2c_client *client)
 		dev_err(&client->dev, "No serializer node found");
 		return 0;
 	}
+
+#ifndef CONFIG_VIDEO_SERLINK
+	dev_err(&client->dev, "serializer found but no driver for it! enable CONFIG_VIDEO_SERLINK");
+	return -ENODEV;
+#endif
+
+	if (!ser_i2c_client)
+		return -EPROBE_DEFER;
 
 	dev_err(&client->dev, "serializer client addr = %x",
 		ser_i2c_client->addr);
