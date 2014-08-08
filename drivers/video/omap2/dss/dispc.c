@@ -37,6 +37,7 @@
 #include <linux/pm_runtime.h>
 #include <linux/sizes.h>
 #include <linux/regmap.h>
+#include <linux/spinlock.h>
 #include <linux/of.h>
 #include <linux/of_device.h>
 #include <linux/mfd/syscon.h>
@@ -133,6 +134,9 @@ static struct {
 
 	/* syscon for dispc */
 	struct regmap *syscon;
+
+	/* for handling dispc_crtl reg: */
+	spinlock_t control_lk;
 
 } dispc;
 
@@ -569,12 +573,15 @@ EXPORT_SYMBOL(dispc_mgr_go_busy);
 
 void dispc_mgr_go(enum omap_channel channel)
 {
+	unsigned long flags;
 	WARN_ON(dispc_mgr_is_enabled(channel) == false);
 	WARN_ON(dispc_mgr_go_busy(channel));
 
 	DSSDBG("GO %s\n", mgr_desc[channel].name);
 
+	spin_lock_irqsave(&dispc.control_lk, flags);
 	mgr_fld_write(channel, DISPC_MGR_FLD_GO, 1);
+	spin_unlock_irqrestore(&dispc.control_lk, flags);
 }
 EXPORT_SYMBOL(dispc_mgr_go);
 
@@ -2735,7 +2742,12 @@ EXPORT_SYMBOL(dispc_ovl_enabled);
 
 void dispc_mgr_enable(enum omap_channel channel, bool enable)
 {
+	unsigned long flags;
+
+	spin_lock_irqsave(&dispc.control_lk, flags);
 	mgr_fld_write(channel, DISPC_MGR_FLD_ENABLE, enable);
+	spin_unlock_irqrestore(&dispc.control_lk, flags);
+
 	/* flush posted write */
 	mgr_fld_read(channel, DISPC_MGR_FLD_ENABLE);
 }
@@ -2789,7 +2801,11 @@ static void dispc_mgr_enable_fifohandcheck(enum omap_channel channel, bool enabl
 
 static void dispc_mgr_set_lcd_type_tft(enum omap_channel channel)
 {
+	unsigned long flags;
+
+	spin_lock_irqsave(&dispc.control_lk, flags);
 	mgr_fld_write(channel, DISPC_MGR_FLD_STNTFT, 1);
+	spin_unlock_irqrestore(&dispc.control_lk, flags);
 }
 
 void dispc_set_loadmode(enum omap_dss_load_mode mode)
@@ -2847,6 +2863,7 @@ EXPORT_SYMBOL(dispc_mgr_setup);
 static void dispc_mgr_set_tft_data_lines(enum omap_channel channel, u8 data_lines)
 {
 	int code;
+	unsigned long flags;
 
 	switch (data_lines) {
 	case 12:
@@ -2866,7 +2883,9 @@ static void dispc_mgr_set_tft_data_lines(enum omap_channel channel, u8 data_line
 		return;
 	}
 
+	spin_lock_irqsave(&dispc.control_lk, flags);
 	mgr_fld_write(channel, DISPC_MGR_FLD_TFTDATALINES, code);
+	spin_unlock_irqrestore(&dispc.control_lk, flags);
 }
 
 static void dispc_mgr_set_io_pad_mode(enum dss_io_pad_mode mode)
@@ -2900,7 +2919,11 @@ static void dispc_mgr_set_io_pad_mode(enum dss_io_pad_mode mode)
 
 static void dispc_mgr_enable_stallmode(enum omap_channel channel, bool enable)
 {
+	unsigned long flags;
+
+	spin_lock_irqsave(&dispc.control_lk, flags);
 	mgr_fld_write(channel, DISPC_MGR_FLD_STALLMODE, enable);
+	spin_unlock_irqrestore(&dispc.control_lk, flags);
 }
 
 void dispc_mgr_set_lcd_config(enum omap_channel channel,
@@ -3873,6 +3896,8 @@ static int __init omap_dispchw_probe(struct platform_device *pdev)
 		DSSERR("platform_get_irq failed\n");
 		return -ENODEV;
 	}
+
+	spin_lock_init(&dispc.control_lk);
 
 	pm_runtime_enable(&pdev->dev);
 
