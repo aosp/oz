@@ -22,6 +22,7 @@
 #define DRA7_DPLL_DSP_DEFFREQ               600000000
 #define DRA7_DPLL_DSP_GFCLK_NOMFREQ			600000000
 #define DRA7_DPLL_EVE_GCLK_NOMFREQ			400000000
+#define DRA7_ATL1_DEFFREQ				11289600
 #define DRA7_ATL2_DEFFREQ				5644800
 #ifdef CONFIG_IVA_OPP_HIGH
 #define DRA7_DPLL_IVA_DEFFREQ				1064000000
@@ -353,6 +354,11 @@ int __init dra7xx_clk_init(void)
 	rc = clk_set_parent(atl_fck, atl_parent);
 	if (rc)
 		pr_err("%s: failed to reparent atl_gfclk_mux\n", __func__);
+
+	atl_fck = clk_get_sys(NULL, "atl_clkin1_ck");
+	rc = clk_set_rate(atl_fck, DRA7_ATL1_DEFFREQ);
+	if (rc)
+		pr_err("%s: failed to set atl_clkin1_ck\n", __func__);
 
 	atl_fck = clk_get_sys(NULL, "atl_clkin2_ck");
 	rc = clk_set_rate(atl_fck, DRA7_ATL2_DEFFREQ);
