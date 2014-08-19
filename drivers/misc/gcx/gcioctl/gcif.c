@@ -858,6 +858,9 @@ static int gc_callback_wait(struct gcicallbackwait *gcicallbackwait)
 
 		if (list_empty(&gccallbackhandle->triggered)) {
 			GCERR("triggered list is empty.\n");
+			cpcmdcallbackwait.gcerror		= GCERR_IOCTL;
+			cpcmdcallbackwait.callback		= NULL;
+			cpcmdcallbackwait.callbackparam	= NULL;
 		} else {
 			/* Get the head of the triggered list. */
 			head = gccallbackhandle->triggered.next;
@@ -870,13 +873,13 @@ static int gc_callback_wait(struct gcicallbackwait *gcicallbackwait)
 				= gccallbackinfo->callback;
 			cpcmdcallbackwait.callbackparam
 				= gccallbackinfo->callbackparam;
+			cpcmdcallbackwait.gcerror = GCERR_NONE;
 
 			/* Free the entry. */
 			list_move(head, &g_vacinfo);
 		}
 
 		GCUNLOCK(&g_callbacklock);
-		cpcmdcallbackwait.gcerror = GCERR_NONE;
 	}
 
 exit:
