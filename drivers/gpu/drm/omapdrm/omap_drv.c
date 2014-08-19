@@ -662,16 +662,26 @@ static void dev_lastclose(struct drm_device *dev)
 	drm_modeset_lock_all(dev);
 	ret = drm_fb_helper_restore_fbdev_mode(priv->fbdev);
 	drm_modeset_unlock_all(dev);
+
 	if (ret)
 		DBG("failed to restore crtc mode");
+
+	/* flush crtcs so the fbs get released */
+	for (i = 0; i < priv->num_crtcs; i++)
+		omap_crtc_flush(priv->crtcs[i]);
 }
 
 static void dev_preclose(struct drm_device *dev, struct drm_file *file)
 {
+	struct omap_drm_private *priv = dev->dev_private;
 	struct omap_drm_plugin *plugin;
-	int ret;
+	int i, ret;
 
 	DBG("preclose: dev=%p", dev);
+
+	/* flush crtcs so the fbs get released */
+	for (i = 0; i < priv->num_crtcs; i++)
+		omap_crtc_flush(priv->crtcs[i]);
 
 	list_for_each_entry(plugin, &plugin_list, list) {
 		ret = plugin->release(dev, file);
