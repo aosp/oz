@@ -2315,11 +2315,9 @@ static const struct of_device_id vip_of_match[] = {
 	{
 		.compatible = "ti,vip1", .data = "vip1",
 	},
-#if 0
 	{
 		.compatible = "ti,vip2", .data = "vip2",
 	},
-#endif
 	{
 		.compatible = "ti,vip3", .data = "vip3",
 	},
