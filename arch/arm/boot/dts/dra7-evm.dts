@@ -844,7 +844,8 @@
 			<&gpio6 17 0>,		/* OV_PWDN */
 			<&gpio2 29 0>,		/* DEMUX_FPD_A */
 			<&gpio1 4 0>,		/* DEMUX_FPD_B */
-			<&gpio6 7 0>;		/* DEMUX_FPD_C */
+			<&gpio6 7 0>,		/* DEMUX_FPD_C */
+			<&pcf_hdmi 1 0>;	/* VIN6_SEL_S0 */
 		ovnode = <&i2c2>;
 	};
 
@@ -871,7 +872,8 @@
 			<&gpio6 17 0>,		/* OV_PWDN */
 			<&gpio2 29 0>,		/* DEMUX_FPD_A */
 			<&gpio1 4 0>,		/* DEMUX_FPD_B */
-			<&gpio6 7 0>;		/* DEMUX_FPD_C */
+			<&gpio6 7 0>,		/* DEMUX_FPD_C */
+			<&pcf_hdmi 1 0>;	/* VIN6_SEL_S0 */
 		ovnode = <&i2c2>;
 	};
 
