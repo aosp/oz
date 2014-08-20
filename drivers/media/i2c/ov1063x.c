@@ -109,13 +109,15 @@ struct ov1063x_priv {
 	int			demux_fpd_a_gpio;
 	int			demux_fpd_b_gpio;
 	int			demux_fpd_c_gpio;
+	int			vin6_sel_s0_gpio;
 };
 
 static int ov1063x_init_sensor(struct i2c_client *client);
 
 static int ov1063x_set_gpios(struct i2c_client *client, int vin2_s0_val,
 	int cam_fpd_mux_s0_val, int mux1_sel0_val, int mux1_sel1_val,
-	int mux2_sel0_val, int mux2_sel1_val, int ov_pwdn_val);
+	int mux2_sel0_val, int mux2_sel1_val, int ov_pwdn_val,
+	int vin6_sel_s0);
 
 static const struct ov1063x_reg ov1063x_regs_default[] = {
 	/* Register configuration for full resolution : 1280x720 */
@@ -1520,11 +1522,12 @@ static int ov1063x_cropcap(struct v4l2_subdev *sd, struct v4l2_cropcap *a)
 
 static int ov1063x_set_gpios(struct i2c_client *client, int vin2_s0_val,
 	int cam_fpd_mux_s0_val, int mux1_sel0_val, int mux1_sel1_val,
-	int mux2_sel0_val, int mux2_sel1_val, int ov_pwdn_val) {
+	int mux2_sel0_val, int mux2_sel1_val, int ov_pwdn_val,
+	int vin6_sel_s0) {
 
 	struct ov1063x_priv *priv = to_ov1063x(client);
 	int ret = 0, X = -1, idx = 0;
-	struct gpio gpios[10];
+	struct gpio gpios[15];
 
 	if (vin2_s0_val != X) {
 		gpios[idx].gpio	= priv->vin2_s0_gpio;
@@ -1598,6 +1601,14 @@ static int ov1063x_set_gpios(struct i2c_client *client, int vin2_s0_val,
 		idx++;
 	}
 
+	if (ov_pwdn_val != X) {
+		gpios[idx].gpio   = priv->vin6_sel_s0_gpio;
+		gpios[idx].flags  = vin6_sel_s0 == 1 ? GPIOF_OUT_INIT_HIGH :
+				GPIOF_OUT_INIT_LOW;
+		gpios[idx].label  = "vin6_sel_s0";
+		idx++;
+	}
+
 	ret = gpio_request_array(gpios, idx);
 	if (ret)
 		return ret;
@@ -1646,19 +1657,21 @@ static int ov1063x_init_sensor(struct i2c_client *client)
 
 	switch (priv->sensor_connector) {
 	case VIS_OVCAM:
-		ret = ov1063x_set_gpios(client, X, 1, 1, 0, 0, 0, 1);
+		ret = ov1063x_set_gpios(client, X, 1, 1, 0, 0, 0, 1, X);
 	break;
 	case VIS_SERDES:
 		if (client->addr == 0x39)
-			ret = ov1063x_set_gpios(client, 0, 1, X, X, X, X, 1);
+			ret = ov1063x_set_gpios(client, 0, 1, X, X, X, X, 1, X);
+		else if (client->addr == 0x3d)
+			ret = ov1063x_set_gpios(client, X, 1, X, X, 0, 1, 1, 1);
 		else
-			ret = ov1063x_set_gpios(client, X, 1, X, X, 0, 1, 1);
+			ret = ov1063x_set_gpios(client, X, 1, X, X, 0, 1, 1, X);
 	break;
 	case VIS_LI:
-		ret = ov1063x_set_gpios(client, X, 1, 0, 0, 1, 0, 1);
+		ret = ov1063x_set_gpios(client, X, 1, 0, 0, 1, 0, 1, X);
 	break;
 	case BASE_LI:
-		ret = ov1063x_set_gpios(client, X, 0, X, X, X, X, X);
+		ret = ov1063x_set_gpios(client, X, 0, X, X, X, X, X, X);
 	break;
 	default:
 		dev_err(&client->dev, "Unknown connector!\n");
@@ -1754,6 +1767,14 @@ static int sensor_get_gpios(struct device_node *node, struct i2c_client *client)
 		priv->demux_fpd_c_gpio = gpio;
 	} else {
 		dev_err(&client->dev, "failed to parse DEMUX_FPD_C gpio\n");
+		return -EINVAL;
+	}
+
+	gpio = of_get_gpio(node, 10);
+	if (gpio_is_valid(gpio)) {
+		priv->vin6_sel_s0_gpio = gpio;
+	} else {
+		dev_err(&client->dev, "failed to parse VIN6_SEL_S0 gpio\n");
 		return -EINVAL;
 	}
 
