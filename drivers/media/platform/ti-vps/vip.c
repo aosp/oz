@@ -809,6 +809,12 @@ static int add_out_dtd(struct vip_stream *stream, int srce_type)
 		vpdma_max_height = MAX_OUT_HEIGHT_REG2;
 	}
 
+	/* Mark this channel to be cleared while cleaning up resources
+	 * This will make sure that an abort descriptor for this channel
+	 * would be submitted to VPDMA causing any ongoing  transaction to be
+	 * aborted and cleanup the VPDMA FSM for this channel */
+	dev->vpdma_channels[channel] = 1;
+
 	vpdma_add_out_dtd_rawchan(&dev->desc_list, c_rect->width,
 		fmt->vpdma_fmt[plane], dma_addr,
 		vpdma_max_width, vpdma_max_height, channel, flags);
@@ -1548,6 +1554,7 @@ static int vip_stop_streaming(struct vb2_queue *vq)
 	struct vip_buffer *buf;
 
 	disable_irqs(dev, dev->slice_id);
+	vpdma_clear_list_stat(dev->shared->vpdma, dev->slice_id);
 	/* release all active buffers */
 	while (!list_empty(&dev->vip_bufs)) {
 		buf = list_entry(dev->vip_bufs.next,
@@ -1736,6 +1743,24 @@ done:
 
 static void vip_release_port(struct vip_port *port)
 {
+	struct vip_dev *dev = port->dev;
+	int ch, size = 0;
+
+	/* Create a list of channels to be cleared */
+	for (ch = 0; ch < VPDMA_MAX_CHANNELS; ch++) {
+		if (dev->vpdma_channels[ch] == 1) {
+			dev->vpdma_channels[size++] = ch;
+			vip_dprintk(dev, "Clear channel no: %d\n", ch);
+		}
+	}
+
+	/* Clear all the used channels for the list */
+	vpdma_list_cleanup(dev->shared->vpdma, dev->slice_id,
+		dev->vpdma_channels, size);
+
+	for (ch = 0; ch < VPDMA_MAX_CHANNELS; ch++)
+		dev->vpdma_channels[ch] = 0;
+
 	if (--port->num_streams == 0)
 		vip_release_dev(port->dev);
 }
