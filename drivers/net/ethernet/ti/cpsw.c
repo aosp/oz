@@ -1315,11 +1315,16 @@ static int cpsw_ndo_open(struct net_device *ndev)
 	cpdma_ctlr_eoi(priv->dma, CPDMA_EOI_TX);
 
 	prim_cpsw = cpsw_get_slave_priv(priv, 0);
-	if (!prim_cpsw->irq_enabled && !prim_cpsw->irq_tx_enabled) {
-		if ((priv == prim_cpsw) || !netif_running(prim_cpsw->ndev)) {
-			prim_cpsw->irq_enabled = true;
+	if ((priv == prim_cpsw) || !netif_running(prim_cpsw->ndev)) {
+		if (!prim_cpsw->irq_enabled) {
+			enable_irq(priv->irqs_table[0]);
+			enable_irq(priv->irqs_table[1]);
+			enable_irq(priv->irqs_table[3]);
+			priv->irq_enabled = true;
+		}
+		if (!prim_cpsw->irq_tx_enabled) {
+			enable_irq(priv->irqs_table[2]);
 			prim_cpsw->irq_tx_enabled = true;
-			cpsw_enable_irq(prim_cpsw);
 		}
 	}
 
