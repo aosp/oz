@@ -1,3 +1,16 @@
+/*
+ * TI VIP V4L2 driver
+ *
+ * Copyright (c) 2013 Texas Instruments Inc.
+ * David Griego, <dagriego@biglakesoftware.com>
+ * Dale Farnsworth, <dale@farnsworth.org>
+ * Nikhil Devshatwar, <nikhil.nd@ti.com>
+ *
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 as published by
+ * the Free Software Foundation
+ */
+
 #include <linux/videodev2.h>
 #include <media/v4l2-async.h>
 #include <media/v4l2-common.h>
@@ -104,16 +117,6 @@ struct vip_dev {
 	struct vb2_alloc_ctx	*alloc_ctx;
 	struct vip_port		*ports[VIP_NUM_PORTS];
 
-	int			mux_gpio;
-	int			mux1_sel0_gpio;
-	int			mux1_sel1_gpio;
-	int			mux2_sel0_gpio;
-	int			mux2_sel1_gpio;
-	int			cam_fpd_mux_s0_gpio;
-	int			vin2_s0_gpio;
-	int			ov_pwdn_gpio;
-
-	struct video_device	 *early_vdev;
 	const char		*vip_name;
 };
 

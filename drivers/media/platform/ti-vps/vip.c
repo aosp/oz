@@ -1,3 +1,16 @@
+/*
+ * TI VIP V4L2 driver
+ *
+ * Copyright (c) 2013 Texas Instruments Inc.
+ * David Griego, <dagriego@biglakesoftware.com>
+ * Dale Farnsworth, <dale@farnsworth.org>
+ * Nikhil Devshatwar, <nikhil.nd@ti.com>
+ *
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 as published by
+ * the Free Software Foundation
+ */
+
 #include <linux/clk.h>
 #include <linux/delay.h>
 #include <linux/dma-mapping.h>
@@ -650,7 +663,6 @@ static void vip_set_data_interface(struct vip_port *port, enum data_interface_mo
 	}
 }
 
-#if 0
 static void vip_reset_port(struct vip_port *port)
 {
 	u32 val = 0;
@@ -690,7 +702,6 @@ static void vip_reset_port(struct vip_port *port)
 		write_vreg(port->dev, VIP2_PARSER_REG_OFFSET + VIP_PARSER_PORTB_0, 0);
 	}
 }
-#endif
 
 static void vip_set_port_enable(struct vip_port *port, bool on)
 {
@@ -1308,12 +1319,6 @@ int vip_s_fmt_vid_cap(struct file *file, void *priv,
 	if (ret)
 		return ret;
 
-#if 0
-	if (vb2_is_busy(vq)) {
-		v4l2_err(&dev->v4l2_dev, "%s queue busy\n", __func__);
-		return -EBUSY;
-	}
-#endif
 	port->fmt		= find_format(f);
 	stream->width		= f->fmt.pix.width;
 	stream->height		= f->fmt.pix.height;
@@ -1672,6 +1677,7 @@ static int vip_setup_parser(struct vip_port *port)
 	int sync_type;
 	unsigned int flags;
 
+	vip_reset_port(port);
 	vip_set_port_enable(port, 1);
 
 	if (endpoint->bus_type == V4L2_MBUS_BT656) {
@@ -1729,6 +1735,8 @@ static int vip_setup_parser(struct vip_port *port)
 			vip_set_pclk_polarity(port,
 				flags & V4L2_MBUS_PCLK_SAMPLE_RISING ? 1 : 0);
 
+		vip_xtra_set_repack_sel(port, 0);
+		vip_set_actvid_hsync_n(port, 0);
 		vip_set_actvid_polarity(port, 1);
 		vip_set_discrete_basic_mode(port);
 
