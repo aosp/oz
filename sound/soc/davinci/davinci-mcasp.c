@@ -902,14 +902,14 @@ static int davinci_mcasp_startup(struct snd_pcm_substream *substream,
 				snd_pcm_hw_rule_add(substream->runtime, 0,
 					SNDRV_PCM_HW_PARAM_BUFFER_SIZE,
 					davinci_mcasp_hwrule_txbuffersize,
-					&mcasp,
+					mcasp,
 					SNDRV_PCM_HW_PARAM_BUFFER_SIZE, -1);
 		} else if (substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
 			if (mcasp->rxnumevt)
 				snd_pcm_hw_rule_add(substream->runtime, 0,
 					SNDRV_PCM_HW_PARAM_BUFFER_SIZE,
 					davinci_mcasp_hwrule_rxbuffersize,
-					&mcasp,
+					mcasp,
 					SNDRV_PCM_HW_PARAM_BUFFER_SIZE, -1);
 		}
 	} else
