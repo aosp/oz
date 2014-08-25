@@ -14,6 +14,10 @@
 #include "vpdma.h"
 #include "vpdma_priv.h"
 
+#define VIP_INSTANCE1	1
+#define VIP_INSTANCE2	2
+#define VIP_INSTANCE3	3
+
 #define VIP_SLICE1	0
 #define VIP_SLICE2	1
 #define VIP_NUM_SLICES	2
@@ -78,6 +82,8 @@ struct vip_dev {
 	struct platform_device *pdev;
 	struct vip_shared	*shared;
 	struct resource *res;
+	struct regmap		*syscon;
+	int			instance_id;
 	int			slice_id;
 	int			num_ports;	/* count of open ports */
 	int			setup_done;
