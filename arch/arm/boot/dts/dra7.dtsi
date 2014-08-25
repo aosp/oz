@@ -1477,6 +1477,8 @@
 				     <0 0x99 0x4>;
 			clocks = <&vip1_gclk_mux>;
 			clock-names = "fck";
+			syscon-smasw = <&tisyscon_dispc>;
+
                         #address-cells = <1>;
                         #size-cells = <0>;
 
@@ -1502,6 +1504,8 @@
 				     <0 0x97 0x4>;
 			clocks = <&vip2_gclk_mux>;
 			clock-names = "fck";
+			syscon-smasw = <&tisyscon_dispc>;
+
                         #address-cells = <1>;
                         #size-cells = <0>;
 
@@ -1527,6 +1531,8 @@
 				     <0 0x95 0x4>;
 			clocks = <&vip3_gclk_mux>;
 			clock-names = "fck";
+			syscon-smasw = <&tisyscon_dispc>;
+
                         #address-cells = <1>;
                         #size-cells = <0>;
 
