@@ -499,12 +499,14 @@ int vpdma_submit_descs(struct vpdma_data *vpdma,
 	/* 16-byte granularity */
 	list_size = (list->next - list->buf.addr) >> 4;
 
+	mutex_lock(&vpdma->mutex);
 	write_reg(vpdma, VPDMA_LIST_ADDR, (u32) list->buf.dma_addr);
 
 	write_reg(vpdma, VPDMA_LIST_ATTR,
 			(list_num << VPDMA_LIST_NUM_SHFT) |
 			(list->type << VPDMA_LIST_TYPE_SHFT) |
 			list_size);
+	mutex_unlock(&vpdma->mutex);
 
 	return 0;
 }
@@ -1041,6 +1043,7 @@ struct vpdma_data *vpdma_create(struct platform_device *pdev,
 
 	vpdma->pdev = pdev;
 	vpdma->cb = cb;
+	mutex_init(&vpdma->mutex);
 
 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "vpdma");
 	if (res == NULL) {
