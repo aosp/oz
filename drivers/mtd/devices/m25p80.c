@@ -91,6 +91,12 @@
 
 /****************************************************************************/
 
+enum read_type {
+	M25P80_NORMAL = 0,
+	M25P80_FAST,
+	M25P80_QUAD,
+};
+
 struct m25p {
 	struct spi_device	*spi;
 	struct mutex		lock;
@@ -104,6 +110,7 @@ struct m25p {
 	bool			fast_read;
 	bool			quad_read;
 	void __iomem		*mem_addr;
+	enum read_type		flash_read;
 };
 
 static inline struct m25p *mtd_to_m25p(struct mtd_info *mtd)
@@ -1228,12 +1235,16 @@ static int m25p_probe(struct spi_device *spi)
 		flash->fast_read = false;
 
 	/* Default commands */
-	if (flash->quad_read)
+	if (flash->quad_read) {
 		flash->read_opcode = OPCODE_QUAD_READ;
-	else if (flash->fast_read)
+		flash->flash_read = M25P80_QUAD;
+	} else if (flash->fast_read) {
 		flash->read_opcode = OPCODE_FAST_READ;
-	else
+		flash->flash_read = M25P80_FAST;
+	} else {
 		flash->read_opcode = OPCODE_NORM_READ;
+		flash->flash_read = M25P80_NORMAL;
+	}
 
 	flash->program_opcode = OPCODE_PP;
 
@@ -1242,7 +1253,25 @@ static int m25p_probe(struct spi_device *spi)
 	else if (flash->mtd.size > 0x1000000) {
 		/* enable 4-byte addressing if the device exceeds 16MiB */
 		flash->addr_width = 4;
-		set_4byte(flash, info->jedec_id, 1);
+		if (JEDEC_MFR(info->jedec_id) == CFI_MFR_AMD) {
+			/* Dedicated 4-byte command set */
+			switch (flash->flash_read) {
+			case M25P80_QUAD:
+				flash->read_opcode = OPCODE_QUAD_READ_4B;
+				break;
+			case M25P80_FAST:
+				flash->read_opcode = OPCODE_FAST_READ_4B;
+				break;
+			case M25P80_NORMAL:
+				flash->read_opcode = OPCODE_NORM_READ_4B;
+				break;
+			}
+			flash->program_opcode = OPCODE_PP_4B;
+			/* No small sector erase for 4-byte command set */
+			flash->erase_opcode = OPCODE_SE_4B;
+			flash->mtd.erasesize = info->sector_size;
+		} else
+			set_4byte(flash, info->jedec_id, 1);
 	} else {
 		flash->addr_width = 3;
 	}
