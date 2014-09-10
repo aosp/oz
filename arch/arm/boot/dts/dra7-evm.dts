@@ -836,6 +836,7 @@
 		compatible = "ti,tlv320aic3106";
 		reg = <0x18>;
 		adc-settle-ms = <40>;
+		ai3x-micbias-vg = <1>;
 		status = "okay";
 
 		/* Regulators */
@@ -1139,6 +1140,7 @@
 	tlv320aic3106a: tlv320aic3106@18 {
 		compatible = "ti,tlv320aic3106";
 		reg = <0x18>;
+		ai3x-micbias-vg = <1>;
 		status = "okay";
 
 		/* Regulators */
@@ -1151,6 +1153,7 @@
 	tlv320aic3106b: tlv320aic3106@19 {
 		compatible = "ti,tlv320aic3106";
 		reg = <0x19>;
+		ai3x-micbias-vg = <1>;
 		status = "okay";
 
 		IOVDD-supply = <&evm_3v3_sw>;
@@ -1162,6 +1165,7 @@
 	tlv320aic3106c: tlv320aic3106@1a {
 		compatible = "ti,tlv320aic3106";
 		reg = <0x1a>;
+		ai3x-micbias-vg = <1>;
 		status = "okay";
 
 		IOVDD-supply = <&evm_3v3_sw>;
