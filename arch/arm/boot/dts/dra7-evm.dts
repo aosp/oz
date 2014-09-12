@@ -639,7 +639,7 @@
 					/* VDD_MPU */
 						regulator-name = "smps123";
 						regulator-min-microvolt = < 850000>;
-						regulator-max-microvolt = <1280000>;
+						regulator-max-microvolt = <1250000>;
 						regulator-always-on;
 						regulator-boot-on;
 					};
