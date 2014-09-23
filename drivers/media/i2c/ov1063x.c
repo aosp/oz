@@ -1601,7 +1601,7 @@ static int ov1063x_set_gpios(struct i2c_client *client, int vin2_s0_val,
 		idx++;
 	}
 
-	if (ov_pwdn_val != X) {
+	if (vin6_sel_s0 != X) {
 		gpios[idx].gpio   = priv->vin6_sel_s0_gpio;
 		gpios[idx].flags  = vin6_sel_s0 == 1 ? GPIOF_OUT_INIT_HIGH :
 				GPIOF_OUT_INIT_LOW;
