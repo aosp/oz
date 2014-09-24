@@ -1675,7 +1675,7 @@
 			reg-names = "mpu";
 			interrupts = <0 157 0x4>,	/* Crossbar 151 */
 				     <0 158 0x4>;	/* Crossbar 150 */
-			interrupts-names = "tx", "rx";
+			interrupt-names = "tx", "rx";
 			dmas =	<&sdma 125>,		/* Crossbar 133 */
 				<&sdma 126>;		/* Crossbar 132 */
 			dma-names = "tx", "rx";
@@ -1692,7 +1692,7 @@
 			reg-names = "mpu","dat";
 			interrupts = <0 154 0x4>,	/* Crossbar 157 */
 				     <0 155 0x4>;	/* Crossbar 156 */
-			interrupts-names = "tx", "rx";
+			interrupt-names = "tx", "rx";
 			dmas =	<&sdma 122>,		/* Crossbar 139 */
 				<&sdma 121>;		/* Crossbar 138 */
 			dma-names = "tx", "rx";
@@ -1709,7 +1709,7 @@
 			reg-names = "mpu","dat";
 			interrupts = <0 147 0x4>,	/* Crossbar 159 */
 				     <0 146 0x4>;	/* Crossbar 158 */
-			interrupts-names = "tx", "rx";
+			interrupt-names = "tx", "rx";
 			dmas =	<&sdma 123>,		/* Crossbar 141 */
 				<&sdma 124>;		/* Crossbar 140 */
 			dma-names = "tx", "rx";
