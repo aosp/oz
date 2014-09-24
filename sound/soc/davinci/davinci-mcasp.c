@@ -329,7 +329,7 @@ static irqreturn_t davinci_mcasp_tx_irq_handler(int irq, void *data)
 	struct snd_pcm_substream *substream;
 		u32 stat;
 
-	stat = mcasp_get_reg(mcasp->base, DAVINCI_MCASP_TXSTAT_REG);
+	stat = mcasp_get_reg(mcasp, DAVINCI_MCASP_TXSTAT_REG);
 	if (stat & XUNDRN) {
 		dev_dbg(mcasp->dev, "Transmit buffer underflow\n");
 		substream = mcasp->substreams[SNDRV_PCM_STREAM_PLAYBACK];
@@ -352,7 +352,7 @@ static irqreturn_t davinci_mcasp_rx_irq_handler(int irq, void *data)
 	struct snd_pcm_substream *substream;
 	u32 stat;
 
-	stat = mcasp_get_reg(mcasp->base, DAVINCI_MCASP_RXSTAT_REG);
+	stat = mcasp_get_reg(mcasp, DAVINCI_MCASP_RXSTAT_REG);
 	if (stat & ROVRN) {
 		dev_dbg(mcasp->dev, "Receive buffer overflow\n");
 		substream = mcasp->substreams[SNDRV_PCM_STREAM_CAPTURE];
@@ -364,7 +364,7 @@ static irqreturn_t davinci_mcasp_rx_irq_handler(int irq, void *data)
 		}
 	}
 
-	mcasp_set_reg(mcasp->base, DAVINCI_MCASP_RXSTAT_REG, stat);
+	mcasp_set_reg(mcasp, DAVINCI_MCASP_RXSTAT_REG, stat);
 
 	return IRQ_HANDLED;
 }
