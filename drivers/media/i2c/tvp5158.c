@@ -125,7 +125,9 @@ tvp5158_set_int_regs(struct i2c_client *client, struct vbus_addr_value *reg,
 #define TVP_CORE_ALL		0x0F
 #define TVP_DECODER_1		(1<<0)
 /* Non interleaved */
-#define TVP_INTERLEAVE_MODE_NON (0<<6)
+#define TVP_INTERLEAVE_MODE_NON		(0<<6)
+#define TVP_INTERLEAVE_MODE_PIX		(1<<6)
+#define TVP_INTERLEAVE_MODE_LINE	(2<<6)
 /* Number of time multiplexed channels = 0 */
 #define TVP_CH_MUX_NUMBER	(2<<4)
 /* ITU BT 656 8 bit */
@@ -280,7 +282,7 @@ static int tvp5158_s_stream(struct v4l2_subdev *sd, int enable)
 			/* VBUS address value setting */
 			tvp5158_set_int_regs(client, vbus_addr_value_set,
 					ARRAY_SIZE(vbus_addr_value_set));
-		tvp5158_start_streaming(client, TVP_DECODER_1);
+		tvp5158_start_streaming(client, TVP_CORE_ALL);
 	} else {
 		tvp5158_write(client, REG_OFM_CTRL, 0x0);
 	}
@@ -305,7 +307,7 @@ static int tvp5158_querystd(struct v4l2_subdev *sd, v4l2_std_id *std_id)
 		return -EINVAL;
 	*std_id = V4L2_STD_UNKNOWN;
 
-	tvp5158_get_video_std(client, TVP_DECODER_1);
+	tvp5158_get_video_std(client, TVP_CORE_ALL);
 	if (priv->current_std == STD_INVALID)
 		return -EINVAL;
 	*std_id = priv->std_list[0].standard.id;
@@ -503,7 +505,7 @@ static int tvp5158_set_int_regs(struct i2c_client *client,
 {
 	int i = 0;
 	/* Core Write enable*/
-	tvp5158_write(client, REG_DEC_WR_EN, TVP_DECODER_1);
+	tvp5158_write(client, REG_DEC_WR_EN, TVP_CORE_ALL);
 	for (i = 0; i < cnt; i++) {
 		tvp5158_write(client, REG_VBUS_1, ((reg[i].addr >> 0) & 0xFF));
 		tvp5158_write(client, REG_VBUS_2, ((reg[i].addr >> 8) & 0xFF));
@@ -521,7 +523,7 @@ tvp5158_set_default(struct i2c_client *client, unsigned char core)
 	/* Core Write enable*/
 	tvp5158_write(client, REG_DEC_WR_EN, core);
 	/* Set Video format */
-	tvp_reg_val = TVP_INTERLEAVE_MODE_NON | TVP_CH_MUX_NUMBER
+	tvp_reg_val = TVP_INTERLEAVE_MODE_LINE | TVP_CH_MUX_NUMBER
 			| TVP_OUTPUT_TYPE | TVP_VCS_ID | TVP_VID_RES;
 	tvp5158_write(client, REG_AVD_CTRL_1, tvp_reg_val);
 	tvp_reg_val = 0;
@@ -624,7 +626,7 @@ static int tvp5158_probe(struct i2c_client *client,
 	u_i2cbuf.buffer |= i2c_read;
 	if (u_i2cbuf.buffer == 0x5158) {
 		v4l2_dbg(1, debug, sd, "Chip id : %x\n", u_i2cbuf.buffer);
-		tvp5158_write(client, REG_DEC_WR_EN, TVP_DECODER_1);
+		tvp5158_write(client, REG_DEC_WR_EN, TVP_CORE_ALL);
 		tvp5158_write(client, REG_OFM_CTRL,
 		(TVP_VIDEO_PORT_ENABLE | TVP_OUT_CLK_P_EN));
 	} else {
@@ -632,8 +634,8 @@ static int tvp5158_probe(struct i2c_client *client,
 		return -ENODEV;
 	}
 
-	tvp5158_set_default(client, TVP_DECODER_1);
-	tvp5158_get_video_std(client, TVP_DECODER_1);
+	tvp5158_set_default(client, TVP_CORE_ALL);
+	tvp5158_get_video_std(client, TVP_CORE_ALL);
 
 	if (priv->signal_present != TVP5158_SIGNAL_PRESENT) {
 		dev_err(&client->dev, "Camera not connected");
