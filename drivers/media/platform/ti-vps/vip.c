@@ -912,7 +912,7 @@ static void clear_irqs(struct vip_dev *dev, int irq_num)
 
 	write_sreg(dev->shared, reg_addr, 0xffffffff);
 
-	vpdma_clear_list_stat(dev->shared->vpdma, irq_num);
+	vpdma_clear_list_stat(dev->shared->vpdma, irq_num, dev->slice_id);
 }
 
 static void populate_desc_list(struct vip_stream *stream)
@@ -1058,7 +1058,8 @@ static irqreturn_t vip_irq(int irq_vip, void *data)
 
 	if (irqst) {
 		if (irqst & 1 << (list_num * 2))
-			vpdma_clear_list_stat(dev->shared->vpdma, list_num);
+			vpdma_clear_list_stat(dev->shared->vpdma,
+				irq_num, list_num);
 
 		irqst &= ~((1 << list_num * 2));
 	}
