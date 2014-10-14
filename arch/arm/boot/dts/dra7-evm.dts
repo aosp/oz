@@ -155,6 +155,8 @@
 		gpios = <&gpio21 0 0>; /* pcf8575@21 P0, SEL_GPMC_AD_VID_S0 */
 		video-source = <&dpi3>;
 		data-lines = <24>;
+		serializer = <&lvds_fpd_ser>;
+		deserializer = <&lvds_fpd_deser>;
 	};
 };
 
@@ -1143,6 +1145,16 @@
 	lvds_ser6: ds90ub913aq@79 {
 		compatible = "ti,ds90ub913aq";
 		reg = <0x79>;
+	};
+
+	lvds_fpd_ser: ds90uh925q@1b {
+		compatible = "ti,ds90uh925q";
+		reg = <0x1b>;
+	};
+
+	lvds_fpd_deser: ds90uh928q@2c {
+		compatible = "ti,ds90uh928q";
+		reg = <0x2c>;
 	};
 
 	tlv320aic3106a: tlv320aic3106@18 {
