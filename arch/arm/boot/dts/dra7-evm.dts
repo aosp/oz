@@ -148,6 +148,14 @@
        btwilink {
                compatible = "btwilink";
        };
+
+	/* 10" LCD panel driver - connected via LVDS */
+	lg101 {
+		compatible = "ti,lg101";
+		gpios = <&gpio21 0 0>; /* pcf8575@21 P0, SEL_GPMC_AD_VID_S0 */
+		video-source = <&dpi3>;
+		data-lines = <24>;
+	};
 };
 
 &dra7_pmx_core {
@@ -773,6 +781,7 @@
 		video-source = <&dpi1>;
 		data-lines = <24>;
 	};
+
 
 	mxt244: touchscreen@4a {
 		compatible = "atmel,mXT244";
