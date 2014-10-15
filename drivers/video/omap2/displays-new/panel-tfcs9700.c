@@ -18,6 +18,7 @@
 #include <linux/i2c.h>
 #include <linux/regmap.h>
 #include <linux/delay.h>
+#include <linux/of_device.h>
 
 #include <video/omapdss.h>
 #include <video/omap-panel-data.h>
@@ -42,7 +43,8 @@ struct panel_drv_data {
 	struct regmap *regmap;
 };
 
-static const struct omap_video_timings tfc_s9700_timings = {
+static const struct omap_video_timings tfc_s9700_timings[] = {
+	{
 	.x_res		= 800,
 	.y_res		= 480,
 
@@ -61,7 +63,37 @@ static const struct omap_video_timings tfc_s9700_timings = {
 	.data_pclk_edge	= OMAPDSS_DRIVE_SIG_RISING_EDGE,
 	.de_level	= OMAPDSS_SIG_ACTIVE_HIGH,
 	.sync_pclk_edge	= OMAPDSS_DRIVE_SIG_RISING_EDGE,
+	},
+	{
+	/* 1280 x 800 @ 60 Hz Reduced blanking VESA CVT 0.31M3-R */
+	.x_res          = 1280,
+	.y_res          = 800,
+
+	.pixel_clock    = 67333,
+
+	.hfp            = 32,
+	.hsw            = 48,
+	.hbp            = 80,
+
+	.vfp            = 4,
+	.vsw            = 3,
+	.vbp            = 7,
+
+	.vsync_level    = OMAPDSS_SIG_ACTIVE_LOW,
+	.hsync_level    = OMAPDSS_SIG_ACTIVE_LOW,
+	.data_pclk_edge = OMAPDSS_DRIVE_SIG_RISING_EDGE,
+	.de_level       = OMAPDSS_SIG_ACTIVE_HIGH,
+	.sync_pclk_edge = OMAPDSS_DRIVE_SIG_RISING_EDGE,
+	},
 };
+
+static const struct of_device_id tlc59108_of_match[] = {
+	{ .compatible = "ti,tlc59108",
+	.data = &tfc_s9700_timings[0],},
+	{ .compatible = "ti,tlc59108-tfclp101",
+	.data = &tfc_s9700_timings[1],},
+};
+MODULE_DEVICE_TABLE(of, tlc59108_of_match);
 
 static int tlc_init(struct panel_drv_data *ddata)
 {
@@ -268,6 +300,8 @@ static int tlc59108_i2c_probe(struct i2c_client *client,
 	struct device *dev = &client->dev;
 	struct omap_dss_device *dssdev;
 	unsigned int val;
+	const struct of_device_id *of_dev_id;
+	struct omap_video_timings *timings;
 
 	ddata = devm_kzalloc(dev, sizeof(*ddata), GFP_KERNEL);
 	if (ddata == NULL)
@@ -279,7 +313,16 @@ static int tlc59108_i2c_probe(struct i2c_client *client,
 	if (r)
 		return r;
 
-	ddata->videomode = tfc_s9700_timings;
+
+	of_dev_id = of_match_device(tlc59108_of_match, dev);
+	if (!of_dev_id) {
+		/* We do not expect this to happen */
+		r = -ENODEV;
+		dev_err(dev, "%s: Unable to match device\n", __func__);
+		return r;
+	}
+	timings = (struct omap_video_timings *)of_dev_id->data;
+	ddata->videomode = *timings;
 
 	if (gpio_is_valid(ddata->enable_gpio)) {
 		r = devm_gpio_request_one(dev, ddata->enable_gpio,
@@ -353,12 +396,6 @@ static const struct i2c_device_id tlc59108_id[] = {
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, tlc59108_id);
-
-static const struct of_device_id tlc59108_of_match[] = {
-	{ .compatible = "ti,tlc59108", },
-	{ },
-};
-MODULE_DEVICE_TABLE(of, tlc59108_of_match);
 
 static struct i2c_driver tlc59108_i2c_driver = {
 	.driver = {
