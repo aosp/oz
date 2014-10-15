@@ -1,0 +1,5 @@
+/* Add an override for the 10' LG Panel */
+#include "dra7-evm.dts"
+&tlc59108 {
+	compatible = "ti,tlc59108-tfclp101";
+};
