@@ -508,10 +508,9 @@ static int dsps_musb_set_mode(struct musb *musb, u8 mode)
 	struct dsps_glue *glue = dev_get_drvdata(dev->parent);
 	const struct dsps_musb_wrapper *wrp = glue->wrp;
 	void __iomem *ctrl_base = musb->ctrl_base;
-	void __iomem *base = musb->mregs;
 	u32 reg;
 
-	reg = dsps_readl(base, wrp->mode);
+	reg = dsps_readl(ctrl_base, wrp->mode);
 
 	switch (mode) {
 	case MUSB_HOST:
@@ -524,7 +523,7 @@ static int dsps_musb_set_mode(struct musb *musb, u8 mode)
 		 */
 		reg |= (1 << wrp->iddig_mux);
 
-		dsps_writel(base, wrp->mode, reg);
+		dsps_writel(ctrl_base, wrp->mode, reg);
 		dsps_writel(ctrl_base, wrp->phy_utmi, 0x02);
 		break;
 	case MUSB_PERIPHERAL:
@@ -537,10 +536,10 @@ static int dsps_musb_set_mode(struct musb *musb, u8 mode)
 		 */
 		reg |= (1 << wrp->iddig_mux);
 
-		dsps_writel(base, wrp->mode, reg);
+		dsps_writel(ctrl_base, wrp->mode, reg);
 		break;
 	case MUSB_OTG:
-		dsps_writel(base, wrp->phy_utmi, 0x02);
+		dsps_writel(ctrl_base, wrp->phy_utmi, 0x02);
 		break;
 	default:
 		dev_err(glue->dev, "unsupported mode %d\n", mode);
@@ -861,7 +860,13 @@ static int dsps_suspend(struct device *dev)
 	struct dsps_glue *glue = dev_get_drvdata(dev);
 	const struct dsps_musb_wrapper *wrp = glue->wrp;
 	struct musb *musb = platform_get_drvdata(glue->musb);
-	void __iomem *mbase = musb->ctrl_base;
+	void __iomem *mbase;
+
+	if (!musb)
+		/* This can happen if musb is still defered */
+		return 0;
+
+	mbase = musb->ctrl_base;
 
 	del_timer_sync(&glue->timer);
 	glue->context.control = dsps_readl(mbase, wrp->control);
@@ -880,8 +885,12 @@ static int dsps_resume(struct device *dev)
 	struct dsps_glue *glue = dev_get_drvdata(dev);
 	const struct dsps_musb_wrapper *wrp = glue->wrp;
 	struct musb *musb = platform_get_drvdata(glue->musb);
-	void __iomem *mbase = musb->ctrl_base;
+	void __iomem *mbase;
 
+	if (!musb)
+		return 0;
+
+	mbase = musb->ctrl_base;
 	dsps_writel(mbase, wrp->control, glue->context.control);
 	dsps_writel(mbase, wrp->epintr_set, glue->context.epintr);
 	dsps_writel(mbase, wrp->coreintr_set, glue->context.coreintr);

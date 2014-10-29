@@ -718,11 +718,12 @@
 			compatible = "ti,tps65218-dcdc3";
 			regulator-name = "vdcdc3";
 			regulator-suspend-enable;
-			regulator-min-microvolt = <1350000>;
-			regulator-max-microvolt = <1350000>;
+			regulator-min-microvolt = <1500000>;
+			regulator-max-microvolt = <1500000>;
 			regulator-boot-on;
 			regulator-always-on;
 		};
+
 		dcdc5: regulator-dcdc5 {
 			compatible = "ti,tps65218-dcdc5";
 			regulator-name = "v1_0bat";
@@ -808,6 +809,14 @@
 
 &epwmss0 {
 	status = "okay";
+};
+
+&tscadc {
+        status = "okay";
+
+        adc {
+                ti,adc-channels = <0 1 2 3 4 5 6 7>;
+        };
 };
 
 &ecap0 {
