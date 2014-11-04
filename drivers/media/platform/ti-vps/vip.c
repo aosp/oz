@@ -1610,6 +1610,7 @@ static int vip_stop_streaming(struct vb2_queue *vq)
 
 	disable_irqs(dev, dev->slice_id, stream->list_num);
 	clear_irqs(dev, dev->slice_id, stream->list_num);
+	stop_dma(stream);
 
 	/* release all active buffers */
 	while (!list_empty(&stream->post_bufs)) {
@@ -1809,11 +1810,14 @@ static int vip_setup_parser(struct vip_port *port)
 
 static void vip_release_stream(struct vip_stream *stream)
 {
-	struct vip_dev *dev = stream->port->dev;
-	int ch, size = 0;
-
 	vpdma_free_desc_buf(&stream->desc_list.buf);
 	vpdma_free_desc_list(&stream->desc_list);
+}
+
+static void stop_dma(struct vip_stream *stream)
+{
+	struct vip_dev *dev = stream->port->dev;
+	int ch, size = 0;
 
 	/* Create a list of channels to be cleared */
 	for (ch = 0; ch < VPDMA_MAX_CHANNELS; ch++) {
