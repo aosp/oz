@@ -1097,7 +1097,8 @@ static struct omap_hwmod dra7xx_gpmc_hwmod = {
 	.name		= "gpmc",
 	.class		= &dra7xx_gpmc_hwmod_class,
 	.clkdm_name	= "l3main1_clkdm",
-	.flags		= HWMOD_INIT_NO_IDLE | HWMOD_INIT_NO_RESET,
+	.flags		= (HWMOD_INIT_NO_IDLE | HWMOD_INIT_NO_RESET |
+			   HWMOD_SWSUP_SIDLE),
 	.main_clk	= "l3_iclk_div",
 	.prcm = {
 		.omap4 = {
@@ -2137,6 +2138,7 @@ static struct omap_hwmod_class_sysconfig dra7xx_rtcss_sysc = {
 static struct omap_hwmod_class dra7xx_rtcss_hwmod_class = {
 	.name	= "rtcss",
 	.sysc	= &dra7xx_rtcss_sysc,
+	.reset	= &omap_hwmod_rtc_unlock,
 };
 
 /* rtcss */
