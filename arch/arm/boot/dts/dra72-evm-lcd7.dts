@@ -8,3 +8,10 @@
 
 #include "dra72-evm.dts"
 #include "dra7xx-evm-lcd7.dtsi"
+
+
+/*
+&mxt244 {
+	interrupt-parent = <&gpio1>;
+	interrupts = <15 IRQ_TYPE_EDGE_RISING>;
+};*/

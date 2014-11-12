@@ -13,6 +13,7 @@
 	};
 };
 
+/* 10" display and tsc hooked to i2c1 */
 &i2c1 {
 	/* TLC chip for LCD panel power and backlight */
 	tlc59108: tlc59108@40 {
@@ -26,6 +27,22 @@
 			};
 		};
 	};
+
+	ldc3001:ldc3001@18 {
+		compatible = "lgphilips,ldc3001";
+		status = "okay";
+		reg = <0x18>;
+		interrupt-parent = <&gpio1>;
+		interrupts = <15 IRQ_TYPE_EDGE_RISING>;
+		pinctrl-0 = <&tsc_pins>;
+	};
+
+
+};
+
+/* audio codec i2c address moved to 0x19 for 10" display config */
+&tlv320aic3106 {
+      reg = <0x19>;
 };
 
 &dss {
@@ -46,3 +63,4 @@
 		};
 	};
 };
+
