@@ -646,6 +646,11 @@
 	voltage-tolerance = <1>;
 };
 
+&gpu {
+	gpu0-voltdm = <&voltdm_gpu>;
+	voltage-tolerance = <1>;
+};
+
 &mac {
 	status = "okay";
 	pinctrl-names = "default", "sleep";
