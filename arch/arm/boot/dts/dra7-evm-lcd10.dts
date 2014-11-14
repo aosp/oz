@@ -23,3 +23,7 @@
 	interrupts = <2 IRQ_TYPE_EDGE_RISING>;
 	pinctrl-0 = <&tsc_pins>;
 };
+
+&tlv320aic3106 {
+	reg = <0x19>;
+};
