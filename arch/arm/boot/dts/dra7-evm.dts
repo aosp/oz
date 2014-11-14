@@ -173,7 +173,6 @@
 		};
 	};
 
-	sound {
 	primary_sound: primary_sound {
 		compatible = "ti,dra7xx-evm-audio";
 		ti,model = "DRA7xx-EVM";
@@ -192,7 +191,6 @@
 			"Mic Jack",		"Mic Bias",
 			"LINE1L",               "Line In",
 			"LINE1R",               "Line In";
-	};
 	};
 };
 
