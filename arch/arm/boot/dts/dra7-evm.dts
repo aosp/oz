@@ -496,30 +496,6 @@
 			0x3d8	(PIN_INPUT | MUX_MODE15)	/* dcan1_rx */
 		>;
 	};
-	atl_pins: pinmux_atl_pins {
-		pinctrl-single,pins = <
-			0x298 (PIN_OUTPUT | MUX_MODE5)	/* xref_clk1.atl_clk1 */
-			0x29c (PIN_OUTPUT | MUX_MODE5)	/* xref_clk2.atl_clk2 */
-		>;
-	};
-
-	mcasp3_pins: pinmux_mcasp3_pins {
-		pinctrl-single,pins = <
-			0x324 (PIN_OUTPUT_PULLDOWN | MUX_MODE0)	/* mcasp3_aclkx */
-			0x328 (PIN_OUTPUT_PULLDOWN | MUX_MODE0)	/* mcasp3_fsx */
-			0x32c (PIN_OUTPUT_PULLDOWN | MUX_MODE0)	/* mcasp3_axr0 */
-			0x330 (PIN_INPUT_PULLDOWN | MUX_MODE0)	/* mcasp3_axr1 */
-		>;
-	};
-
-	mcasp3_sleep_pins: pinmux_mcasp3_sleep_pins {
-		pinctrl-single,pins = <
-			0x324 (PIN_OFF_NONE)
-			0x328 (PIN_OFF_NONE)
-			0x32c (PIN_OFF_NONE)
-			0x330 (PIN_OFF_NONE)
-		>;
-	};
 };
 
 &i2c1 {
