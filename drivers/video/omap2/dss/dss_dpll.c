@@ -499,13 +499,15 @@ int dss_dpll_init_regulator(enum dss_dpll dpll)
 	if (dpll == DSS_DPLL_NONE)
 		return 0;
 
-	reg = devm_regulator_get(&pdev->dev, "vdda_video");
-	if (IS_ERR(reg)) {
-		DSSERR("can't get vdda_video regulator\n");
-		return PTR_ERR(reg);
-	}
+	if (dss_dpll.vdda_video_reg == NULL) {
+		reg = devm_regulator_get(&pdev->dev, "vdda_video");
+		if (IS_ERR(reg)) {
+			DSSERR("can't get vdda_video regulator\n");
+			return PTR_ERR(reg);
+		}
 
-	dss_dpll.vdda_video_reg = reg;
+		dss_dpll.vdda_video_reg = reg;
+	}
 
 	return 0;
 }
