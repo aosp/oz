@@ -238,6 +238,7 @@ static void free_port(struct vip_port *);
 static int find_or_alloc_shared(struct platform_device *, struct vip_dev *,
 		struct resource *);
 static int vip_setup_parser(struct vip_port *port);
+static void stop_dma(struct vip_stream *stream);
 
 static u32 read_sreg(struct vip_shared *shared, int offset)
 {
