@@ -33,6 +33,7 @@ enum {
 	RPMSG_OPEN,
 	RPMSG_LISTENING,
 	RPMSG_CLOSED,
+	RPMSG_ERROR,
 };
 
 struct sockaddr_rpmsg {
