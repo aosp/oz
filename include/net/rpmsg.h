@@ -51,6 +51,7 @@ struct sockaddr_rpmsg {
 struct rpmsg_socket {
 	struct sock sk;
 	struct rpmsg_channel *rpdev;
+	int rproc_id;
 	struct list_head elem;
 	bool unregister_rpdev;
 };
