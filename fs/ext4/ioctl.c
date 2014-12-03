@@ -343,8 +343,7 @@ flags_out:
 		if (!inode_owner_or_capable(inode))
 			return -EPERM;
 
-		if (EXT4_HAS_RO_COMPAT_FEATURE(inode->i_sb,
-				EXT4_FEATURE_RO_COMPAT_METADATA_CSUM)) {
+		if (ext4_has_metadata_csum(inode->i_sb)) {
 			ext4_warning(sb, "Setting inode version is not "
 				     "supported with metadata_csum enabled.");
 			return -ENOTTY;
@@ -544,9 +543,17 @@ group_add_out:
 	}
 
 	case EXT4_IOC_SWAP_BOOT:
+	{
+		int err;
 		if (!(filp->f_mode & FMODE_WRITE))
 			return -EBADF;
-		return swap_inode_boot_loader(sb, inode);
+		err = mnt_want_write_file(filp);
+		if (err)
+			return err;
+		err = swap_inode_boot_loader(sb, inode);
+		mnt_drop_write_file(filp);
+		return err;
+	}
 
 	case EXT4_IOC_RESIZE_FS: {
 		ext4_fsblk_t n_blocks_count;
@@ -592,11 +599,13 @@ resizefs_out:
 		return err;
 	}
 
+	case FIDTRIM:
 	case FITRIM:
 	{
 		struct request_queue *q = bdev_get_queue(sb->s_bdev);
 		struct fstrim_range range;
 		int ret = 0;
+		int flags  = cmd == FIDTRIM ? BLKDEV_DISCARD_SECURE : 0;
 
 		if (!capable(CAP_SYS_ADMIN))
 			return -EPERM;
@@ -604,13 +613,15 @@ resizefs_out:
 		if (!blk_queue_discard(q))
 			return -EOPNOTSUPP;
 
+		if ((flags & BLKDEV_DISCARD_SECURE) && !blk_queue_secdiscard(q))
+			return -EOPNOTSUPP;
 		if (copy_from_user(&range, (struct fstrim_range __user *)arg,
 		    sizeof(range)))
 			return -EFAULT;
 
 		range.minlen = max((unsigned int)range.minlen,
 				   q->limits.discard_granularity);
-		ret = ext4_trim_fs(sb, &range);
+		ret = ext4_trim_fs(sb, &range, flags);
 		if (ret < 0)
 			return ret;
 

@@ -113,6 +113,9 @@ struct frag_hdr {
 #define	IP6_MF		0x0001
 #define	IP6_OFFSET	0xFFF8
 
+#define IP6_REPLY_MARK(net, mark) \
+	((net)->ipv6.sysctl.fwmark_reflect ? (mark) : 0)
+
 #include <net/sock.h>
 
 /* sysctls */
@@ -659,6 +662,8 @@ static inline int ipv6_addr_diff(const struct in6_addr *a1, const struct in6_add
 {
 	return __ipv6_addr_diff(a1, a2, sizeof(struct in6_addr));
 }
+
+void ipv6_proxy_select_ident(struct sk_buff *skb);
 
 int ip6_dst_hoplimit(struct dst_entry *dst);
 
