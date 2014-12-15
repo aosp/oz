@@ -821,7 +821,7 @@
 		gpu: gpu@0x56000000 {
 			compatible = "ti,omap4-gpu";
 			reg = <0x56000000 0xffff>;
-			interrupts = <0 21 0x4>;
+			interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
 			ti,hwmods = "gpu";
 			operating-points = <
 				/* kHz    uV */
