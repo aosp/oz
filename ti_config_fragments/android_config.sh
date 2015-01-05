@@ -6,5 +6,4 @@ ti_config_fragments/connectivity.cfg \
 ti_config_fragments/ipc.cfg \
 ti_config_fragments/audio_display.cfg \
 ti_config_fragments/wlan.cfg \
-ti_config_fragments/system_test.cfg \
 ti_config_fragments/android_omap.cfg
