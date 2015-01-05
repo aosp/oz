@@ -968,6 +968,88 @@
 			status = "disabled";
 		};
 
+		pruss1: pruss@4b200000 {
+			compatible = "ti,am5728-pruss";
+			ti,hwmods = "pruss1";
+			reg = <0x4b200000 0x2000>,
+			      <0x4b202000 0x2000>,
+			      <0x4b210000 0x10000>,
+			      <0x4b220000 0x2000>,
+			      <0x4b226000 0x2000>;
+			reg-names = "dram0", "dram1", "shrdram2", "intc", "cfg";
+			interrupts = <GIC_SPI 186 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 187 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 188 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 189 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 190 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 191 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 192 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 193 IRQ_TYPE_LEVEL_HIGH>;
+			#address-cells = <1>;
+			#size-cells = <1>;
+			ranges;
+			status = "disabled";
+
+			pru1_0: pru@4b234000 {
+				compatible = "ti,pru-rproc";
+				reg = <0x4b234000 0x3000>,
+				      <0x4b222000 0x400>,
+				      <0x4b222400 0x100>;
+				reg-names = "iram", "control", "debug";
+				status = "disabled";
+			};
+
+			pru1_1: pru@4b238000 {
+				compatible = "ti,pru-rproc";
+				reg = <0x4b238000 0x3000>,
+				      <0x4b224000 0x400>,
+				      <0x4b224400 0x100>;
+				reg-names = "iram", "control", "debug";
+				status = "disabled";
+			};
+		};
+
+		pruss2: pruss@4b280000 {
+			compatible = "ti,am5728-pruss";
+			ti,hwmods = "pruss2";
+			reg = <0x4b280000 0x2000>,
+			      <0x4b282000 0x2000>,
+			      <0x4b290000 0x8000>,
+			      <0x4b2a0000 0x2000>,
+			      <0x4b2a6000 0x2000>;
+			reg-names = "dram0", "dram1", "shrdram2", "intc", "cfg";
+			interrupts = <GIC_SPI 196 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 197 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 198 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 199 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 200 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 201 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 202 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 203 IRQ_TYPE_LEVEL_HIGH>;
+			#address-cells = <1>;
+			#size-cells = <1>;
+			ranges;
+			status = "disabled";
+
+			pru2_0: pru@4b2b4000 {
+				compatible = "ti,pru-rproc";
+				reg = <0x4b2b4000 0x3000>,
+				      <0x4b2a2000 0x400>,
+				      <0x4b2a2400 0x100>;
+				reg-names = "iram", "control", "debug";
+				status = "disabled";
+			};
+
+			pru2_1: pru@4b2b8000 {
+				compatible = "ti,pru-rproc";
+				reg = <0x4b2b8000 0x3000>,
+				      <0x4b2a4000 0x400>,
+				      <0x4b2a4400 0x100>;
+				reg-names = "iram", "control", "debug";
+				status = "disabled";
+			};
+		};
+
 		abb_mpu: regulator-abb-mpu {
 			compatible = "ti,abb-v3";
 			regulator-name = "abb_mpu";
@@ -1286,7 +1368,6 @@
 					      "wkupclk", "refclk",
 					      "div-clk", "phy-div";
 				#phy-cells = <0>;
-				id = <1>;
 				ti,hwmods = "pcie1-phy";
 			};
 
@@ -1307,7 +1388,6 @@
 					      "div-clk", "phy-div";
 				#phy-cells = <0>;
 				ti,hwmods = "pcie2-phy";
-				id = <2>;
 				status = "disabled";
 			};
 		};
@@ -1426,7 +1506,12 @@
 			usb1: usb@48890000 {
 				compatible = "snps,dwc3";
 				reg = <0x48890000 0x17000>;
-				interrupts = <GIC_SPI 71 IRQ_TYPE_LEVEL_HIGH>;
+				interrupts = <GIC_SPI 71 IRQ_TYPE_LEVEL_HIGH>,
+					     <GIC_SPI 71 IRQ_TYPE_LEVEL_HIGH>,
+					     <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>;
+				interrupt-names = "peripheral",
+						  "host",
+						  "otg";
 				phys = <&usb2_phy1>, <&usb3_phy1>;
 				phy-names = "usb2-phy", "usb3-phy";
 				tx-fifo-resize;
@@ -1447,7 +1532,12 @@
 			usb2: usb@488d0000 {
 				compatible = "snps,dwc3";
 				reg = <0x488d0000 0x17000>;
-				interrupts = <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
+				interrupts = <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>,
+					     <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>,
+					     <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>;
+				interrupt-names = "peripheral",
+						  "host",
+						  "otg";
 				phys = <&usb2_phy2>;
 				phy-names = "usb2-phy";
 				tx-fifo-resize;
@@ -1470,7 +1560,12 @@
 			usb3: usb@48910000 {
 				compatible = "snps,dwc3";
 				reg = <0x48910000 0x17000>;
-				interrupts = <GIC_SPI 88 IRQ_TYPE_LEVEL_HIGH>;
+				interrupts = <GIC_SPI 88 IRQ_TYPE_LEVEL_HIGH>,
+					     <GIC_SPI 88 IRQ_TYPE_LEVEL_HIGH>,
+					     <GIC_SPI 344 IRQ_TYPE_LEVEL_HIGH>;
+				interrupt-names = "peripheral",
+						  "host",
+						  "otg";
 				tx-fifo-resize;
 				maximum-speed = "high-speed";
 				dr_mode = "otg";
@@ -1490,7 +1585,12 @@
 			usb4: usb@48950000 {
 				compatible = "snps,dwc3";
 				reg = <0x48950000 0x17000>;
-				interrupts = <GIC_SPI 345 IRQ_TYPE_LEVEL_HIGH>;
+				interrupts = <GIC_SPI 345 IRQ_TYPE_LEVEL_HIGH>,
+					     <GIC_SPI 345 IRQ_TYPE_LEVEL_HIGH>,
+					     <GIC_SPI 346 IRQ_TYPE_LEVEL_HIGH>;
+				interrupt-names = "peripheral",
+						  "host",
+						  "otg";
 				tx-fifo-resize;
 				maximum-speed = "high-speed";
 				dr_mode = "otg";
@@ -1712,27 +1812,21 @@
 			clock-names = "fck";
 		};
 
-		dcan1: d_can@481cc000 {
-			compatible = "bosch,d_can";
+		dcan1: can@481cc000 {
+			compatible = "ti,dra7-d_can";
 			ti,hwmods = "dcan1";
-			reg = <0x4ae3c000 0x2000>,
-			      <0x558 0x4>; /* index to RAMINIT reg within syscon */
-			syscon = <&dra7_ctrl_core>;
-			raminit-start-bit = <3>;
-			raminit-done-bit = <1>;
+			reg = <0x4ae3c000 0x2000>;
+			syscon-raminit = <&dra7_ctrl_core 0x558 0>;
 			interrupts = <GIC_SPI 222 IRQ_TYPE_LEVEL_HIGH>;
 			clocks = <&dcan1_sys_clk_mux>;
 			status = "disabled";
 		};
 
-		dcan2: d_can@481d0000 {
-			compatible = "bosch,d_can";
+		dcan2: can@481d0000 {
+			compatible = "ti,dra7-d_can";
 			ti,hwmods = "dcan2";
-			reg = <0x48480000 0x2000>,
-			      <0x558 0x4>; /* index to RAMINIT reg within syscon */
-			syscon = <&dra7_ctrl_core>;
-			raminit-start-bit = <5>;
-			raminit-done-bit = <2>;
+			reg = <0x48480000 0x2000>;
+			syscon-raminit = <&dra7_ctrl_core 0x558 1>;
 			interrupts = <GIC_SPI 225 IRQ_TYPE_LEVEL_HIGH>;
 			clocks = <&sys_clkin1>;
 			status = "disabled";

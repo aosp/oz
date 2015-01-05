@@ -1334,8 +1334,18 @@ static void dispc_init_mflag(void)
 {
 	int i;
 
+	/*
+	 * HACK: NV12 color format and MFLAG seem to have problems working
+	 * together: using two displays, and having an NV12 overlay on one of
+	 * the displays will cause underflows/synclosts when MFLAG_CTRL=2.
+	 * Changing MFLAG thresholds and PRELOAD to certain values seem to
+	 * remove the errors, but there doesn't seem to be a clear logic on
+	 * which values work and which not.
+	 *
+	 * As a work-around, set force MFLAG to always on.
+	 */
 	dispc_write_reg(DISPC_GLOBAL_MFLAG_ATTRIBUTE,
-		(2 << 0) |	/* MFLAG_CTRL = enable */
+		(1 << 0) |	/* MFLAG_CTRL = force always on */
 		(0 << 2));	/* MFLAG_START = disable */
 
 	for (i = 0; i < dss_feat_get_num_ovls(); ++i) {
@@ -2526,7 +2536,7 @@ static int dispc_ovl_setup_common(enum omap_plane plane,
 	unsigned long pclk = dispc_plane_pclk_rate(plane);
 	unsigned long lclk = dispc_plane_lclk_rate(plane);
 
-	if (paddr == 0)
+	if (paddr == 0 && rotation_type != OMAP_DSS_ROT_TILER)
 		return -EINVAL;
 
 	out_width = out_width == 0 ? width : out_width;
@@ -3961,6 +3971,7 @@ static int __init omap_dispchw_probe(struct platform_device *pdev)
 	}
 
 	pm_runtime_enable(&pdev->dev);
+	pm_runtime_irq_safe(&pdev->dev);
 
 	r = dispc_runtime_get();
 	if (r)

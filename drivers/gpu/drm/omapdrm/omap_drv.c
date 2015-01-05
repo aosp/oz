@@ -479,6 +479,7 @@ static int dev_load(struct drm_device *dev, unsigned long flags)
 
 	priv->wq = alloc_ordered_workqueue("omapdrm", 0);
 
+	spin_lock_init(&priv->list_lock);
 	INIT_LIST_HEAD(&priv->obj_list);
 
 	omap_gem_init(dev);
@@ -683,23 +684,6 @@ static struct drm_driver omap_drm_driver = {
 		.patchlevel = DRIVER_PATCHLEVEL,
 };
 
-static int pdev_suspend(struct platform_device *pDevice, pm_message_t state)
-{
-	DBG("");
-	return 0;
-}
-
-static int pdev_resume(struct platform_device *device)
-{
-	DBG("");
-	return 0;
-}
-
-static void pdev_shutdown(struct platform_device *device)
-{
-	DBG("");
-}
-
 static int pdev_probe(struct platform_device *device)
 {
 	int r;
@@ -731,9 +715,28 @@ static int pdev_remove(struct platform_device *device)
 	return 0;
 }
 
+static int omap_drm_suspend(struct device *dev)
+{
+	struct drm_device *drm_dev = dev_get_drvdata(dev);
+
+	drm_kms_helper_poll_disable(drm_dev);
+
+	return 0;
+}
+
+static int omap_drm_resume(struct device *dev)
+{
+	struct drm_device *drm_dev = dev_get_drvdata(dev);
+
+	drm_kms_helper_poll_enable(drm_dev);
+
+	return omap_gem_resume(dev);
+}
+
 #ifdef CONFIG_PM
 static const struct dev_pm_ops omapdrm_pm_ops = {
-	.resume = omap_gem_resume,
+	.suspend = omap_drm_suspend,
+	.resume = omap_drm_resume,
 };
 #endif
 
@@ -747,9 +750,6 @@ static struct platform_driver pdev = {
 		},
 		.probe = pdev_probe,
 		.remove = pdev_remove,
-		.suspend = pdev_suspend,
-		.resume = pdev_resume,
-		.shutdown = pdev_shutdown,
 };
 
 static int __init omap_drm_init(void)

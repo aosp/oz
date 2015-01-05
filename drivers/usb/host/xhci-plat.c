@@ -11,16 +11,29 @@
  * version 2 as published by the Free Software Foundation.
  */
 
-#include <linux/platform_device.h>
-#include <linux/module.h>
-#include <linux/slab.h>
-#include <linux/of.h>
+#include <linux/clk.h>
 #include <linux/dma-mapping.h>
+#include <linux/module.h>
+#include <linux/of.h>
+#include <linux/platform_device.h>
+#include <linux/slab.h>
+#include <linux/usb/otg.h>
+#include <linux/usb/drd.h>
+#include <linux/usb/xhci_pdriver.h>
 
 #include "xhci.h"
+#include "xhci-mvebu.h"
+#include "xhci-rcar.h"
 
 static void xhci_plat_quirks(struct device *dev, struct xhci_hcd *xhci)
 {
+	struct usb_xhci_pdata   *pdata = dev_get_platdata(dev);
+
+	if (pdata->usb_drd_support)
+		xhci->quirks |= XHCI_DRD_SUPPORT;
+
+	if (pdata->usb_needs_lhc_reset)
+		xhci->quirks |= XHCI_NEEDS_LHC_RESET;
 	/*
 	 * As of now platform drivers don't provide MSI support so we ensure
 	 * here that the generic code does not try to make a pci_dev from our
@@ -32,7 +45,28 @@ static void xhci_plat_quirks(struct device *dev, struct xhci_hcd *xhci)
 /* called during probe() after chip reset completes */
 static int xhci_plat_setup(struct usb_hcd *hcd)
 {
+	struct device_node *of_node = hcd->self.controller->of_node;
+	int ret;
+
+	if (of_device_is_compatible(of_node, "renesas,xhci-r8a7790") ||
+	    of_device_is_compatible(of_node, "renesas,xhci-r8a7791")) {
+		ret = xhci_rcar_init_quirk(hcd);
+		if (ret)
+			return ret;
+	}
+
 	return xhci_gen_setup(hcd, xhci_plat_quirks);
+}
+
+static int xhci_plat_start(struct usb_hcd *hcd)
+{
+	struct device_node *of_node = hcd->self.controller->of_node;
+
+	if (of_device_is_compatible(of_node, "renesas,xhci-r8a7790") ||
+	    of_device_is_compatible(of_node, "renesas,xhci-r8a7791"))
+		xhci_rcar_start(hcd);
+
+	return xhci_run(hcd);
 }
 
 static const struct hc_driver xhci_plat_xhci_driver = {
@@ -50,7 +84,7 @@ static const struct hc_driver xhci_plat_xhci_driver = {
 	 * basic lifecycle operations
 	 */
 	.reset =		xhci_plat_setup,
-	.start =		xhci_run,
+	.start =		xhci_plat_start,
 	.stop =			xhci_stop,
 	.shutdown =		xhci_shutdown,
 
@@ -83,14 +117,21 @@ static const struct hc_driver xhci_plat_xhci_driver = {
 	.hub_status_data =	xhci_hub_status_data,
 	.bus_suspend =		xhci_bus_suspend,
 	.bus_resume =		xhci_bus_resume,
+
+	.enable_usb3_lpm_timeout =	xhci_enable_usb3_lpm_timeout,
+	.disable_usb3_lpm_timeout =	xhci_disable_usb3_lpm_timeout,
 };
 
 static int xhci_plat_probe(struct platform_device *pdev)
 {
+	struct device_node	*node = pdev->dev.of_node;
+	struct usb_xhci_pdata	*pdata = dev_get_platdata(&pdev->dev);
 	const struct hc_driver	*driver;
 	struct xhci_hcd		*xhci;
 	struct resource         *res;
 	struct usb_hcd		*hcd;
+	struct clk              *clk;
+	struct usb_drd_host	*drd_host;
 	int			ret;
 	int			irq;
 
@@ -106,6 +147,15 @@ static int xhci_plat_probe(struct platform_device *pdev)
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (!res)
 		return -ENODEV;
+
+	if (of_device_is_compatible(pdev->dev.of_node,
+				    "marvell,armada-375-xhci") ||
+	    of_device_is_compatible(pdev->dev.of_node,
+				    "marvell,armada-380-xhci")) {
+		ret = xhci_mvebu_mbus_init_quirk(pdev);
+		if (ret)
+			return ret;
+	}
 
 	/* Initialize dma_mask and coherent_dma_mask to 32-bits */
 	ret = dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32));
@@ -123,28 +173,33 @@ static int xhci_plat_probe(struct platform_device *pdev)
 	hcd->rsrc_start = res->start;
 	hcd->rsrc_len = resource_size(res);
 
-	if (!request_mem_region(hcd->rsrc_start, hcd->rsrc_len,
-				driver->description)) {
-		dev_dbg(&pdev->dev, "controller already in use\n");
-		ret = -EBUSY;
+	hcd->regs = devm_ioremap_resource(&pdev->dev, res);
+	if (IS_ERR(hcd->regs)) {
+		ret = PTR_ERR(hcd->regs);
 		goto put_hcd;
 	}
 
-	hcd->regs = ioremap_nocache(hcd->rsrc_start, hcd->rsrc_len);
-	if (!hcd->regs) {
-		dev_dbg(&pdev->dev, "error mapping memory\n");
-		ret = -EFAULT;
-		goto release_mem_region;
+	/*
+	 * Not all platforms have a clk so it is not an error if the
+	 * clock does not exists.
+	 */
+	clk = devm_clk_get(&pdev->dev, NULL);
+	if (!IS_ERR(clk)) {
+		ret = clk_prepare_enable(clk);
+		if (ret)
+			goto put_hcd;
 	}
 
 	ret = usb_add_hcd(hcd, irq, IRQF_SHARED);
 	if (ret)
-		goto unmap_registers;
+		goto disable_clk;
+
 	device_wakeup_enable(hcd->self.controller);
 
 	/* USB 2.0 roothub is stored in the platform_device now. */
 	hcd = platform_get_drvdata(pdev);
 	xhci = hcd_to_xhci(hcd);
+	xhci->clk = clk;
 	xhci->shared_hcd = usb_create_shared_hcd(driver, &pdev->dev,
 			dev_name(&pdev->dev), hcd);
 	if (!xhci->shared_hcd) {
@@ -152,15 +207,32 @@ static int xhci_plat_probe(struct platform_device *pdev)
 		goto dealloc_usb2_hcd;
 	}
 
+	if ((node && of_property_read_bool(node, "usb3-lpm-capable")) ||
+			(pdata && pdata->usb3_lpm_capable))
+		xhci->quirks |= XHCI_LPM_SUPPORT;
 	/*
 	 * Set the xHCI pointer before xhci_plat_setup() (aka hcd_driver.reset)
 	 * is called by usb_add_hcd().
 	 */
 	*((struct xhci_hcd **) xhci->shared_hcd->hcd_priv) = xhci;
 
+	if (HCC_MAX_PSA(xhci->hcc_params) >= 4)
+		xhci->shared_hcd->can_do_streams = 1;
+
 	ret = usb_add_hcd(xhci->shared_hcd, irq, IRQF_SHARED);
 	if (ret)
 		goto put_usb3_hcd;
+
+	drd_host = kzalloc(sizeof(*drd_host), GFP_KERNEL);
+	if (!drd_host)
+		return -ENOMEM;
+
+	drd_host->main_hcd = xhci->main_hcd;
+	drd_host->shared_hcd = xhci->shared_hcd;
+	drd_host->hcd_irq = irq;
+	drd_host->host_setup = NULL;
+
+	usb_drd_register_hcd(pdev->dev.parent, drd_host);
 
 	return 0;
 
@@ -170,11 +242,9 @@ put_usb3_hcd:
 dealloc_usb2_hcd:
 	usb_remove_hcd(hcd);
 
-unmap_registers:
-	iounmap(hcd->regs);
-
-release_mem_region:
-	release_mem_region(hcd->rsrc_start, hcd->rsrc_len);
+disable_clk:
+	if (!IS_ERR(clk))
+		clk_disable_unprepare(clk);
 
 put_hcd:
 	usb_put_hcd(hcd);
@@ -186,26 +256,40 @@ static int xhci_plat_remove(struct platform_device *dev)
 {
 	struct usb_hcd	*hcd = platform_get_drvdata(dev);
 	struct xhci_hcd	*xhci = hcd_to_xhci(hcd);
+	struct clk *clk = xhci->clk;
 
 	usb_remove_hcd(xhci->shared_hcd);
 	usb_put_hcd(xhci->shared_hcd);
 
 	usb_remove_hcd(hcd);
-	iounmap(hcd->regs);
-	release_mem_region(hcd->rsrc_start, hcd->rsrc_len);
+	if (!IS_ERR(clk))
+		clk_disable_unprepare(clk);
 	usb_put_hcd(hcd);
+	usb_drd_unregister_hcd(dev->dev.parent);
 	kfree(xhci);
 
 	return 0;
 }
 
-#ifdef CONFIG_PM
+#ifdef CONFIG_PM_SLEEP
 static int xhci_plat_suspend(struct device *dev)
 {
 	struct usb_hcd	*hcd = dev_get_drvdata(dev);
 	struct xhci_hcd	*xhci = hcd_to_xhci(hcd);
 
-	return xhci_suspend(xhci);
+	/*
+	 * xhci_suspend() needs `do_wakeup` to know whether host is allowed
+	 * to do wakeup during suspend. Since xhci_plat_suspend is currently
+	 * only designed for system suspend, device_may_wakeup() is enough
+	 * to dertermine whether host is allowed to do wakeup. Need to
+	 * reconsider this when xhci_plat_suspend enlarges its scope, e.g.,
+	 * also applies to runtime suspend.
+	 */
+
+	if (usb_drd_get_state(dev->parent) & DRD_HOST_ACTIVE)
+		return xhci_suspend(xhci, device_may_wakeup(dev));
+
+	return 0;
 }
 
 static int xhci_plat_resume(struct device *dev)
@@ -213,7 +297,10 @@ static int xhci_plat_resume(struct device *dev)
 	struct usb_hcd	*hcd = dev_get_drvdata(dev);
 	struct xhci_hcd	*xhci = hcd_to_xhci(hcd);
 
-	return xhci_resume(xhci, 0);
+	if (usb_drd_get_state(dev->parent) & DRD_HOST_ACTIVE)
+		return xhci_resume(xhci, 0);
+
+	return 0;
 }
 
 static const struct dev_pm_ops xhci_plat_pm_ops = {
@@ -226,7 +313,12 @@ static const struct dev_pm_ops xhci_plat_pm_ops = {
 
 #ifdef CONFIG_OF
 static const struct of_device_id usb_xhci_of_match[] = {
+	{ .compatible = "generic-xhci" },
 	{ .compatible = "xhci-platform" },
+	{ .compatible = "marvell,armada-375-xhci"},
+	{ .compatible = "marvell,armada-380-xhci"},
+	{ .compatible = "renesas,xhci-r8a7790"},
+	{ .compatible = "renesas,xhci-r8a7791"},
 	{ },
 };
 MODULE_DEVICE_TABLE(of, usb_xhci_of_match);

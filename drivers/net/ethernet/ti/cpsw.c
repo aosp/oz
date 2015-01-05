@@ -641,11 +641,15 @@ static void cpsw_ndo_set_rx_mode(struct net_device *ndev)
 	if (ndev->flags & IFF_PROMISC) {
 		/* Enable promiscuous mode */
 		cpsw_set_promiscious(ndev, true);
+		cpsw_ale_set_allmulti(priv->ale, IFF_ALLMULTI);
 		return;
 	} else {
 		/* Disable promiscuous mode */
 		cpsw_set_promiscious(ndev, false);
 	}
+
+	/* Restore allmulti on vlans if necessary */
+	cpsw_ale_set_allmulti(priv->ale, priv->ndev->flags & IFF_ALLMULTI);
 
 	/* Clear all mcast from ALE */
 	cpsw_ale_flush_multicast(priv->ale, ALE_ALL_PORTS << priv->host_port);
@@ -916,7 +920,7 @@ static void _cpsw_adjust_link(struct cpsw_slave *slave,
 		/* disable forwarding */
 		cpsw_ale_control_set(priv->ale, slave_port,
 				     ALE_PORT_STATE,
-				     priv->port_state[slave_port]);
+				     ALE_PORT_STATE_DISABLE);
 	}
 
 	if (mac_control != slave->mac_control) {
@@ -1268,6 +1272,7 @@ static inline void cpsw_add_default_vlan(struct cpsw_priv *priv)
 	const int port = priv->host_port;
 	u32 reg;
 	int i;
+	int unreg_mcast_mask;
 
 	reg = (priv->version == CPSW_VERSION_1) ? CPSW1_PORT_VLAN :
 	       CPSW2_PORT_VLAN;
@@ -1277,9 +1282,14 @@ static inline void cpsw_add_default_vlan(struct cpsw_priv *priv)
 	for (i = 0; i < priv->data.slaves; i++)
 		slave_write(priv->slaves + i, vlan, reg);
 
+	if (priv->ndev->flags & IFF_ALLMULTI)
+		unreg_mcast_mask = ALE_ALL_PORTS;
+	else
+		unreg_mcast_mask = ALE_PORT_1 | ALE_PORT_2;
+
 	cpsw_ale_add_vlan(priv->ale, vlan, ALE_ALL_PORTS << port,
 			  ALE_ALL_PORTS << port, ALE_ALL_PORTS << port,
-			  (ALE_PORT_1 | ALE_PORT_2) << port);
+			  unreg_mcast_mask << port);
 }
 
 static void cpsw_init_host_port(struct cpsw_priv *priv)
@@ -1833,6 +1843,109 @@ static int cpsw_switch_config_ioctl(struct net_device *ndev,
 			ret = -EINVAL;
 		}
 		break;
+	case CONFIG_SWITCH_GET_PORT_VLAN_CONFIG:
+	{
+		u32 __iomem *port_vlan_reg;
+		u32 port_vlan;
+
+		switch (config.port) {
+		case 0:
+			port_vlan_reg = &priv->host_port_regs->port_vlan;
+			port_vlan = readl(port_vlan_reg);
+			break;
+		case 1:
+		case 2:
+		{
+			int slave = config.port - 1;
+			if (priv->version == CPSW_VERSION_1) {
+				port_vlan = slave_read(priv->slaves + slave,
+						       CPSW1_PORT_VLAN);
+			} else {
+				port_vlan = slave_read(priv->slaves + slave,
+						       CPSW2_PORT_VLAN);
+			}
+			break;
+		}
+		default:
+			dev_err(priv->dev, "Invalid Arguments\n");
+			ret = -EINVAL;
+			break;
+		}
+
+		if (!ret) {
+			config.vid = port_vlan & 0xfff;
+			config.vlan_cfi = port_vlan & BIT(12) ? true : false;
+			config.prio = (port_vlan >> 13) & 0x7;
+			ret = copy_to_user(ifrq->ifr_data, &config,
+					   sizeof(config));
+		}
+		break;
+	}
+	case CONFIG_SWITCH_SET_PORT_VLAN_CONFIG:
+	{
+		void __iomem *port_vlan_reg;
+		u32 port_vlan;
+
+		port_vlan = config.vid;
+		port_vlan |= config.vlan_cfi ? BIT(12) : 0;
+		port_vlan |= (config.prio & 0x7) << 13;
+
+		switch (config.port) {
+		case 0:
+			port_vlan_reg = &priv->host_port_regs->port_vlan;
+			writel(port_vlan, port_vlan_reg);
+			break;
+		case 1:
+		case 2:
+		{
+			int slave = config.port - 1;
+			if (priv->version == CPSW_VERSION_1) {
+				slave_write(priv->slaves + slave, port_vlan,
+					    CPSW1_PORT_VLAN);
+			} else {
+				slave_write(priv->slaves + slave, port_vlan,
+					    CPSW2_PORT_VLAN);
+			}
+			break;
+		}
+		default:
+			dev_err(priv->dev, "Invalid Arguments\n");
+			ret = -EINVAL;
+			break;
+		}
+
+		break;
+	}
+	case CONFIG_SWITCH_RATELIMIT:
+	{
+		if (config.port > 2) {
+			dev_err(priv->dev, "Invalid Arguments\n");
+			ret = -EINVAL;
+			break;
+		}
+
+		ret = cpsw_ale_control_set(priv->ale, 0, ALE_RATE_LIMIT_TX,
+					   !!config.direction);
+		if (ret) {
+			dev_err(priv->dev, "CPSW_ALE control set failed");
+			break;
+		}
+
+		ret = cpsw_ale_control_set(priv->ale, config.port,
+					   ALE_PORT_BCAST_LIMIT,
+					   config.bcast_rate_limit);
+		if (ret) {
+			dev_err(priv->dev, "CPSW_ALE control set failed");
+			break;
+		}
+
+		ret = cpsw_ale_control_set(priv->ale, config.port,
+					   ALE_PORT_MCAST_LIMIT,
+					   config.mcast_rate_limit);
+		if (ret)
+			dev_err(priv->dev, "CPSW_ALE control set failed");
+		break;
+	}
 
 	default:
 		ret = -EOPNOTSUPP;
@@ -1933,11 +2046,17 @@ static inline int cpsw_add_vlan_ale_entry(struct cpsw_priv *priv,
 				unsigned short vid)
 {
 	int ret;
+	int unreg_mcast_mask;
+
+	if (priv->ndev->flags & IFF_ALLMULTI)
+		unreg_mcast_mask = ALE_ALL_PORTS;
+	else
+		unreg_mcast_mask = ALE_PORT_1 | ALE_PORT_2;
 
 	ret = cpsw_ale_add_vlan(priv->ale, vid,
 				ALE_ALL_PORTS << priv->host_port,
 				0, ALE_ALL_PORTS << priv->host_port,
-				(ALE_PORT_1 | ALE_PORT_2) << priv->host_port);
+				unreg_mcast_mask << priv->host_port);
 	if (ret != 0)
 		return ret;
 
@@ -2646,6 +2765,15 @@ clean_ndev_ret:
 	return ret;
 }
 
+static int cpsw_remove_child_device(struct device *dev, void *c)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+
+	of_device_unregister(pdev);
+
+	return 0;
+}
+
 static int cpsw_remove(struct platform_device *pdev)
 {
 	struct net_device *ndev = platform_get_drvdata(pdev);
@@ -2660,6 +2788,7 @@ static int cpsw_remove(struct platform_device *pdev)
 	cpdma_chan_destroy(priv->rxch);
 	cpdma_ctlr_destroy(priv->dma);
 	pm_runtime_disable(&pdev->dev);
+	device_for_each_child(&pdev->dev, NULL, cpsw_remove_child_device);
 	if (priv->data.dual_emac)
 		free_netdev(cpsw_get_slave_ndev(priv, 1));
 	free_netdev(ndev);

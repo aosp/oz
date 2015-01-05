@@ -355,7 +355,7 @@
 		>;
 	};
 
-	dss_pins: dss_pins {
+	dss_pinctrl_default: dss_pinctrl_default {
 		pinctrl-single,pins = <
 			0x020 (PIN_OUTPUT_PULLUP | MUX_MODE1) /*gpmc ad 8 -> DSS DATA 23 */
 			0x024 (PIN_OUTPUT_PULLUP | MUX_MODE1)
@@ -386,6 +386,39 @@
 			0x0e8 (PIN_OUTPUT_PULLUP | MUX_MODE0) /* DSS PCLK */
 			0x0ec (PIN_OUTPUT_PULLUP | MUX_MODE0) /* DSS AC BIAS EN */
 
+		>;
+	};
+
+	dss_pinctrl_sleep: dss_pinctrl_sleep {
+		pinctrl-single,pins = <
+			0x020 (DS0_PULL_UP_DOWN_EN | PIN_INPUT_PULLDOWN | MUX_MODE7)
+			0x024 (DS0_PULL_UP_DOWN_EN | PIN_INPUT_PULLDOWN | MUX_MODE7)
+			0x028 (DS0_PULL_UP_DOWN_EN | PIN_INPUT_PULLDOWN | MUX_MODE7)
+			0x02C (DS0_PULL_UP_DOWN_EN | PIN_INPUT_PULLDOWN | MUX_MODE7)
+			0x030 (DS0_PULL_UP_DOWN_EN | PIN_INPUT_PULLDOWN | MUX_MODE7)
+			0x034 (DS0_PULL_UP_DOWN_EN | PIN_INPUT_PULLDOWN | MUX_MODE7)
+			0x038 (DS0_PULL_UP_DOWN_EN | PIN_INPUT_PULLDOWN | MUX_MODE7)
+			0x03C (DS0_PULL_UP_DOWN_EN | PIN_INPUT_PULLDOWN | MUX_MODE7)
+			0x0A0 (DS0_PULL_UP_DOWN_EN | INPUT_EN | PULL_DISABLE | MUX_MODE7)
+			0x0A4 (DS0_PULL_UP_DOWN_EN | INPUT_EN | PULL_DISABLE | MUX_MODE7)
+			0x0A8 (DS0_PULL_UP_DOWN_EN | INPUT_EN | PULL_DISABLE | MUX_MODE7)
+			0x0AC (DS0_PULL_UP_DOWN_EN | INPUT_EN | PULL_DISABLE | MUX_MODE7)
+			0x0B0 (DS0_PULL_UP_DOWN_EN | INPUT_EN | PULL_DISABLE | MUX_MODE7)
+			0x0B4 (DS0_PULL_UP_DOWN_EN | INPUT_EN | PULL_DISABLE | MUX_MODE7)
+			0x0B8 (DS0_PULL_UP_DOWN_EN | INPUT_EN | PULL_DISABLE | MUX_MODE7)
+			0x0BC (DS0_PULL_UP_DOWN_EN | PIN_INPUT_PULLDOWN | MUX_MODE7)
+			0x0C0 (DS0_PULL_UP_DOWN_EN | PIN_INPUT_PULLDOWN | MUX_MODE7)
+			0x0C4 (DS0_PULL_UP_DOWN_EN | INPUT_EN | PULL_DISABLE | MUX_MODE7)
+			0x0C8 (DS0_PULL_UP_DOWN_EN | PIN_INPUT_PULLDOWN | MUX_MODE7)
+			0x0CC (DS0_PULL_UP_DOWN_EN | PIN_INPUT_PULLDOWN | MUX_MODE7)
+			0x0D0 (DS0_PULL_UP_DOWN_EN | INPUT_EN | PULL_DISABLE | MUX_MODE7)
+			0x0D4 (DS0_PULL_UP_DOWN_EN | INPUT_EN | PULL_DISABLE | MUX_MODE7)
+			0x0D8 (DS0_PULL_UP_DOWN_EN | INPUT_EN | PULL_DISABLE | MUX_MODE7)
+			0x0DC (DS0_PULL_UP_DOWN_EN | PIN_INPUT_PULLDOWN | MUX_MODE7)
+			0x0E0 (DS0_PULL_UP_DOWN_EN | PIN_INPUT_PULLDOWN | MUX_MODE7)
+			0x0E4 (DS0_PULL_UP_DOWN_EN | PIN_INPUT_PULLDOWN | MUX_MODE7)
+			0x0E8 (DS0_PULL_UP_DOWN_EN | PIN_INPUT_PULLDOWN | MUX_MODE7)
+			0x0EC (DS0_PULL_UP_DOWN_EN | PIN_INPUT_PULLDOWN | MUX_MODE7)
 		>;
 	};
 
@@ -450,24 +483,10 @@
 		>;
 	};
 
-	dcan0_sleep: dcan0_sleep_pins {
-		pinctrl-single,pins = <
-			0x178 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-			0x17c (PIN_INPUT_PULLDOWN | MUX_MODE7)
-		>;
-	};
-
 	dcan1_default: dcan1_default_pins {
 		pinctrl-single,pins = <
 			0x180 (PIN_OUTPUT_PULLDOWN | MUX_MODE2) /* uart1_rxd.d_can1_tx */
 			0x184 (PIN_INPUT_PULLUP | MUX_MODE2) /* uart1_txd.d_can1_rx */
-		>;
-	};
-
-	dcan1_sleep: dcan1_sleep_pins {
-		pinctrl-single,pins = <
-			0x180 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-			0x184 (PIN_INPUT_PULLDOWN | MUX_MODE7)
 		>;
 	};
 
@@ -639,6 +658,12 @@
 
 	unused_pins: unused_pins {
 		pinctrl-single,pins = <
+			0x54	(PIN_INPUT_PULLDOWN | MUX_MODE7)
+			0x58	(PIN_INPUT_PULLDOWN | MUX_MODE7)
+			0x60	(PIN_INPUT_PULLDOWN | MUX_MODE7)
+			0x64	(PIN_INPUT_PULLDOWN | MUX_MODE7)
+			0x68	(PIN_INPUT_PULLDOWN | MUX_MODE7)
+			0x6C	(PIN_INPUT_PULLDOWN | MUX_MODE7)
 			0x150	(PIN_INPUT_PULLDOWN | MUX_MODE7)
 			0x154	(PIN_INPUT_PULLDOWN | MUX_MODE0)
 			0x190	(PIN_INPUT_PULLDOWN | MUX_MODE7)
@@ -876,8 +901,8 @@
 	status = "okay";
 	/* these are on the crossbar and are outlined in the
 	   xbar-event-map element */
-	dmas = <&edma 32
-		&edma 33>;
+	dmas = <&edma 30
+		&edma 31>;
 	dma-names = "tx", "rx";
 	vmmc-supply = <&vmmcwl_fixed>;
 	bus-width = <4>;
@@ -899,8 +924,8 @@
 };
 
 &edma {
-	ti,edma-xbar-event-map = /bits/ 16 <1 32
-				  	    2 33>;
+	ti,edma-xbar-event-map = /bits/ 16 <1 30
+				  	    2 31>;
 };
 
 &uart3 {
@@ -909,23 +934,30 @@
 	pinctrl-0 = <&uart3_pins>;
 };
 
-&usb2_phy1 {
-	status = "okay";
+&dwc3_1 {
 	pinctrl-names = "default", "sleep";
 	pinctrl-0 = <&usb2_phy1_default>;
 	pinctrl-1 = <&usb2_phy1_sleep>;
+
+};
+
+&usb2_phy1 {
+	status = "okay";
 };
 
 &usb1 {
-	dr_mode = "peripheral";
+	dr_mode = "otg";
 	status = "okay";
+};
+
+&dwc3_2 {
+	pinctrl-names = "default", "sleep";
+	pinctrl-0 = <&usb2_phy2_default>;
+	pinctrl-1 = <&usb2_phy2_sleep>;
 };
 
 &usb2_phy2 {
 	status = "okay";
-	pinctrl-names = "default", "sleep";
-	pinctrl-0 = <&usb2_phy2_default>;
-	pinctrl-1 = <&usb2_phy2_sleep>;
 };
 
 &usb2 {
@@ -1049,8 +1081,9 @@
 &dss {
 	status = "ok";
 
-	pinctrl-names = "default";
-	pinctrl-0 = <&dss_pins>;
+	pinctrl-names = "default", "sleep";
+	pinctrl-0 = <&dss_pinctrl_default>;
+	pinctrl-1 = <&dss_pinctrl_sleep>;
 
 	port {
 		dpi_out: endpoint@0 {
@@ -1061,16 +1094,14 @@
 };
 
 &dcan0 {
-	pinctrl-names = "default", "sleep";
+	pinctrl-names = "default";
 	pinctrl-0 = <&dcan0_default>;
-	pinctrl-1 = <&dcan0_sleep>;
 	status = "okay";
 };
 
 &dcan1 {
-	pinctrl-names = "default", "sleep";
+	pinctrl-names = "default";
 	pinctrl-0 = <&dcan1_default>;
-	pinctrl-1 = <&dcan1_sleep>;
 	status = "okay";
 };
 

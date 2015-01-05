@@ -110,6 +110,15 @@
 		cable-name = "USB-HOST";
 	};
 
+	evm_3v3_sd: fixedregulator-sd {
+		compatible = "regulator-fixed";
+		regulator-name = "evm_3v3_sd";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		enable-active-high;
+		gpio = <&pcf_gpio_21 5 0>;
+	};
+
 	evm_3v3: fixedregulator-evm_3v3 {
 		compatible = "regulator-fixed";
 		regulator-name = "evm_3v3";
@@ -349,6 +358,20 @@
 			0xb8 (PIN_OUTPUT | MUX_MODE1)	/* gpmc_cs2.qspi1_cs0 */
 		>;
 	};
+
+	dcan1_pins_default: dcan1_pins_default {
+		pinctrl-single,pins = <
+			0x3d0   (PIN_OUTPUT | MUX_MODE0)	/* dcan1_tx */
+			0x418   (PULL_DIS | MUX_MODE1)		/* wakeup0.dcan1_rx */
+		>;
+	};
+
+	dcan1_pins_sleep: dcan1_pins_sleep {
+		pinctrl-single,pins = <
+			0x3d0   (MUX_MODE15)	/* dcan1_tx.off */
+			0x418   (MUX_MODE15)	/* wakeup0.off */
+		>;
+	};
 };
 
 &i2c1 {
@@ -388,7 +411,7 @@
 					/* VDD_CORE */
 					regulator-name = "smps2";
 					regulator-min-microvolt = <850000>;
-					regulator-max-microvolt = <1030000>;
+					regulator-max-microvolt = <1060000>;
 					regulator-boot-on;
 					regulator-always-on;
 				};
@@ -548,13 +571,21 @@
 &mmc1 {
 	/* Using default configured pins */
 	status = "okay";
-	vmmc-supply = <&ldo1_reg>;
+	pbias-supply = <&pbias_mmc_reg>;
+	vmmc-supply = <&evm_3v3_sd>;
+	vmmc_aux-supply = <&ldo1_reg>;
 	bus-width = <4>;
 	/*
 	 * SDCD signal is not being used here - using the fact that GPIO mode
 	 * is always hardwired.
 	 */
 	cd-gpios = <&gpio6 27 0>;
+	sd-uhs-sdr104;
+	sd-uhs-sdr50;
+	sd-uhs-ddr50;
+	sd-uhs-sdr25;
+	sd-uhs-sdr12;
+	max-frequency = <192000000>;
 };
 
 &mmc2 {
@@ -563,6 +594,8 @@
 	vmmc-supply = <&evm_3v3>;
 	bus-width = <8>;
 	ti,non-removable;
+	mmc-hs200-1_8v;
+	max-frequency = <192000000>;
 };
 
 &mac {
@@ -816,7 +849,7 @@
 };
 
 &usb1 {
-	dr_mode = "peripheral";
+	dr_mode = "otg";
 	pinctrl-names = "default";
 	pinctrl-0 = <&usb1_pins>;
 };
@@ -890,4 +923,11 @@
 			reg = <0x009e0000 0x01620000>;
 		};
 	};
+};
+
+&dcan1 {
+	status = "ok";
+	pinctrl-names = "default", "sleep";
+	pinctrl-0 = <&dcan1_pins_default>;
+	pinctrl-1 = <&dcan1_pins_sleep>;
 };

@@ -66,6 +66,11 @@
 		cache-level = <2>;
 	};
 
+	am43xx_control_module: control_module@4a002000 {
+		compatible = "syscon";
+		reg = <0x44e10000 0x7f4>;
+	};
+
 	am43xx_pinmux: pinmux@44e10800 {
 		compatible = "ti,am437-padconf", "pinctrl-single";
 		reg = <0x44e10800 0x31c>;
@@ -188,6 +193,7 @@
 			ti,mbox-num-fifos = <8>;
 
 			mbox_wkupm3: wkup_m3 {
+				ti,mbox-send-noirq;
 				ti,mbox-tx = <0 0 0>;
 				ti,mbox-rx = <0 0 3>;
 			};
@@ -933,8 +939,13 @@
 
 			usb1: usb@48390000 {
 				compatible = "synopsys,dwc3";
-				reg = <0x48390000 0x10000>;
-				interrupts = <GIC_SPI 168 IRQ_TYPE_LEVEL_HIGH>;
+				reg = <0x48390000 0x17000>;
+				interrupts = <GIC_SPI 168 IRQ_TYPE_LEVEL_HIGH>,
+					     <GIC_SPI 168 IRQ_TYPE_LEVEL_HIGH>,
+					     <GIC_SPI 172 IRQ_TYPE_LEVEL_HIGH>;
+				interrupt-names = "peripheral",
+						  "host",
+						  "otg";
 				phys = <&usb2_phy1>;
 				phy-names = "usb2-phy";
 				maximum-speed = "high-speed";
@@ -955,8 +966,13 @@
 
 			usb2: usb@483d0000 {
 				compatible = "synopsys,dwc3";
-				reg = <0x483d0000 0x10000>;
-				interrupts = <GIC_SPI 174 IRQ_TYPE_LEVEL_HIGH>;
+				reg = <0x483d0000 0x17000>;
+				interrupts = <GIC_SPI 174 IRQ_TYPE_LEVEL_HIGH>,
+					     <GIC_SPI 174 IRQ_TYPE_LEVEL_HIGH>,
+					     <GIC_SPI 178 IRQ_TYPE_LEVEL_HIGH>;
+				interrupt-names = "peripheral",
+						  "host",
+						  "otg";
 				phys = <&usb2_phy2>;
 				phy-names = "usb2-phy";
 				maximum-speed = "high-speed";
@@ -1020,23 +1036,23 @@
 		};
 
 		dcan0: can@481cc000 {
-			compatible = "bosch,d_can";
+			compatible = "ti,am4372-d_can", "ti,am3352-d_can";
 			ti,hwmods = "d_can0";
 			clocks = <&dcan0_fck>;
 			clock-names = "fck";
-			reg = <0x481cc000 0x2000
-				0x44e10644 0x4>;
+			reg = <0x481cc000 0x2000>;
+			syscon-raminit = <&am43xx_control_module 0x644 0>;
 			interrupts = <GIC_SPI 52 IRQ_TYPE_LEVEL_HIGH>;
 			status = "disabled";
 		};
 
 		dcan1: can@481d0000 {
-			compatible = "bosch,d_can";
+			compatible = "ti,am4372-d_can", "ti,am3352-d_can";
 			ti,hwmods = "d_can1";
 			clocks = <&dcan1_fck>;
 			clock-names = "fck";
-			reg = <0x481d0000 0x2000
-				0x44e10644 0x4>;
+			reg = <0x481d0000 0x2000>;
+			syscon-raminit = <&am43xx_control_module 0x644 1>;
 			interrupts = <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>;
 			status = "disabled";
 		};
