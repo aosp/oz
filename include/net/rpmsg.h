@@ -33,6 +33,7 @@ enum {
 	RPMSG_OPEN,
 	RPMSG_LISTENING,
 	RPMSG_CLOSED,
+	RPMSG_ERROR,
 };
 
 struct sockaddr_rpmsg {
@@ -51,6 +52,8 @@ struct sockaddr_rpmsg {
 struct rpmsg_socket {
 	struct sock sk;
 	struct rpmsg_channel *rpdev;
+	int rproc_id;
+	struct list_head elem;
 	bool unregister_rpdev;
 };
 

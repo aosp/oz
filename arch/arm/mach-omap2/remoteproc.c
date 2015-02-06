@@ -98,8 +98,8 @@ static void dra7_ctrl_write_dsp2_boot_addr(u32 bootaddr);
 static struct omap_rproc_timers_info omap4_ipu_timers[] = {
 	{ .name = "timer3", .id = 3, },
 #ifdef CONFIG_OMAP_REMOTEPROC_WATCHDOG
-	{ .name = "timer4", .id = 4, .is_wdt = 1, },
 	{ .name = "timer9", .id = 9, .is_wdt = 1, },
+	{ .name = "timer11", .id = 11, .is_wdt = 1, },
 #endif
 };
 
