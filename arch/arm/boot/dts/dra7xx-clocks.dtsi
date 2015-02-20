@@ -448,7 +448,7 @@ mpu_dpll_hs_clk_div: mpu_dpll_hs_clk_div {
 
 dpll_mpu_ck: dpll_mpu_ck@4a005160 {
 	#clock-cells = <0>;
-	compatible = "ti,omap4-dpll-clock";
+	compatible = "ti,omap5-mpu-dpll-clock";
 	clocks = <&sys_clkin1>, <&mpu_dpll_hs_clk_div>;
 	reg = <0x4a005160 0x4>, <0x4a005164 0x4>, <0x4a005168 0x4>, <0x4a00516c 0x4>;
 	reg-names = "control", "idlest", "autoidle", "mult-div1";
